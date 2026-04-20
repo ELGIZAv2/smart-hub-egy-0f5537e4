@@ -276,13 +276,7 @@ const DeepResearchPage = () => {
 
   const hasResults = sessions.length > 0;
 
-  // Click-anywhere closes plus menu
-  useEffect(() => {
-    if (!plusOpen) return;
-    const close = () => setPlusOpen(false);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [plusOpen]);
+  // plus menu close handled inside LiquidWorkspaceInput
 
   return (
     <AppLayout>
@@ -442,6 +436,7 @@ const DeepResearchPage = () => {
           canSend={Boolean(input.trim())}
           plusOpen={plusOpen}
           onPlusToggle={() => setPlusOpen((v) => !v)}
+          onPlusClose={() => setPlusOpen(false)}
           attachments={attachedFiles}
           onRemoveAttachment={(index) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
           textareaRef={textareaRef}

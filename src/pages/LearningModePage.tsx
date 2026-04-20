@@ -273,6 +273,7 @@ const LearningModePage = () => {
           canSend={Boolean(input.trim() || attachedFiles.length > 0)}
           plusOpen={plusOpen}
           onPlusToggle={() => setPlusOpen((v) => !v)}
+          onPlusClose={() => setPlusOpen(false)}
           attachments={attachedFiles}
           onRemoveAttachment={(index) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
           textareaRef={textareaRef}
