@@ -721,19 +721,15 @@ Ask me anything to get started!`;
             { ref: cameraInputRef, icon: Camera, label: "Camera" },
             { ref: imageInputRef, icon: Image, label: "Photos" },
             { ref: fileInputRef, icon: FileUp, label: "Files" },
-          ].map(({ ref, icon: Icon, label }, i) => (
-            <motion.button
+          ].map(({ ref, icon: Icon, label }) => (
+            <button
               key={label}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...iosSpring, delay: i * 0.03 }}
-              whileTap={{ scale: 0.9 }}
               onClick={() => { ref.current?.click(); setPlusMenuOpen(false); }}
-              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl liquid-glass-hover transition-colors ios-menu-item"
+              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl liquid-glass-hover transition-colors ios-menu-item active:scale-95"
             >
               <Icon className="w-5 h-5 text-muted-foreground" />
               <span className="text-[11px] text-foreground/80">{label}</span>
-            </motion.button>
+            </button>
           ))}
         </div>
         <div className="border-t border-border/15 pt-2 space-y-1">
@@ -781,19 +777,15 @@ Ask me anything to get started!`;
                   { path: "/tools/exam-simulator", icon: ClipboardList, label: "Exam Simulator" },
                   { path: "/tools/study-planner", icon: CalendarDays, label: "Study Planner" },
                   { path: "/tools/focus-room", icon: Timer, label: "Focus Room" },
-                ].map(({ path, icon: Icon, label }, i) => (
-                  <motion.button
+                ].map(({ path, icon: Icon, label }) => (
+                  <button
                     key={path}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...iosSpring, delay: i * 0.03 }}
-                    whileTap={{ scale: 0.94 }}
                     onClick={() => { navigate(path); setPlusMenuOpen(false); }}
-                    className="flex items-center gap-2 px-2.5 py-2.5 rounded-xl liquid-glass-hover transition-colors ios-menu-item"
+                    className="flex items-center gap-2 px-2.5 py-2.5 rounded-xl liquid-glass-hover transition-colors ios-menu-item active:scale-95"
                   >
                     <Icon className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span className="text-[11px] text-foreground/85 leading-tight">{label}</span>
-                  </motion.button>
+                  </button>
                 ))}
               </div>
             </div>
