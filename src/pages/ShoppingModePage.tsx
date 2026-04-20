@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Menu, X, ShoppingCart, Star, Sparkles } from "lucide-react";
+import { Menu, Plus, X, ShoppingCart, ArrowUp, Square, Image as ImageIcon, FileUp, Camera, Star, MoreHorizontal, Download, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AppSidebar from "@/components/AppSidebar";
@@ -10,7 +10,6 @@ import ChatMessage from "@/components/ChatMessage";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import LiquidWorkspaceInput from "@/components/LiquidWorkspaceInput";
 
 interface Product {
   title: string;
@@ -44,12 +43,15 @@ const ShoppingModePage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; data: string }[]>([]);
   const [livePreview, setLivePreview] = useState<Product[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const liveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,6 +84,14 @@ const ShoppingModePage = () => {
     return () => { if (liveDebounce.current) clearTimeout(liveDebounce.current); };
   }, [input, hasResults]);
 
+  // Close plus menu on any outside click
+  useEffect(() => {
+    if (!plusOpen) return;
+    const close = () => setPlusOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [plusOpen]);
+
   const handleFile = useCallback((files: FileList | null, kind: "image" | "file") => {
     if (!files) return;
     Array.from(files).forEach((f) => {
@@ -92,6 +102,7 @@ const ShoppingModePage = () => {
       };
       reader.readAsDataURL(f);
     });
+    setPlusOpen(false);
   }, []);
 
   const send = useCallback(async () => {
@@ -116,15 +127,7 @@ const ShoppingModePage = () => {
     const apiMessages = [
       { role: "assistant" as const, content: SHOPPING_PROMPT },
       ...messages.map((m) => ({ role: m.role, content: m.content })),
-      {
-        role: "user" as const,
-        content: attachedFiles.filter(f => f.type === "image").length > 0
-          ? [
-              { type: "text", text: sentInput || "Analyze these shopping files" },
-              ...attachedFiles.filter(f => f.type === "image").map(f => ({ type: "image_url", image_url: { url: f.data } })),
-            ]
-          : sentInput,
-      },
+      { role: "user" as const, content: sentInput },
     ];
 
     let buf = "";
@@ -170,7 +173,7 @@ const ShoppingModePage = () => {
       },
       onError: (e) => { toast.error(e); setIsLoading(false); },
     });
-  }, [input, attachedFiles, isLoading, messages, userId, conversationId]);
+  }, [input, attachedFiles, isLoading, messages, userId]);
 
   const stop = () => { abortRef.current?.abort(); setIsLoading(false); };
 
@@ -205,7 +208,16 @@ const ShoppingModePage = () => {
     <AppLayout>
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={() => navigate("/")} currentMode="shopping" />
 
-      <div className="ios26-page-shell relative h-full w-full overflow-y-auto overflow-x-hidden bg-background">
+      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "file")} />
+      <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
+
+      <div className="relative h-full w-full overflow-y-auto overflow-x-hidden bg-background">
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-amber-500/20 blur-[120px] animate-pulse" />
+          <div className="absolute top-1/3 -right-40 h-[600px] w-[600px] rounded-full bg-orange-500/15 blur-[140px] animate-pulse" style={{ animationDelay: "1s" }} />
+          <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-rose-400/10 blur-[100px] animate-pulse" style={{ animationDelay: "2s" }} />
+        </div>
 
         {/* Floating sidebar btn */}
         <button
@@ -218,35 +230,23 @@ const ShoppingModePage = () => {
         {!hasResults ? (
           <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-5 py-24 text-center">
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl"
+              transition={{ duration: 0.7, delay: 0.1 }}
+              className="font-display text-[10vw] uppercase leading-[0.95] tracking-tight md:text-[5rem]"
             >
-              Shop smarter.
+              FIND <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">ANYTHING.</span>
+              <br />SHOP SMART.
             </motion.h1>
 
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mt-8 flex flex-wrap items-center justify-center gap-2"
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="mt-5 max-w-md text-sm text-muted-foreground md:text-base"
             >
-              {[
-                "iPhone 17 Pro",
-                "AirPods Pro 3",
-                "PlayStation 5",
-                "Dyson V15",
-              ].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setInput(item)}
-                  className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground/80 hover:bg-foreground/5"
-                >
-                  {item}
-                </button>
-              ))}
-            </motion.div>
+              Search across stores, compare prices, get the best deals — instantly.
+            </motion.p>
 
             {/* Live preview as user types */}
             {livePreview.length > 0 && (
@@ -270,40 +270,113 @@ const ShoppingModePage = () => {
                     ))}
                   </div>
                 )}
+                {m.content && <ChatMessage role={m.role} content={m.content} />}
                 {m.products && m.products.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     {m.products.map((p, j) => <ProductCard key={j} p={p} />)}
                   </div>
                 )}
-                {m.content && <ChatMessage role={m.role} content={m.content} />}
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
         )}
 
-        {isLoading && !hasResults && (
-          <div className="pointer-events-none fixed inset-x-0 bottom-40 z-20 flex justify-center">
-            <div className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground/75">
-              <Sparkles className="h-4 w-4 animate-pulse" />
-              Finding the best results
+        {/* Input bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-4 pt-2 pointer-events-none">
+          <div className="mx-auto max-w-3xl pointer-events-auto">
+            {attachedFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2 px-2">
+                {attachedFiles.map((f, i) => (
+                  <div key={i} className="group relative">
+                    {f.type === "image" ? (
+                      <img src={f.data} alt={f.name} className="h-16 w-16 rounded-xl object-cover" />
+                    ) : (
+                      <div className="flex h-16 items-center gap-2 rounded-xl bg-background/50 px-3 backdrop-blur-xl">
+                        <FileUp className="h-4 w-4 text-amber-400" />
+                        <span className="max-w-[120px] truncate text-xs">{f.name}</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setAttachedFiles((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="relative rounded-[28px] border border-white/10 bg-background/50 p-2 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
+              <div className="flex items-end gap-2">
+                <div className="relative">
+                  <button
+                    onClick={() => setPlusOpen((v) => !v)}
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
+                  >
+                    <Plus className="h-5 w-5 text-foreground" />
+                  </button>
+
+                  <AnimatePresence>
+                    {plusOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, y: 12, scale: 0.92 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 12, scale: 0.92 }}
+                          className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
+                        >
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { ref: cameraInputRef, icon: Camera, label: "Camera" },
+                              { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
+                              { ref: fileInputRef, icon: FileUp, label: "Files" },
+                            ].map(({ ref, icon: Icon, label }, i) => (
+                              <button
+                                key={label}
+                                onClick={() => { ref.current?.click(); setPlusOpen(false); }}
+                                className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 transition"
+                              >
+                                <Icon className="w-5 h-5 text-amber-400" />
+                                <span className="text-[11px] text-foreground/80">{label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  placeholder="What are you shopping for?"
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent px-2 py-3 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/60"
+                  style={{ maxHeight: "140px" }}
+                />
+
+                {isLoading ? (
+                  <button onClick={stop} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+                    <Square className="h-4 w-4 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={send}
+                    disabled={!input.trim() && attachedFiles.length === 0}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg transition hover:scale-105 disabled:opacity-40"
+                  >
+                    <ArrowUp className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        )}
-
-        <LiquidWorkspaceInput
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          onStop={stop}
-          isLoading={isLoading}
-          placeholder="Search any product"
-          canSend={Boolean(input.trim() || attachedFiles.length > 0)}
-          hidePlus
-          attachments={attachedFiles}
-          onRemoveAttachment={(index) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
-          textareaRef={textareaRef}
-        />
+        </div>
       </div>
     </AppLayout>
   );

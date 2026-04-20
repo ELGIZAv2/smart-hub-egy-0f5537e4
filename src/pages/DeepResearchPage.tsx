@@ -11,7 +11,6 @@ import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
-import LiquidWorkspaceInput from "@/components/LiquidWorkspaceInput";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -84,7 +83,6 @@ const DeepResearchPage = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -276,7 +274,13 @@ const DeepResearchPage = () => {
 
   const hasResults = sessions.length > 0;
 
-  // plus menu close handled inside LiquidWorkspaceInput
+  // Click-anywhere closes plus menu
+  useEffect(() => {
+    if (!plusOpen) return;
+    const close = () => setPlusOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [plusOpen]);
 
   return (
     <AppLayout>
@@ -286,7 +290,12 @@ const DeepResearchPage = () => {
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
 
-      <div className="ios26-page-shell relative h-full w-full overflow-y-auto overflow-x-hidden bg-background">
+      <div className="relative h-full w-full overflow-y-auto overflow-x-hidden bg-background">
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-violet-500/20 blur-[120px] animate-pulse" />
+          <div className="absolute top-1/3 -right-40 h-[600px] w-[600px] rounded-full bg-indigo-500/15 blur-[140px] animate-pulse" style={{ animationDelay: "1s" }} />
+          <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-blue-400/10 blur-[100px] animate-pulse" style={{ animationDelay: "2s" }} />
+        </div>
 
         <button
           onClick={() => setSidebarOpen(true)}
@@ -296,14 +305,22 @@ const DeepResearchPage = () => {
         </button>
 
         {!hasResults ? (
-          <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-6 py-24 text-center">
+          <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-5 py-24 text-center">
             <motion.h1
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl"
+              initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1 }}
+              className="font-display text-[10vw] uppercase leading-[0.95] tracking-tight md:text-[5rem]"
             >
-              Deep research.
+              RESEARCH <span className="bg-gradient-to-r from-violet-400 to-indigo-500 bg-clip-text text-transparent">DEEP.</span>
+              <br />KNOW MORE.
             </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="mt-5 max-w-md text-sm text-muted-foreground md:text-base"
+            >
+              Watch your AI agent search, analyze, compare, and write — live in front of you.
+            </motion.p>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-2xl px-4 pb-48 pt-20 space-y-8">
@@ -313,8 +330,8 @@ const DeepResearchPage = () => {
               return (
                 <div key={s.id} className="space-y-4">
                   {/* User query as plain text right-aligned */}
-                    <div className="flex justify-end">
-                      <div className="max-w-[85%] rounded-[1.75rem] ios26-surface-card px-4 py-2.5 text-sm font-semibold text-foreground">
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] rounded-3xl bg-foreground/5 px-4 py-2.5 text-sm text-foreground">
                       {s.query}
                     </div>
                   </div>
@@ -326,11 +343,11 @@ const DeepResearchPage = () => {
                       const isExpanded = s.expandedStep === step.id;
                       return (
                         <div key={step.id}>
-                           <button
+                          <button
                             onClick={() => toggleStep(idx, step.id)}
                             className="w-full flex items-center gap-2.5 py-1.5 text-left hover:opacity-80 transition"
                           >
-                             <div className={`shrink-0 ${isStepActive ? "text-primary" : "text-foreground/55"}`}>
+                            <div className={`shrink-0 ${isStepActive ? "text-violet-400" : "text-emerald-400/80"}`}>
                               <Sparkles className={`h-4 w-4 ${isStepActive ? "animate-pulse" : ""}`} />
                             </div>
                             <span className={`flex-1 text-sm font-bold truncate ${isStepActive ? "text-foreground" : "text-foreground/85"}`}>
@@ -357,8 +374,8 @@ const DeepResearchPage = () => {
                     })}
                     {isActive && s.steps.length === 0 && (
                       <div className="flex items-center gap-2.5 py-1.5">
-                        <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-                        <span className="text-sm font-bold text-foreground">Starting research…</span>
+                        <Sparkles className="h-4 w-4 text-violet-400 animate-pulse" />
+                        <span className="text-sm font-bold text-foreground">جاري بدء البحث…</span>
                       </div>
                     )}
                   </div>
@@ -378,14 +395,14 @@ const DeepResearchPage = () => {
 
                   {/* Report card — clean, no icons except subtle FileText, three-dot menu */}
                   {s.report && (
-                    <div className="ios26-surface-card relative overflow-hidden rounded-[2rem]">
+                    <div className="relative rounded-3xl border border-foreground/10 bg-background/60 backdrop-blur-xl overflow-hidden">
                       <button
                         onClick={() => openPreview(s)}
                         className="block w-full p-4 text-left transition hover:bg-foreground/[0.03]"
                       >
                         <div className="flex items-start gap-3">
-                          <div className="ios26-circle-button flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-                            <FileText className="h-5 w-5 text-foreground/70" />
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
+                            <FileText className="h-5 w-5 text-blue-400" />
                           </div>
                           <div className="flex-1 min-w-0 pr-8">
                             <h3 className="text-sm font-semibold text-foreground truncate">{s.query}</h3>
@@ -408,7 +425,7 @@ const DeepResearchPage = () => {
                             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </DropdownMenuTrigger>
-                         <DropdownMenuContent align="end" className="ios26-plus-sheet rounded-2xl">
+                        <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-2xl border-foreground/10 rounded-2xl">
                           <DropdownMenuItem onClick={() => downloadReport(s)} className="rounded-xl">
                             <Download className="mr-2 h-4 w-4" /> Download as PDF
                           </DropdownMenuItem>
@@ -426,41 +443,75 @@ const DeepResearchPage = () => {
           </div>
         )}
 
-        <LiquidWorkspaceInput
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          onStop={stop}
-          isLoading={isLoading}
-          placeholder="Research any topic in depth"
-          canSend={Boolean(input.trim())}
-          plusOpen={plusOpen}
-          onPlusToggle={() => setPlusOpen((v) => !v)}
-          onPlusClose={() => setPlusOpen(false)}
-          attachments={attachedFiles}
-          onRemoveAttachment={(index) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
-          textareaRef={textareaRef}
-          plusMenu={plusOpen ? (
-            <div className="ios26-plus-sheet w-full p-3">
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { ref: cameraInputRef, icon: Camera, label: "Camera" },
-                  { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
-                  { ref: fileInputRef, icon: FileUp, label: "Files" },
-                ].map(({ ref, icon: Icon, label }) => (
+        {/* Input bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-4 pt-2 pointer-events-none">
+          <div className="mx-auto max-w-3xl pointer-events-auto">
+            <div className="relative rounded-[28px] border border-white/10 bg-background/50 p-2 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
+              <div className="flex items-end gap-2">
+                <div className="relative">
                   <button
-                    key={label}
-                    onClick={() => { ref.current?.click(); setPlusOpen(false); }}
-                    className="ios26-plus-tile"
+                    onClick={(e) => { e.stopPropagation(); setPlusOpen((v) => !v); }}
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
                   >
-                    <Icon className="h-6 w-6" strokeWidth={1.6} />
-                    <span>{label}</span>
+                    <Plus className="h-5 w-5 text-foreground" />
                   </button>
-                ))}
+                  <AnimatePresence>
+                    {plusOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 12, scale: 0.92 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 12, scale: 0.92 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
+                      >
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { ref: cameraInputRef, icon: Camera, label: "Camera" },
+                            { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
+                            { ref: fileInputRef, icon: FileUp, label: "Files" },
+                          ].map(({ ref, icon: Icon, label }) => (
+                            <button
+                              key={label}
+                              onClick={() => { ref.current?.click(); setPlusOpen(false); }}
+                              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 transition"
+                            >
+                              <Icon className="w-5 h-5 text-violet-400" />
+                              <span className="text-[11px] text-foreground/80">{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  placeholder="What do you want to research?"
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent px-2 py-3 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/60"
+                  style={{ maxHeight: "140px" }}
+                />
+
+                {isLoading ? (
+                  <button onClick={stop} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+                    <Square className="h-4 w-4 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={send}
+                    disabled={!input.trim()}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg transition hover:scale-105 disabled:opacity-40"
+                  >
+                    <ArrowUp className="h-5 w-5" />
+                  </button>
+                )}
               </div>
             </div>
-          ) : null}
-        />
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

@@ -11,7 +11,6 @@ import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import ChatMessage from "@/components/ChatMessage";
 import ThinkingLoader from "@/components/ThinkingLoader";
-import LiquidWorkspaceInput from "@/components/LiquidWorkspaceInput";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
 
@@ -181,7 +180,13 @@ const LearningModePage = () => {
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
 
-      <div ref={scrollAreaRef} className="ios26-page-shell relative h-full w-full overflow-y-auto overflow-x-hidden bg-background">
+      <div ref={scrollAreaRef} className="relative h-full w-full overflow-y-auto overflow-x-hidden bg-background">
+        {/* Animated background */}
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-emerald-500/20 blur-[120px] animate-pulse" />
+          <div className="absolute top-1/3 -right-40 h-[600px] w-[600px] rounded-full bg-violet-500/15 blur-[140px] animate-pulse" style={{ animationDelay: "1s" }} />
+          <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-amber-400/10 blur-[100px] animate-pulse" style={{ animationDelay: "2s" }} />
+        </div>
 
         {/* Floating sidebar button (no header) */}
         <button
@@ -193,15 +198,25 @@ const LearningModePage = () => {
 
         {/* Empty state hero */}
         {messages.length === 0 ? (
-          <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-6 py-24 text-center">
+          <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-5 py-24 text-center">
             <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1 }}
+              className="font-display text-[10vw] uppercase leading-[0.95] tracking-tight text-foreground md:text-[5rem]"
+            >
+              LEARN <span className="bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">ANYTHING.</span>
+              <br />FAST.
+            </motion.h1>
+
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl"
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="mt-5 max-w-md text-sm text-muted-foreground md:text-base"
             >
-              Learn with clarity.
-            </motion.h1>
+              Your personal tutor that breaks down the hardest concepts — ask, upload a book, or start a study plan.
+            </motion.p>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-3xl px-4 pb-48 pt-20">
@@ -263,41 +278,110 @@ const LearningModePage = () => {
           </button>
         </div>
 
-        <LiquidWorkspaceInput
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          onStop={stop}
-          isLoading={isLoading}
-          placeholder="Ask anything you want to understand"
-          canSend={Boolean(input.trim() || attachedFiles.length > 0)}
-          plusOpen={plusOpen}
-          onPlusToggle={() => setPlusOpen((v) => !v)}
-          onPlusClose={() => setPlusOpen(false)}
-          attachments={attachedFiles}
-          onRemoveAttachment={(index) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
-          textareaRef={textareaRef}
-          plusMenu={plusOpen ? (
-            <div className="ios26-plus-sheet w-full p-3">
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { ref: cameraInputRef, icon: Camera, label: "Camera" },
-                  { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
-                  { ref: fileInputRef, icon: FileUp, label: "Files" },
-                ].map(({ ref, icon: Icon, label }) => (
-                  <button
-                    key={label}
-                    onClick={() => { ref.current?.click(); setPlusOpen(false); }}
-                    className="ios26-plus-tile"
-                  >
-                    <Icon className="h-6 w-6" strokeWidth={1.6} />
-                    <span>{label}</span>
-                  </button>
+        {/* Input bar — same style as ChatPage */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-4 pt-2 pointer-events-none">
+          <div className="mx-auto max-w-3xl pointer-events-auto">
+            {attachedFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2 px-2">
+                {attachedFiles.map((f, i) => (
+                  <div key={i} className="group relative">
+                    {f.type === "image" ? (
+                      <img src={f.data} alt={f.name} className="h-16 w-16 rounded-xl border border-white/10 object-cover" />
+                    ) : (
+                      <div className="flex h-16 items-center gap-2 rounded-xl border border-white/10 bg-background/50 px-3 backdrop-blur-xl">
+                        <FileUp className="h-4 w-4 text-emerald-400" />
+                        <span className="max-w-[120px] truncate text-xs">{f.name}</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setAttachedFiles((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
+            )}
+
+            <div className="relative rounded-[28px] border border-white/10 bg-background/50 p-2 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.1)]">
+              <div className="flex items-end gap-2">
+                <div className="relative">
+                  <button
+                    onClick={() => setPlusOpen((v) => !v)}
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
+                  >
+                    <Plus className="h-5 w-5 text-foreground" />
+                  </button>
+
+                  <AnimatePresence>
+                    {plusOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, y: 12, scale: 0.92 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 12, scale: 0.92 }}
+                          transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                          className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
+                        >
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { ref: cameraInputRef, icon: Camera, label: "Camera" },
+                              { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
+                              { ref: fileInputRef, icon: FileUp, label: "Files" },
+                            ].map(({ ref, icon: Icon, label }, i) => (
+                              <motion.button
+                                key={label}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.03 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => { ref.current?.click(); setPlusOpen(false); }}
+                                className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 transition"
+                              >
+                                <Icon className="w-5 h-5 text-emerald-400" />
+                                <span className="text-[11px] text-foreground/80">{label}</span>
+                              </motion.button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  placeholder="Ask anything you want to learn..."
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent px-2 py-3 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/60"
+                  style={{ maxHeight: "140px" }}
+                />
+
+                {isLoading ? (
+                  <button
+                    onClick={stop}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition hover:scale-105"
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={send}
+                    disabled={!input.trim() && attachedFiles.length === 0}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-lg transition hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+                  >
+                    <ArrowUp className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
             </div>
-          ) : null}
-        />
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

@@ -265,7 +265,7 @@ const AnimatedInput = ({ value, onChange, onSend, onCancel, onPlusClick, disable
           />
         )}
       </AnimatePresence>
-      <div className="ios26-input-shell overflow-hidden">
+      <div className="rounded-2xl liquid-glass overflow-hidden">
         <AnimatePresence>
           {hasQuestions && currentQuestion && (
             <motion.div
@@ -325,10 +325,10 @@ const AnimatedInput = ({ value, onChange, onSend, onCancel, onPlusClick, disable
           )}
         </AnimatePresence>
 
-        <div className="relative z-[1] flex items-end gap-2 px-3.5 py-3">
+        <div className="relative flex items-end gap-2 px-3 py-3">
           <button
             onClick={onPlusClick}
-            className="ios26-circle-button shrink-0 w-11 h-11 flex items-center justify-center text-foreground/80 transition-colors"
+            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full border-0 bg-transparent shadow-none text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Open attachments"
           >
             <Plus className="w-5 h-5" />
@@ -343,7 +343,7 @@ const AnimatedInput = ({ value, onChange, onSend, onCancel, onPlusClick, disable
                 onKeyDown={handleKeyDown}
                 placeholder={displayedPlaceholder || " "}
                 rows={1}
-                className="flex-1 w-full min-w-0 bg-transparent border-none outline-none resize-none text-[0.95rem] font-medium text-foreground placeholder:text-foreground/45 py-2 px-1"
+                className="flex-1 w-full min-w-0 bg-transparent border-none outline-none resize-none text-[0.95rem] text-foreground placeholder:text-muted-foreground/50 py-2 px-1"
                 style={{ minHeight: "44px" }}
               />
             </div>
@@ -352,7 +352,7 @@ const AnimatedInput = ({ value, onChange, onSend, onCancel, onPlusClick, disable
           {isLoading ? (
             <button
               onClick={onCancel}
-              className="ios26-send-button shrink-0 w-11 h-11 flex items-center justify-center hover:opacity-90 transition-all animate-pulse-slow"
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-all animate-pulse-slow"
               aria-label="Stop generation"
             >
               <Square className="w-3.5 h-3.5" />
@@ -361,7 +361,7 @@ const AnimatedInput = ({ value, onChange, onSend, onCancel, onPlusClick, disable
             <button
               onClick={onSend}
               disabled={!value.trim() || disabled}
-                className="ios26-send-button shrink-0 w-11 h-11 flex items-center justify-center transition-transform duration-200 hover:scale-[1.03] disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-foreground hover:bg-muted-foreground/10 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
               aria-label="Send message"
             >
               <ArrowUp className="w-4 h-4" />
