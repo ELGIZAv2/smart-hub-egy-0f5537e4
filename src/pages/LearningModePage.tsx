@@ -199,24 +199,14 @@ const LearningModePage = () => {
         {/* Empty state hero */}
         {messages.length === 0 ? (
           <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-5 py-24 text-center">
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
+            <motion.h2
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-              className="font-display text-[10vw] uppercase leading-[0.95] tracking-tight text-foreground md:text-[5rem]"
+              transition={{ duration: 0.5 }}
+              className="font-display text-2xl md:text-3xl font-bold text-foreground"
             >
-              LEARN <span className="bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">ANYTHING.</span>
-              <br />FAST.
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="mt-5 max-w-md text-sm text-muted-foreground md:text-base"
-            >
-              Your personal tutor that breaks down the hardest concepts — ask, upload a book, or start a study plan.
-            </motion.p>
+              Learn Anything
+            </motion.h2>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-3xl px-4 pb-48 pt-20">
@@ -308,47 +298,41 @@ const LearningModePage = () => {
               <div className="flex items-end gap-2">
                 <div className="relative">
                   <button
-                    onClick={() => setPlusOpen((v) => !v)}
+                    onClick={(e) => { e.stopPropagation(); setPlusOpen((v) => !v); }}
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
                   >
                     <Plus className="h-5 w-5 text-foreground" />
                   </button>
 
-                  <AnimatePresence>
-                    {plusOpen && (
-                      <>
-                        <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} />
-                        <motion.div
-                          initial={{ opacity: 0, y: 12, scale: 0.92 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 12, scale: 0.92 }}
-                          transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                          className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
-                        >
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              { ref: cameraInputRef, icon: Camera, label: "Camera" },
-                              { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
-                              { ref: fileInputRef, icon: FileUp, label: "Files" },
-                            ].map(({ ref, icon: Icon, label }, i) => (
-                              <motion.button
-                                key={label}
-                                initial={{ opacity: 0, y: 6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.03 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => { ref.current?.click(); setPlusOpen(false); }}
-                                className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 transition"
-                              >
-                                <Icon className="w-5 h-5 text-emerald-400" />
-                                <span className="text-[11px] text-foreground/80">{label}</span>
-                              </motion.button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
+                  {plusOpen && (
+                    <>
+                      <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { ref: cameraInputRef, icon: Camera, label: "Camera" },
+                            { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
+                            { ref: fileInputRef, icon: FileUp, label: "Files" },
+                          ].map(({ ref, icon: Icon, label }) => (
+                            <button
+                              key={label}
+                              onClick={() => { ref.current?.click(); setPlusOpen(false); }}
+                              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 active:scale-95 transition"
+                            >
+                              <Icon className="w-5 h-5 text-emerald-400" />
+                              <span className="text-[11px] text-foreground/80">{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
                 </div>
 
                 <textarea
