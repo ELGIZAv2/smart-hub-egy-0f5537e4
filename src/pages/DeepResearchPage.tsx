@@ -274,13 +274,7 @@ const DeepResearchPage = () => {
 
   const hasResults = sessions.length > 0;
 
-  // Click-anywhere closes plus menu
-  useEffect(() => {
-    if (!plusOpen) return;
-    const close = () => setPlusOpen(false);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [plusOpen]);
+  // (outside-click handled via fixed backdrop overlay inside the menu)
 
   return (
     <AppLayout>
@@ -447,12 +441,13 @@ const DeepResearchPage = () => {
                   >
                     <Plus className="h-5 w-5 text-foreground" />
                   </button>
-                  <AnimatePresence>
-                    {plusOpen && (
+                  {plusOpen && (
+                    <>
+                      <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
                       <motion.div
-                        initial={{ opacity: 0, y: 12, scale: 0.92 }}
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 12, scale: 0.92 }}
+                        transition={{ duration: 0.15 }}
                         onClick={(e) => e.stopPropagation()}
                         className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
                       >
@@ -465,7 +460,7 @@ const DeepResearchPage = () => {
                             <button
                               key={label}
                               onClick={() => { ref.current?.click(); setPlusOpen(false); }}
-                              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 transition"
+                              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 active:scale-95 transition"
                             >
                               <Icon className="w-5 h-5 text-violet-400" />
                               <span className="text-[11px] text-foreground/80">{label}</span>
@@ -473,8 +468,8 @@ const DeepResearchPage = () => {
                           ))}
                         </div>
                       </motion.div>
-                    )}
-                  </AnimatePresence>
+                    </>
+                  )}
                 </div>
 
                 <textarea
