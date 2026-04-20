@@ -276,13 +276,7 @@ const DeepResearchPage = () => {
 
   const hasResults = sessions.length > 0;
 
-  // Click-anywhere closes plus menu
-  useEffect(() => {
-    if (!plusOpen) return;
-    const close = () => setPlusOpen(false);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [plusOpen]);
+  // plus menu close handled inside LiquidWorkspaceInput
 
   return (
     <AppLayout>
@@ -442,40 +436,29 @@ const DeepResearchPage = () => {
           canSend={Boolean(input.trim())}
           plusOpen={plusOpen}
           onPlusToggle={() => setPlusOpen((v) => !v)}
+          onPlusClose={() => setPlusOpen(false)}
           attachments={attachedFiles}
           onRemoveAttachment={(index) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
           textareaRef={textareaRef}
           plusMenu={plusOpen ? (
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.96 }}
-              transition={{ type: "spring", damping: 22, stiffness: 350 }}
-              className="ios26-plus-sheet w-full max-w-[20rem] p-3"
-            >
+            <div className="ios26-plus-sheet w-full p-3">
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { ref: cameraInputRef, icon: Camera, label: "Camera" },
                   { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
                   { ref: fileInputRef, icon: FileUp, label: "Files" },
-                ].map(({ ref, icon: Icon, label }, i) => (
-                  <motion.button
+                ].map(({ ref, icon: Icon, label }) => (
+                  <button
                     key={label}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    whileTap={{ scale: 0.94 }}
                     onClick={() => { ref.current?.click(); setPlusOpen(false); }}
-                    className="flex flex-col items-center gap-2 rounded-2xl px-3 py-3 text-foreground/80 hover:bg-foreground/5"
+                    className="ios26-plus-tile"
                   >
-                    <div className="ios26-circle-button flex h-11 w-11 items-center justify-center">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="text-[11px] font-medium">{label}</span>
-                  </motion.button>
+                    <Icon className="h-6 w-6" strokeWidth={1.6} />
+                    <span>{label}</span>
+                  </button>
                 ))}
               </div>
-            </motion.div>
+            </div>
           ) : null}
         />
       </div>
