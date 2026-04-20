@@ -84,13 +84,7 @@ const ShoppingModePage = () => {
     return () => { if (liveDebounce.current) clearTimeout(liveDebounce.current); };
   }, [input, hasResults]);
 
-  // Close plus menu on any outside click
-  useEffect(() => {
-    if (!plusOpen) return;
-    const close = () => setPlusOpen(false);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [plusOpen]);
+  // (outside-click handled via fixed backdrop overlay inside the menu)
 
   const handleFile = useCallback((files: FileList | null, kind: "image" | "file") => {
     if (!files) return;
@@ -302,42 +296,41 @@ const ShoppingModePage = () => {
               <div className="flex items-end gap-2">
                 <div className="relative">
                   <button
-                    onClick={() => setPlusOpen((v) => !v)}
+                    onClick={(e) => { e.stopPropagation(); setPlusOpen((v) => !v); }}
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
                   >
                     <Plus className="h-5 w-5 text-foreground" />
                   </button>
 
-                  <AnimatePresence>
-                    {plusOpen && (
-                      <>
-                        <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} />
-                        <motion.div
-                          initial={{ opacity: 0, y: 12, scale: 0.92 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 12, scale: 0.92 }}
-                          className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
-                        >
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              { ref: cameraInputRef, icon: Camera, label: "Camera" },
-                              { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
-                              { ref: fileInputRef, icon: FileUp, label: "Files" },
-                            ].map(({ ref, icon: Icon, label }, i) => (
-                              <button
-                                key={label}
-                                onClick={() => { ref.current?.click(); setPlusOpen(false); }}
-                                className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 transition"
-                              >
-                                <Icon className="w-5 h-5 text-amber-400" />
-                                <span className="text-[11px] text-foreground/80">{label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
+                  {plusOpen && (
+                    <>
+                      <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { ref: cameraInputRef, icon: Camera, label: "Camera" },
+                            { ref: imageInputRef, icon: ImageIcon, label: "Photos" },
+                            { ref: fileInputRef, icon: FileUp, label: "Files" },
+                          ].map(({ ref, icon: Icon, label }) => (
+                            <button
+                              key={label}
+                              onClick={() => { ref.current?.click(); setPlusOpen(false); }}
+                              className="flex flex-col items-center gap-1.5 py-3 rounded-2xl hover:bg-white/5 active:scale-95 transition"
+                            >
+                              <Icon className="w-5 h-5 text-amber-400" />
+                              <span className="text-[11px] text-foreground/80">{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
                 </div>
 
                 <textarea
