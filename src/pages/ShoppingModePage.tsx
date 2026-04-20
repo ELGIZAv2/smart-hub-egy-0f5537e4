@@ -229,24 +229,14 @@ const ShoppingModePage = () => {
 
         {!hasResults ? (
           <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-5 py-24 text-center">
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
+            <motion.h2
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-              className="font-display text-[10vw] uppercase leading-[0.95] tracking-tight md:text-[5rem]"
+              transition={{ duration: 0.5 }}
+              className="font-display text-2xl md:text-3xl font-bold text-foreground"
             >
-              FIND <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">ANYTHING.</span>
-              <br />SHOP SMART.
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="mt-5 max-w-md text-sm text-muted-foreground md:text-base"
-            >
-              Search across stores, compare prices, get the best deals — instantly.
-            </motion.p>
+              Shop Smart
+            </motion.h2>
 
             {/* Live preview as user types */}
             {livePreview.length > 0 && (

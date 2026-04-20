@@ -306,21 +306,13 @@ const DeepResearchPage = () => {
 
         {!hasResults ? (
           <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-5 py-24 text-center">
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-              className="font-display text-[10vw] uppercase leading-[0.95] tracking-tight md:text-[5rem]"
+            <motion.h2
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="font-display text-2xl md:text-3xl font-bold text-foreground"
             >
-              RESEARCH <span className="bg-gradient-to-r from-violet-400 to-indigo-500 bg-clip-text text-transparent">DEEP.</span>
-              <br />KNOW MORE.
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="mt-5 max-w-md text-sm text-muted-foreground md:text-base"
-            >
-              Watch your AI agent search, analyze, compare, and write — live in front of you.
-            </motion.p>
+              Research Deeply
+            </motion.h2>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-2xl px-4 pb-48 pt-20 space-y-8">

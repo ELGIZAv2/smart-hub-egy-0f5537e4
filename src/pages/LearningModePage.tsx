@@ -199,24 +199,14 @@ const LearningModePage = () => {
         {/* Empty state hero */}
         {messages.length === 0 ? (
           <div className="relative z-10 mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center px-5 py-24 text-center">
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
+            <motion.h2
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-              className="font-display text-[10vw] uppercase leading-[0.95] tracking-tight text-foreground md:text-[5rem]"
+              transition={{ duration: 0.5 }}
+              className="font-display text-2xl md:text-3xl font-bold text-foreground"
             >
-              LEARN <span className="bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">ANYTHING.</span>
-              <br />FAST.
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="mt-5 max-w-md text-sm text-muted-foreground md:text-base"
-            >
-              Your personal tutor that breaks down the hardest concepts — ask, upload a book, or start a study plan.
-            </motion.p>
+              Learn Anything
+            </motion.h2>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-3xl px-4 pb-48 pt-20">
