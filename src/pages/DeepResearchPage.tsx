@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Menu, Plus, X, ArrowUp, Square, Image as ImageIcon, FileUp, Camera,
-  ChevronDown, MoreHorizontal, Download, Share2,
+  ChevronDown, Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,11 +11,8 @@ import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
-import { saveResearch, loadRecentResearch } from "@/lib/researchPersistence";
+import { saveResearch } from "@/lib/researchPersistence";
 import { getModeDescription } from "@/lib/modeDescriptions";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 const ChatThinkingStar = ({ active }: { active: boolean }) => (
   <motion.svg
