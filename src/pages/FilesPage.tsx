@@ -133,6 +133,7 @@ const FilesPage = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<SlideTemplate | null>(null);
   const [slideTemplates, setSlideTemplates] = useState<SlideTemplate[]>([]);
   const [researchSteps, setResearchSteps] = useState<ResearchStep[]>([]);
+  const [slideCount, setSlideCount] = useState<number>(10);
   const [showExport, setShowExport] = useState(false);
   const [exportHtml, setExportHtml] = useState("");
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat");
@@ -764,28 +765,60 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
               <AnimatePresence>
                 {showTemplates && slideTemplates.length > 0 && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={spring} className="max-w-xl mx-auto mb-6 overflow-hidden">
-                    <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider mb-3 text-left px-1">Choose a template</p>
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider">Choose a template</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="font-medium">{slideCount} slides</span>
+                      </div>
+                    </div>
+                    <div className="px-1 mb-4">
+                      <input
+                        type="range"
+                        min={3}
+                        max={60}
+                        step={1}
+                        value={slideCount}
+                        onChange={(e) => setSlideCount(Number(e.target.value))}
+                        className="w-full h-1.5 rounded-full appearance-none bg-foreground/10 accent-primary cursor-pointer"
+                        aria-label="Number of slides"
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground/60 mt-1">
+                        <span>3</span><span>15</span><span>30</span><span>45</span><span>60</span>
+                      </div>
+                    </div>
                     <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none px-1">
-                      {slideTemplates.map(tmpl => (
-                        <motion.button
-                          key={tmpl.id}
-                          whileTap={{ scale: 0.95 }}
-                          whileHover={{ scale: 1.02 }}
-                          transition={spring}
-                          onClick={() => setSelectedTemplate(selectedTemplate?.id === tmpl.id ? null : tmpl)}
-                          className={`shrink-0 w-36 rounded-2xl overflow-hidden transition-all ${
-                            selectedTemplate?.id === tmpl.id ? "ring-2 ring-primary shadow-lg shadow-primary/20 scale-105" : "liquid-glass-subtle"
-                          }`}
-                        >
-                          <div className="aspect-[16/10] bg-secondary/50 flex items-center justify-center">
-                            {tmpl.image_url ? (
-                              <img src={tmpl.image_url} alt="Template" className="w-full h-full object-cover" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                            ) : (
-                              <span className="text-xs text-muted-foreground">{tmpl.template_id.slice(-6)}</span>
+                      {slideTemplates.map(tmpl => {
+                        const isPremium = tmpl.template_engine === "react-native";
+                        const selected = selectedTemplate?.id === tmpl.id;
+                        return (
+                          <motion.button
+                            key={tmpl.id}
+                            whileTap={{ scale: 0.95 }}
+                            whileHover={{ scale: 1.02 }}
+                            transition={spring}
+                            onClick={() => setSelectedTemplate(selected ? null : tmpl)}
+                            className={`shrink-0 w-40 rounded-2xl overflow-hidden transition-all text-left ${
+                              selected ? "ring-2 ring-primary shadow-lg shadow-primary/20 scale-105" : "liquid-glass-subtle"
+                            }`}
+                          >
+                            <div className="aspect-[16/10] bg-secondary/50 flex items-center justify-center relative">
+                              {tmpl.image_url ? (
+                                <img src={tmpl.image_url} alt={tmpl.name || "Template"} className="w-full h-full object-cover" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground/60 font-mono px-2 text-center">{tmpl.name || tmpl.template_id.slice(-8)}</span>
+                              )}
+                              {isPremium && (
+                                <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold uppercase tracking-wider">Premium</span>
+                              )}
+                            </div>
+                            {tmpl.name && (
+                              <div className="px-2.5 py-1.5">
+                                <p className="text-[11px] font-semibold text-foreground truncate">{tmpl.name}</p>
+                              </div>
                             )}
-                          </div>
-                        </motion.button>
-                      ))}
+                          </motion.button>
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}

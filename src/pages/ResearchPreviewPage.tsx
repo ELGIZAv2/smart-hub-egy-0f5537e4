@@ -184,7 +184,17 @@ const ResearchPreviewPage = () => {
             <div className="mt-5 flex items-center gap-3 text-xs text-muted-foreground">
               <div className="h-px w-10 bg-foreground/40" />
               <span>{new Date().toLocaleDateString(isRtl ? "ar-EG" : "en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
+          </div>
+
+          {imagesExpired && (
+            <div className="mb-8 rounded-xl border border-foreground/10 bg-foreground/[0.03] px-4 py-3">
+              <p className="text-xs text-muted-foreground" dir="auto">
+                {isRtl
+                  ? "الصور المرفقة بهذا التقرير انتهت صلاحيتها بعد 10 أيام، لكن النص الكامل محفوظ."
+                  : "Attached images expired after 10 days, but the full report text is preserved."}
+              </p>
             </div>
+          )}
           </div>
 
           {topImages.length > 0 && (
