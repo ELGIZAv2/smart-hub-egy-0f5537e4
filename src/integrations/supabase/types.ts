@@ -2461,6 +2461,7 @@ export type Database = {
         Args: { profile_row: Database["public"]["Tables"]["profiles"]["Row"] }
         Returns: boolean
       }
+      cleanup_old_research_reports: { Args: never; Returns: undefined }
       create_notification: {
         Args: {
           p_message: string
