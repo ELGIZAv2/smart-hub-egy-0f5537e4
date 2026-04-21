@@ -2,7 +2,8 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Download, Pencil } from "lucide-react";
 
 interface FilePreviewPanelProps {
-  html: string;
+  html?: string | null;
+  pdfUrl?: string | null;
   title: string;
   onClose: () => void;
   onEdit: () => void;
@@ -12,11 +13,13 @@ interface FilePreviewPanelProps {
 
 const springTransition = { type: "spring" as const, damping: 22, stiffness: 350 };
 
-const FilePreviewPanel = ({ html, title, onClose, onEdit, onDownload }: FilePreviewPanelProps) => {
-  const responsiveHtml = html.replace(
-    /<head([^>]*)>/i,
-    `<head$1><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw;width:100%}img{max-width:100%;height:auto}table{max-width:100%;display:block;overflow-x:auto}pre{overflow-x:auto;max-width:100%}</style>`
-  );
+const FilePreviewPanel = ({ html, pdfUrl, title, onClose, onEdit, onDownload }: FilePreviewPanelProps) => {
+  const responsiveHtml = html
+    ? html.replace(
+        /<head([^>]*)>/i,
+        `<head$1><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw;width:100%}img{max-width:100%;height:auto}table{max-width:100%;display:block;overflow-x:auto}pre{overflow-x:auto;max-width:100%}</style>`
+      )
+    : null;
 
   return (
     <motion.div
@@ -39,13 +42,25 @@ const FilePreviewPanel = ({ html, title, onClose, onEdit, onDownload }: FilePrev
       </div>
 
       {/* Preview */}
-      <div className="flex-1 min-h-0 mx-2 mb-2 rounded-2xl overflow-hidden border border-border/20">
-        <iframe
-          srcDoc={responsiveHtml}
-          className="w-full h-full bg-white"
-          sandbox="allow-scripts"
-          title="File Preview"
-        />
+      <div className="flex-1 min-h-0 mx-2 mb-2 rounded-2xl overflow-hidden border border-border/20 bg-white">
+        {pdfUrl ? (
+          <iframe
+            src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+            className="w-full h-full"
+            title="PDF Preview"
+          />
+        ) : responsiveHtml ? (
+          <iframe
+            srcDoc={responsiveHtml}
+            className="w-full h-full bg-white"
+            sandbox="allow-scripts"
+            title="File Preview"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+            No preview available
+          </div>
+        )}
       </div>
 
       {/* Floating buttons */}
