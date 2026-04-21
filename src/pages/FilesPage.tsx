@@ -488,6 +488,18 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     const userInput = overrideInput || input;
     if (!userInput.trim() && attachedFiles.length === 0) return;
 
+    // Specialized builders: open Intake → Brief → Build flow.
+    if (
+      agentMode === "work" &&
+      activeAgent &&
+      SPECIALIZED_BUILDERS.includes(activeAgent as FileBuilderType) &&
+      !pendingBuilder
+    ) {
+      setPendingBuilder({ type: activeAgent as FileBuilderType, topic: userInput, extras: {} });
+      setIntakeOpen(true);
+      return;
+    }
+
     const userContent = userInput || `[Attached ${attachedFiles.length} file(s)]`;
     pushMessage({ role: "user", content: userContent });
     setInput("");
