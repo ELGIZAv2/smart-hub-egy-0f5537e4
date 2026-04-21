@@ -158,7 +158,7 @@ const FilesPage = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<SlideTemplate | null>(null);
   const [slideTemplates, setSlideTemplates] = useState<SlideTemplate[]>([]);
   const [researchSteps, setResearchSteps] = useState<ResearchStep[]>([]);
-  const [slideCount, setSlideCount] = useState<number>(10);
+  const [slideCount, setSlideCount] = useState<number>(0); // 0 = AI decides
   const [showExport, setShowExport] = useState(false);
   const [exportHtml, setExportHtml] = useState("");
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat");
