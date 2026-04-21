@@ -21,7 +21,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { fileType, topic, pageCount, extra } = await req.json();
+    const { fileType, topic, pageCount, extra, userLanguage } = await req.json();
     if (!fileType || !topic) {
       return new Response(JSON.stringify({ success: false, error: "fileType and topic are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -38,7 +38,9 @@ serve(async (req) => {
       `Topic: ${topic}`,
       pageCount ? `Requested length: ${pageCount} ${fileType === "slides" ? "slides" : "items"}` : null,
       extra ? `Additional context: ${JSON.stringify(extra)}` : null,
-      `Detect the language from the topic. Mirror it in the brief.`,
+      userLanguage
+        ? `IMPORTANT: Write the entire brief (summary, outline, sections, all text fields) in this language: ${userLanguage}. Do not translate technical names.`
+        : `Detect the language from the topic and mirror it in the brief.`,
     ].filter(Boolean).join("\n");
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

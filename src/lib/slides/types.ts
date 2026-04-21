@@ -14,6 +14,10 @@ export interface Slide {
   stats?: SlideStat[];
   author?: string;
   cta?: string;
+  /** AI-suggested keywords for fetching a Pexels photo. */
+  image_query?: string;
+  /** Resolved photo URL injected by the backend. */
+  image?: string;
 }
 
 export interface SlidePalette {

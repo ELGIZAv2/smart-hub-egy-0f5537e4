@@ -24,6 +24,20 @@ const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg
   "premium-cairo-modern":    { primary: "#0f3057", accent: "#d4af37", bg: "#fffdf7", fg: "#0a1929" },
 };
 
+async function fetchPexelsImage(query: string, apiKey: string): Promise<string | null> {
+  try {
+    const url = new URL("https://api.pexels.com/v1/search");
+    url.searchParams.set("query", query.slice(0, 100));
+    url.searchParams.set("per_page", "1");
+    url.searchParams.set("orientation", "landscape");
+    const r = await fetch(url.toString(), { headers: { Authorization: apiKey } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const photo = d?.photos?.[0];
+    return photo?.src?.large2x || photo?.src?.large || photo?.src?.original || null;
+  } catch { return null; }
+}
+
 async function generateReactSlideDeck(opts: {
   topic: string;
   content: string;
@@ -42,9 +56,9 @@ Schema:
   "subtitle": "short subtitle",
   "language": "ar|en|...",
   "slides": [
-    {"type":"cover","title":"...","subtitle":"...","author":"..."},
-    {"type":"section","title":"section name","kicker":"01"},
-    {"type":"content","title":"slide title","bullets":["...", "..."],"body":"optional paragraph"},
+    {"type":"cover","title":"...","subtitle":"...","author":"...","image_query":"2-4 english keywords for a hero photo"},
+    {"type":"section","title":"section name","kicker":"01","image_query":"keywords"},
+    {"type":"content","title":"slide title","bullets":["...", "..."],"body":"optional paragraph","image_query":"english keywords for an illustrative photo"},
     {"type":"quote","quote":"...","attribution":"..."},
     {"type":"stats","title":"...","stats":[{"label":"...","value":"42%"}]},
     {"type":"closing","title":"Thank You","subtitle":"...","cta":"..."}
@@ -55,7 +69,9 @@ Rules:
 - First slide MUST be type "cover". Last slide MUST be type "closing".
 - Mix types. Use "section" every ~5-6 slides for chapter breaks.
 - Each "content" slide: 3-5 concise bullets (max 10 words each).
-- Detect language from topic and mirror it. ${isCairo ? "Strongly prefer Arabic." : ""}
+- ALWAYS include "image_query" (2-4 ENGLISH keywords) for cover, section, and most content slides. Skip for quote/stats/closing.
+- Detect language from topic and mirror it in title/bullets/body. ${isCairo ? "Strongly prefer Arabic." : ""}
+- "image_query" must ALWAYS be in English regardless of slide language (Pexels searches English best).
 - Be specific, factual, and concise. No filler.`;
 
   const userMsg = `Topic: ${topic}\n${content ? `Reference material:\n${content.slice(0, 4000)}` : ""}`;
@@ -80,6 +96,19 @@ Rules:
   if (!Array.isArray(deck.slides) || deck.slides.length === 0) {
     deck.slides = [{ type: "cover", title: topic }, { type: "closing", title: "Thank You" }];
   }
+
+  // Inject Pexels images in parallel.
+  const pexelsKey = Deno.env.get("PEXELS_API_KEY");
+  if (pexelsKey) {
+    const tasks = deck.slides.map(async (slide: any) => {
+      if (slide?.image_query && !slide.image) {
+        const url = await fetchPexelsImage(slide.image_query, pexelsKey);
+        if (url) slide.image = url;
+      }
+    });
+    await Promise.all(tasks);
+  }
+
   return deck;
 }
 
@@ -95,7 +124,6 @@ serve(async (req) => {
       pages = Math.max(0, Math.min(60, Math.floor(pageCount)));
     }
 
-    // -------- Premium React-native templates: return JSON deck --------
     if (templateId && REACT_TEMPLATES.has(templateId)) {
       const apiKey = Deno.env.get("LOVABLE_API_KEY");
       if (!apiKey) {
