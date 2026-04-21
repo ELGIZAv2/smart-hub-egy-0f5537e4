@@ -182,6 +182,15 @@ function getNextFallbackModel(currentModel: string): string | null {
   return OPENROUTER_FALLBACK_MODELS.find((candidate) => candidate !== currentModel) ?? null;
 }
 
+function normalizeModelForProvider(model: string, provider: "openrouter" | "lemondata"): string {
+  // LemonData expects bare model IDs (e.g. "gemini-2.5-flash-lite"), not "google/gemini-2.5-flash-lite"
+  if (provider === "lemondata") {
+    const slash = model.indexOf("/");
+    return slash === -1 ? model : model.slice(slash + 1);
+  }
+  return model;
+}
+
 // Detect if the task requires a more powerful model
 function detectComplexTask(text: string, hasImages: boolean, isDeepResearch: boolean, isShopping: boolean, mode?: string): boolean {
   if (hasImages) return true;
