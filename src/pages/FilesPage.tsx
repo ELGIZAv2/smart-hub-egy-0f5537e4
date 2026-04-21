@@ -1240,17 +1240,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
           </div>
         )}
 
-        {/* Specialized builder Intake overlay */}
-        <AnimatePresence>
-          {intakeOpen && pendingBuilder && (
-            <IntakeForm
-              fileType={pendingBuilder.type}
-              onSubmit={handleIntakeSubmit}
-              onSkip={handleIntakeSkip}
-              onClose={() => { setIntakeOpen(false); setPendingBuilder(null); }}
-            />
-          )}
-        </AnimatePresence>
+        {/* IntakeForm removed — replaced by in-chat SmartQuestionFlow */}
 
         {/* Premium slide deck preview overlay */}
         <AnimatePresence>
