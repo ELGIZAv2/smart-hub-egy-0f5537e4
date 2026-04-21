@@ -16,7 +16,7 @@ import SlideDeckPreview from "@/components/files/SlideDeckPreview";
 import BriefCard, { type FileBrief } from "@/components/files/BriefCard";
 import IntakeForm from "@/components/files/IntakeForm";
 import { getBuilder, type FileBuilderType } from "@/lib/builders";
-import { AnimatePresence as AP2 } from "framer-motion";
+
 
 const SPECIALIZED_BUILDERS: FileBuilderType[] = [
   "document", "resume", "report", "spreadsheet",
