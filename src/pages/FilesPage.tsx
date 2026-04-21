@@ -547,7 +547,95 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     setIsGenerating(false);
     setStatusText("");
     setResearchSteps([]);
-  }, [input, attachedFiles, activeAgent, conversationId, selectedTemplate, isMobile, agentMode]);
+  }, [input, attachedFiles, activeAgent, conversationId, selectedTemplate, isMobile, agentMode, pendingBuilder]);
+
+  // ---- Specialized builder flow: Intake -> Brief -> Build ----
+  const handleIntakeSubmit = async (topic: string, extras: Record<string, string>) => {
+    if (!pendingBuilder) return;
+    setIntakeOpen(false);
+    setInput("");
+    pushMessage({ role: "user", content: topic });
+    const convId = await getOrCreateConversation(topic);
+    if (convId) await saveMsg(convId, "user", topic);
+
+    setIsGenerating(true);
+    setStatusText("Drafting brief...");
+    try {
+      const { data } = await supabase.functions.invoke("generate-file-brief", {
+        body: { fileType: pendingBuilder.type, topic, extra: extras },
+      });
+      const brief: FileBrief = data?.brief ?? { summary: topic };
+      setPendingBuilder({ ...pendingBuilder, topic, extras });
+      pushMessage({
+        role: "assistant",
+        content: brief.summary || `Here's the plan for your ${pendingBuilder.type}.`,
+        brief,
+        briefForType: pendingBuilder.type,
+        briefTopic: topic,
+      });
+    } catch {
+      // On brief failure, build directly.
+      await runBuilder(pendingBuilder.type, topic, undefined, convId);
+    }
+    setIsGenerating(false);
+    setStatusText("");
+  };
+
+  const handleIntakeSkip = async () => {
+    if (!pendingBuilder) return;
+    setIntakeOpen(false);
+    const topic = pendingBuilder.topic || input || "Untitled";
+    setInput("");
+    pushMessage({ role: "user", content: topic });
+    const convId = await getOrCreateConversation(topic);
+    if (convId) await saveMsg(convId, "user", topic);
+    await runBuilder(pendingBuilder.type, topic, undefined, convId);
+    setPendingBuilder(null);
+  };
+
+  const runBuilder = async (
+    type: FileBuilderType,
+    topic: string,
+    brief: FileBrief | undefined,
+    convId: string | null
+  ) => {
+    const builder = getBuilder(type);
+    if (!builder) return;
+    setIsGenerating(true);
+    setResearchSteps([{ id: "build", label: `Building your ${type}...`, status: "active" }]);
+    try {
+      const result = await builder(topic, brief);
+      pushMessage({
+        role: "assistant",
+        content: result.summary,
+        htmlContent: result.previewHtml,
+        downloadUrl: result.downloadUrl,
+      });
+      if (convId) {
+        await saveMsg(convId, "assistant", result.summary, {
+          htmlContent: result.previewHtml,
+          downloadUrl: result.downloadUrl,
+        });
+      }
+      if (result.previewHtml) {
+        setPreviewHtml(result.previewHtml);
+        if (!isMobile) setActiveTab("preview");
+      }
+    } catch (e) {
+      console.error("builder failed:", e);
+      pushMessage({ role: "assistant", content: "Generation failed. Please try again." });
+    }
+    setIsGenerating(false);
+    setResearchSteps([]);
+  };
+
+  const handleBriefConfirm = async (msgIdx: number, editedBrief: FileBrief) => {
+    const msg = messages[msgIdx];
+    if (!msg?.briefForType || !msg.briefTopic) return;
+    setMessages(prev => prev.map((m, i) => i === msgIdx ? { ...m, briefConsumed: true } : m));
+    await runBuilder(msg.briefForType, msg.briefTopic, editedBrief, conversationId);
+    setPendingBuilder(null);
+  };
 
   const newChat = () => {
     setMessages([]); setInput(""); setPreviewHtml(null); setAttachedFiles([]);
