@@ -142,6 +142,7 @@ const ResearchPreviewPage = () => {
 
   const topImages = data.images.slice(0, 3);
   const restImages = data.images.slice(3);
+  const imagesExpired = data.images.length === 0 && !reportEmpty;
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
