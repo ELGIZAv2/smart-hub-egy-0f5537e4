@@ -1,113 +1,79 @@
 
 
-## خطة شاملة: قوالب سلايدس فاخرة + Builders ذكية + محادثة تفاعلية
+## خطة الإصلاح الشامل: محتوى عميق + صور Pexels حقيقية + بريفيو PDF + منع تكرار الأسئلة
 
-### 1) إصلاحات السلايدس الفورية
+### المشاكل الفعلية المكتشفة
 
-**المشاكل الحالية في 5 قوالب React**: نصوص بـ`text-2xl/3xl` (صغيرة على 1920×1080)، لا توجد صور، لا توجد thumbnails، شريط القوالب بسيط.
+1. **محتوى السلايدس فارغ**: `generate-slides` يستخدم `gemini-2.5-flash` بدون آلية بحث عميق، النموذج يكتب bullets قصيرة بدلاً من فقرات غنية.
+2. **الصور خاطئة/مفقودة**: `image_query` يُولَّد ثم يُمرَّر لـ Pexels لكن النموذج يكتب كلمات عربية أو غامضة فلا تطابق المكتبة، والكثير من السلايدات لا يحصل على صورة أصلاً.
+3. **Builders بدون بريفيو**: PDF يُحمَّل فقط ولا يُعرَض في `FilePreviewPanel` (الذي يدعم HTML iframe فقط، لا PDF).
+4. **الأسئلة الذكية تتكرر**: `generate-file-questions` لا يحتوي seed/randomization، Gemini يعيد نفس الأسئلة لنفس النوع.
+5. **Spreadsheet/Mindmap/Roadmap/Timeline** لا تنتج بريفيو لأن `previewHtml` مفقود.
 
-**الحلول**:
-- **رفع أحجام النصوص**: العنوان الرئيسي `text-8xl/9xl` (140-180px)، العناوين الفرعية `text-5xl/6xl`، المحتوى `text-3xl/4xl`. تطبيق scale موحد عبر CSS class `.slide-content` مع `font-size` floor 28px للجسم.
-- **محتوى عملاق + صور**: كل سلايد content يأخذ صورة من Pexels تلقائياً (حقل `image_query` في schema). الـcover slide يصبح half-bleed image (نصف الشاشة صورة، نصف نص). slides من نوع `stats` تعرض أرقام بحجم 200px+.
-- **استدعاء Pexels داخل generate-slides**: بعد توليد JSON من Gemini، loop على slides واستدعاء `pexels-search` للحصول على URL لكل `image_query`. الصور تُحقن في الـdeck قبل إرساله للفرونت.
-- **حذف زر "معاينة" العائم**: إزالة الـfloating preview button من `FilesPage.tsx`.
+---
 
-### 2) معرض قوالب فاخر iOS 26 + thumbnails حقيقية
+### الإصلاحات
 
-- **حذف كلمة "Premium"** من badges في `FilesPage.tsx`.
-- **شريط القوالب الجديد**: `TemplateGallery.tsx` بستايل iOS 26 — بطاقات أفقية بـ`backdrop-blur-3xl`, `border-white/10`, gradient overlay، ثمبنيل صورة فعلية للقالب، اسم القالب أسفل، scroll أفقي ناعم بـsnap-x.
-- **Thumbnails حقيقية**: لكل قالب صورة JPG مولدة بـhtml-to-image من السلايد الأول (cover) ومخزنة في `slide-images` bucket. سأولد 25 thumbnail (5 موجودة + 20 جديدة) برمجياً عبر سكريبت رفع لـ DB.
+#### 1) محرّك سلايدس بـ "بحث عميق على مرحلتين"
+داخل `generate-slides` (مسار React templates):
+- **المرحلة A — Outline**: `gemini-2.5-flash` ينتج هيكل (titles + image_queries إنجليزية فقط + counts) في مكالمة سريعة.
+- **المرحلة B — Deep Content**: `gemini-2.5-pro` (نموذج أقوى للمحتوى) يستقبل الـoutline + topic + reference content، ويولّد لكل سلايد:
+  - `body`: فقرة 60-120 كلمة (إجباري)
+  - `bullets`: 4-6 نقاط، كل واحدة 8-15 كلمة (لا 3 كلمات)
+  - `stats` و`quote` بأرقام/اقتباسات حقيقية
+- **إجبار الإنجليزية على image_query**: تحقق برمجي بعد parse — لو احتوى أحرف غير لاتينية، نعيد ترجمته عبر استدعاء AI سريع `"translate to 3 english visual keywords"`.
 
-### 3) إضافة 20 قالب جديد متنوع
+#### 2) إصلاح Pexels integration
+- استدعاءات متوازية مع **fallback**: إن لم تعد Pexels نتيجة لـ`image_query`، نجرب أول كلمة فقط، ثم نستخدم صورة generic للقالب من DB.
+- **تخزين الصور في الـSlide** بـ `image` و`image_thumb`، تمرير الأول للعرض والثاني للـlazy load.
+- **logging**: نطبع كل failed query في edge logs لتشخيص لاحق.
 
-كل قالب = مكون React جديد في `src/lib/slides/templates/` + إدخال DB:
+#### 3) PDF Preview للملفات الأخرى
+- إضافة `pdfPreviewUrl` لـ `BuilderResult`. عند توليد الـPDF، نحوّل الـblob لـ `URL.createObjectURL(blob)` ونمرّره.
+- في `FilePreviewPanel` نضيف `pdfUrl` prop: لو موجود، نعرض `<iframe src={pdfUrl}>` بدلاً من `srcDoc`.
+- يطبَّق على: `document`, `resume`, `report`, `letter`.
+- لـ `spreadsheet`: نولّد HTML preview بسيط من الـschema (table بـTailwind inline) + رابط XLSX للتحميل.
+- لـ `roadmap`, `mindmap`, `timeline`: نولّد HTML preview جميل من الـschema (موجود جزئياً، نتأكد من ملئه).
 
-| # | القالب | الستايل |
-|---|---|---|
-| 1 | **SketchHand** | خطوط يدوية (Rough.js)، خط Caveat، ورقة beige |
-| 2 | **Cinema3D** | Three.js gradient mesh background، depth layers |
-| 3 | **iOSGlass** | iOS 26 liquid glass، SF Pro، depth blur |
-| 4 | **TerminalDev** | مونوسبيس JetBrains Mono، أخضر/أسود hacker |
-| 5 | **MagazineFold** | تخطيط مجلة (CSS columns)، Playfair + Lora |
-| 6 | **NeonCyber** | cyberpunk، neon glow، Orbitron font |
-| 7 | **PaperOrigami** | folded paper shadows، CSS clip-path |
-| 8 | **MinimalSwiss** | Helvetica Neue، grid system، أبيض نقي |
-| 9 | **GradientWave** | SVG wave dividers، pastel gradients |
-| 10 | **DarkLuxe** | أسود مخملي + ذهبي، Bodoni font |
-| 11 | **KidsPlayful** | Comic Neue، أيقونات ملونة كبيرة، فقاعات |
-| 12 | **CorporateNavy** | navy/أبيض شركاتي، Inter |
-| 13 | **NatureOrganic** | ألوان طبيعية، أوراق SVG، Source Serif |
-| 14 | **GlitchArt** | RGB shift، CSS distortions |
-| 15 | **IsometricTech** | isometric SVG illustrations |
-| 16 | **WatercolorSoft** | watercolor backgrounds (PNG)، Dancing Script |
-| 17 | **RetroArcade** | 80s، Press Start 2P font، CRT scanlines |
-| 18 | **ScientificPaper** | LaTeX-style، Computer Modern، figures |
-| 19 | **PitchYC** | YC pitch deck، Inter، charts (Recharts) |
-| 20 | **ArabesqueGold** | زخارف عربية SVG، خط Amiri، ذهبي/أزرق |
+#### 4) منع تكرار الأسئلة
+- `generate-file-questions` يستقبل `seed: Date.now()` ويُحقن في system prompt: `"Variation seed: ${seed} — produce a fresh angle different from previous runs."`
+- نرفع `temperature: 0.9` (افتراضي 0.7) ليولّد تنوّعاً.
+- نحفظ آخر 3 أسئلة في `localStorage` ونمررها للـedge: `"Avoid repeating these previous questions: [...]"`.
 
-**أيقونات ضخمة من 4 مكتبات**:
-- `lucide-react` (موجودة)
-- `react-icons` (يضم: Font Awesome, Material, Bootstrap, Heroicons, Phosphor, Feather, Tabler, Remix, Ionicons, Octicons — 100,000+ أيقونة في مكتبة واحدة)
-- `@phosphor-icons/react` (تنوع weights)
-- `lottie-react` (للأنيميشنات داخل السلايدات)
+#### 5) تحسين system prompt للمحتوى العميق
+استبدال الـsystem الحالي:
+```
+- Each "content" slide: body paragraph 60-120 words (REQUIRED, not optional)
+  + 4-6 bullets each 8-15 words (NOT 3 words)
+- Stats slides: 3-5 stats with real-looking numbers
+- Quote slides: real-feel quote 15-30 words + plausible attribution
+- Section slides: full kicker + 1-line description
+- NEVER produce empty fields. If unsure, expand with relevant context.
+- image_query: ALWAYS English, 3-5 visual keywords (e.g. "modern glass office skyline aerial")
+```
 
-كل قالب يستخدم مكتبة الأيقونات المناسبة لطابعه (مثلاً TerminalDev = Octicons, Cinema3D = Phosphor duotone).
+---
 
-**Engine اختيار الأيقونة**: `iconRegistry.ts` يستقبل `keyword` ويعيد component أيقونة من المكتبة المناسبة.
+### الملفات المتأثرة
 
-### 4) الاستبيان الذكي بدلاً من Form
+```text
+supabase/functions/generate-slides/index.ts        ← إعادة كتابة (two-stage)
+supabase/functions/generate-file-questions/index.ts ← seed + temperature + avoid list
+src/lib/builders/types.ts                          ← +pdfPreviewUrl, +previewHtml للجميع
+src/lib/builders/documentBuilder.tsx               ← إنتاج blob URL
+src/lib/builders/resumeBuilder.tsx                 ← إنتاج blob URL
+src/lib/builders/reportBuilder.tsx                 ← إنتاج blob URL
+src/lib/builders/letterBuilder.tsx                 ← إنتاج blob URL
+src/lib/builders/spreadsheetBuilder.ts             ← +HTML table preview
+src/lib/builders/roadmapBuilder.ts                 ← التأكد من previewHtml
+src/lib/builders/mindmapBuilder.ts                 ← التأكد من previewHtml
+src/lib/builders/timelineBuilder.ts                ← التأكد من previewHtml
+src/components/files/FilePreviewPanel.tsx          ← دعم pdfUrl prop
+src/pages/FilesPage.tsx                            ← تمرير pdfUrl + حفظ آخر أسئلة
+```
 
-- **حذف `IntakeForm.tsx`** من تجربة المستخدم.
-- **`SmartQuestionCard.tsx` (موجود بالفعل)**: استخدامه داخل المحادثة. عند طلب توليد ملف، edge function `generate-file-questions` (جديدة) يولد 3-5 أسئلة ذكية قصيرة بلغة المستخدم (مكتشفة من النص أو من `navigator.language`).
-- **مثال (طلب Resume)**: يطرح: "ما اسمك الكامل؟" → "ما تخصصك؟" → "أبرز 3 إنجازات؟" → كل سؤال بطاقة منفصلة، خيارات سريعة + حقل نص حر + زر "تخطي".
-- بعد الانتهاء، تجمع الإجابات في `brief context` يمر للـbuilder.
-
-### 5) BriefCard بدون أيقونات + لغة المستخدم
-
-- إزالة جميع الأيقونات من `BriefCard.tsx` و`SmartQuestionCard.tsx`.
-- `generate-file-brief` يستقبل `userLanguage` ويولد التقرير بنفس اللغة (auto-detect من نص المحادثة).
-- استبدال الأيقونات بأرقام/نقاط نصية أنيقة.
-
-### 6) إصلاح Builders المعطلة (Document/Resume/Report/Spreadsheet/Letter)
-
-**السبب الجذري**: `aiSchema.ts` يستدعي edge function `generate-file-brief` بدور مزدوج (brief + schema). يحتاج فصل + JSON mode صارم + معالجة أخطاء واضحة.
-
-**الإصلاحات لكل builder**:
-- **`generate-builder-schema` (edge function جديدة)**: تستقبل `type` و`brief` وتعيد JSON صارم باستخدام `responseFormat: json_schema` على Gemini مع schema لكل نوع.
-- **التخلص الكامل من HTML**: كل builder يبني الإخراج برمجياً:
-  - **Document**: `@react-pdf/renderer` ينتج PDF vector حقيقي (لا html2canvas، لا jsPDF خام).
-  - **Resume**: `@react-pdf/renderer` بقالب modern، صورة hero من Pexels.
-  - **Report**: `@react-pdf/renderer` + `Recharts` → SVG → PDF embed.
-  - **Spreadsheet**: `xlsx` (موجودة) + cell styling + formulas — يعمل، يحتاج فقط إصلاح الـschema.
-  - **Letter**: `@react-pdf/renderer` بترويسة رسمية.
-- **Preview داخل التطبيق**: لكل ملف، iframe يعرض blob URL من PDF (PDF.js عبر متصفح).
-- **Logging**: كل builder يطبع logs في console + يعرض رسائل خطأ واضحة في الـchat إن فشل.
-
-### 7) ترتيب التنفيذ
-
-1. **DB Migration**: إضافة 20 قالب جديد (display_order = -25..-6)، حذف عمود `name` المتكرر إن لزم، إضافة `thumbnail_url`.
-2. **Edge Functions**:
-   - تحديث `generate-slides` → استدعاء Pexels لكل سلايد + حقن صور.
-   - `generate-file-questions` (جديدة) → أسئلة ذكية بلغة المستخدم.
-   - `generate-builder-schema` (جديدة) → JSON صارم لكل نوع ملف.
-   - `generate-file-brief` → دعم `userLanguage`.
-3. **Frontend Components**:
-   - 20 مكون قالب جديد في `src/lib/slides/templates/`.
-   - تكبير نصوص 5 قوالب موجودة + إضافة صور Pexels لها.
-   - `iconRegistry.ts` (موحد لـ 100k+ أيقونة).
-   - `TemplateGallery.tsx` (iOS 26 style).
-   - `SmartQuestionFlow.tsx` (يستبدل IntakeForm).
-   - تنظيف `BriefCard` و`SmartQuestionCard` من الأيقونات.
-4. **Builders Rewrite**: إعادة كتابة 5 builders بـ `@react-pdf/renderer` (Document, Resume, Report, Letter) و`xlsx` نظيف (Spreadsheet).
-5. **FilesPage Integration**: حذف floating preview button، حذف IntakeForm overlay، توصيل SmartQuestionFlow.
-6. **Thumbnails**: سكريبت يولد 25 صورة JPG ويرفعها لـ`slide-images/templates/`، update DB rows.
-
-### 8) Dependencies جديدة
-- `react-icons` (100k+ أيقونة)
-- `@phosphor-icons/react`
-- `lottie-react`
-- `roughjs` (للـSketchHand)
-- `three` + `@react-three/fiber` (للـCinema3D)
-
-PEXELS_API_KEY موجود ✓.
+### النتيجة المتوقعة
+- سلايدس بمحتوى ضعف الحالي + صور Pexels صحيحة في كل سلايد.
+- بريفيو PDF داخل التطبيق لـ4 أنواع ملفات + بريفيو HTML للباقي.
+- أسئلة ذكية مختلفة في كل مرة، حتى لنفس الموضوع.
 
