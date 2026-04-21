@@ -13,6 +13,7 @@ import ChatMessage from "@/components/ChatMessage";
 import ThinkingLoader from "@/components/ThinkingLoader";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
+import { getModeDescription } from "@/lib/modeDescriptions";
 
 interface Message {
   role: "user" | "assistant";
@@ -207,6 +208,14 @@ const LearningModePage = () => {
             >
               Learn Anything
             </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mt-2 text-sm font-medium text-muted-foreground"
+            >
+              {getModeDescription("learning")}
+            </motion.p>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-3xl px-4 pb-48 pt-20">
