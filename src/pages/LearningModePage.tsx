@@ -239,7 +239,7 @@ const LearningModePage = () => {
         {/* Floating Tools button — pyramid menu (memoized, no remount) */}
         {toolsOpen && (
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[60]"
             onMouseDown={() => setToolsOpen(false)}
             onTouchStart={() => setToolsOpen(false)}
           />
