@@ -1704,27 +1704,39 @@ export type Database = {
       }
       slide_templates: {
         Row: {
+          component_name: string | null
           created_at: string
+          description: string | null
           display_order: number
           id: string
           image_url: string | null
           is_active: boolean
+          name: string | null
+          template_engine: string
           template_id: string
         }
         Insert: {
+          component_name?: string | null
           created_at?: string
+          description?: string | null
           display_order?: number
           id?: string
           image_url?: string | null
           is_active?: boolean
+          name?: string | null
+          template_engine?: string
           template_id: string
         }
         Update: {
+          component_name?: string | null
           created_at?: string
+          description?: string | null
           display_order?: number
           id?: string
           image_url?: string | null
           is_active?: boolean
+          name?: string | null
+          template_engine?: string
           template_id?: string
         }
         Relationships: []
