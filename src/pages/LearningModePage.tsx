@@ -244,7 +244,7 @@ const LearningModePage = () => {
             onTouchStart={() => setToolsOpen(false)}
           />
         )}
-        <div className="fixed bottom-32 right-4 z-50 md:right-8">
+        <div className="fixed bottom-32 right-4 z-[61] md:right-8">
           <AnimatePresence initial={false}>
             {toolsOpen && (
               <motion.div
