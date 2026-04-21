@@ -992,6 +992,14 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                     <div className="text-foreground text-sm select-text leading-relaxed whitespace-pre-wrap">
                       {extractChatDisplay(msg.content)}
                     </div>
+
+                    {msg.brief && msg.briefForType && !msg.briefConsumed && (
+                      <BriefCard
+                        brief={msg.brief}
+                        fileType={msg.briefForType}
+                        onConfirm={(edited) => handleBriefConfirm(i, edited)}
+                      />
+                    )}
                     
                     {/* File thumbnail card */}
                     {msg.htmlContent && (
