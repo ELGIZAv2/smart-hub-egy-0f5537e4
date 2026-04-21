@@ -10,9 +10,9 @@ const COMPOSIO_BASE = "https://backend.composio.dev/api/v1";
 const LEMONDATA_URL = "https://api.lemondata.cc/v1/chat/completions";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const SHOPPY_WISE_BASE = "https://ygsoyowrumtntnlasmmh.supabase.co/functions/v1";
-const DEFAULT_MODEL = "google/gemini-2.5-flash-lite-preview-09-2025";
+const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
 const COMPLEX_MODEL = "moonshotai/kimi-k2.5:nitro";
-const OPENROUTER_FALLBACK_MODELS = [DEFAULT_MODEL, "google/gemini-2.5-flash", "google/gemini-3-flash-preview"];
+const OPENROUTER_FALLBACK_MODELS = [DEFAULT_MODEL, "google/gemini-2.5-flash", "google/gemini-2.5-flash-lite-preview-09-2025", "google/gemini-3-flash-preview"];
 
 function safeParseToolArgs(raw: string): Record<string, unknown> {
   try {
@@ -174,7 +174,8 @@ function normalizeRequestedModel(rawModel: string | null): string | null {
 }
 
 function isModelUnavailable(status: number, errorText: string): boolean {
-  return status === 400 && /not.*available|invalid.*model|unsupported/i.test(errorText);
+  if (status !== 400 && status !== 404) return false;
+  return /not.*available|invalid.*model|unsupported|model[_\s-]?not[_\s-]?found|not\s+found|no\s+such\s+model|deprecated/i.test(errorText);
 }
 
 function getNextFallbackModel(currentModel: string): string | null {
