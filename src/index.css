@@ -993,12 +993,15 @@ input, textarea, select {
 
 /* ===== Deep Research Report Renderer ===== */
 .research-report {
-  color: hsl(var(--foreground) / 0.9);
-  font-size: 15px;
-  line-height: 1.85;
+  color: hsl(var(--foreground) / 0.92);
+  font-size: 15.5px;
+  line-height: 1.95;
   word-wrap: break-word;
   overflow-wrap: anywhere;
+  font-feature-settings: "kern", "liga";
 }
+.research-report > * + * { margin-top: 0.85rem; }
+.research-report--rtl { font-family: "Noto Naskh Arabic", "Cairo", "Tajawal", system-ui, sans-serif; }
 .research-report :where(h1, h2, h3, h4) {
   font-family: var(--font-display, inherit);
   color: hsl(var(--foreground));
