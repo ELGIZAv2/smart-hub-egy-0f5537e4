@@ -611,6 +611,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
         content: result.summary,
         htmlContent: result.previewHtml,
         downloadUrl: result.downloadUrl,
+        mimeType: result.mimeType,
       });
       if (convId) {
         await saveMsg(convId, "assistant", result.summary, {
