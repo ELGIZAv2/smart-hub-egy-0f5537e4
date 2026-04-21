@@ -139,6 +139,7 @@ const ShoppingModePage = () => {
       attachedImages: attachedFiles.filter(f => f.type === "image").map(f => f.data),
     };
     setMessages((m) => [...m, userMsg]);
+    userJustSentRef.current = true;
     const sentInput = input;
     setInput("");
     setAttachedFiles([]);
