@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Download } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,12 +15,28 @@ interface ReportData {
 
 const ResearchPreviewPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const stateReport = (location.state as { reportData?: ReportData } | null)?.reportData ?? null;
 
   useEffect(() => {
-    if (!id) return;
+    if (stateReport?.report) {
+      setData({
+        query: stateReport.query,
+        report: stateReport.report,
+        images: Array.isArray(stateReport.images) ? stateReport.images : [],
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
     (async () => {
       const { data: user } = await supabase.auth.getUser();
       const uid = user.user?.id;
@@ -40,7 +56,7 @@ const ResearchPreviewPage = () => {
       }
       setLoading(false);
     })();
-  }, [id]);
+  }, [id, stateReport]);
 
   if (loading) {
     return (
