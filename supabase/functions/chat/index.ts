@@ -1586,7 +1586,7 @@ async function handleToolCalls(
     ];
 
     const secondBody: any = {
-      model: modelId,
+      model: apiUrl === LEMONDATA_URL ? normalizeModelForProvider(modelId, "lemondata") : modelId,
       messages: searchMessages,
       stream: true,
       max_tokens: isDeepResearch ? 8192 : (isShopping ? 2048 : 2048),
