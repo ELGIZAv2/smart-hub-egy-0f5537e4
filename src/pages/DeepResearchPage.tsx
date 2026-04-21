@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Menu, Plus, X, ArrowUp, Square, Image as ImageIcon, FileUp, Camera,
-  ChevronDown, MoreHorizontal, Download, Share2, FileText, Sparkles,
+  ChevronDown, MoreHorizontal, Download, Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,9 +11,32 @@ import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
+import { saveResearch, loadRecentResearch } from "@/lib/researchPersistence";
+import { getModeDescription } from "@/lib/modeDescriptions";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+// Pegtop star animation (same as the main chat thinking loader)
+const PegtopStar = ({ active }: { active: boolean }) => (
+  <motion.svg
+    viewBox="0 0 24 24"
+    className="h-4 w-4 shrink-0"
+    animate={active ? { rotate: [0, 360], scale: [1, 1.15, 1] } : { rotate: 0, scale: 1 }}
+    transition={active ? { rotate: { duration: 4, repeat: Infinity, ease: "linear" }, scale: { duration: 1.4, repeat: Infinity } } : { duration: 0.3 }}
+  >
+    <path
+      d="M12 2 L14.2 9.2 L21.6 9.6 L15.8 14.2 L18 21.4 L12 17.2 L6 21.4 L8.2 14.2 L2.4 9.6 L9.8 9.2 Z"
+      fill={active ? "url(#pgrad)" : "hsl(var(--primary) / 0.85)"}
+    />
+    <defs>
+      <linearGradient id="pgrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="hsl(265 90% 70%)" />
+        <stop offset="100%" stopColor="hsl(220 90% 65%)" />
+      </linearGradient>
+    </defs>
+  </motion.svg>
+);
 
 interface TimelineStep {
   id: string;
