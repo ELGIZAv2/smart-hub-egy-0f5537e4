@@ -28,6 +28,7 @@ interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   htmlContent?: string;
+  pdfPreviewUrl?: string;
   downloadUrl?: string;
   mimeType?: string;
   deck?: SlideDeck;
@@ -149,6 +150,7 @@ const FilesPage = () => {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
