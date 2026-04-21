@@ -69,9 +69,14 @@ const ShoppingModePage = () => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
+  // Auto-scroll only when the user just sent a message — never auto-jump while reading.
+  const userJustSentRef = useRef(false);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isLoading]);
+    if (userJustSentRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      userJustSentRef.current = false;
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     if (!plusOpen) return;
@@ -86,6 +91,28 @@ const ShoppingModePage = () => {
     window.addEventListener("pointerdown", handlePointerDown, true);
     return () => window.removeEventListener("pointerdown", handlePointerDown, true);
   }, [plusOpen]);
+
+  const loadConversation = useCallback(async (cid: string) => {
+    setConversationId(cid);
+    const { data: msgs } = await supabase
+      .from("messages")
+      .select("role, content, images")
+      .eq("conversation_id", cid)
+      .order("created_at", { ascending: true });
+    if (!msgs?.length) return;
+    setMessages(msgs.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+      attachedImages: (m.images as string[] | null) || undefined,
+    })));
+  }, []);
+
+  const startNewSession = useCallback(() => {
+    setMessages([]);
+    setConversationId(null);
+    setInput("");
+    setAttachedFiles([]);
+  }, []);
 
   const hasResults = messages.length > 0;
 
