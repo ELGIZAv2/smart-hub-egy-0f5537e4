@@ -36,8 +36,13 @@ interface ChatMsg {
   briefForType?: FileBuilderType;
   briefTopic?: string;
   briefConsumed?: boolean;
-  isQuestion?: boolean;
-  questionOptions?: string[];
+  /** When set, this assistant message renders a SmartQuestionFlow card. */
+  questions?: SmartQuestion[];
+  questionsForType?: FileBuilderType;
+  questionsTopic?: string;
+  questionsAnswered?: boolean;
+  questionsAnswer?: string;
+  questionsLanguage?: string;
 }
 
 interface AttachedFile {
