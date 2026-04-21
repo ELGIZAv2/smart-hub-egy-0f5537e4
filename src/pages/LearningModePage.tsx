@@ -329,7 +329,7 @@ const LearningModePage = () => {
                         initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
+                        className="absolute bottom-full mb-2 left-0 z-[61] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="grid grid-cols-3 gap-2">
