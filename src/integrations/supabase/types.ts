@@ -1337,6 +1337,42 @@ export type Database = {
           },
         ]
       }
+      research_reports: {
+        Row: {
+          created_at: string
+          id: string
+          images: Json
+          query: string
+          report: string
+          session_key: string
+          steps: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          images?: Json
+          query: string
+          report?: string
+          session_key: string
+          steps?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          images?: Json
+          query?: string
+          report?: string
+          session_key?: string
+          steps?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       research_sessions: {
         Row: {
           created_at: string
@@ -1543,6 +1579,36 @@ export type Database = {
           service_name?: string
           service_url?: string
           status?: string
+        }
+        Relationships: []
+      }
+      shopping_product_reports: {
+        Row: {
+          ai_report: string
+          created_at: string
+          currency: string
+          id: string
+          product_data: Json
+          product_key: string
+          user_id: string
+        }
+        Insert: {
+          ai_report?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          product_data?: Json
+          product_key: string
+          user_id: string
+        }
+        Update: {
+          ai_report?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          product_data?: Json
+          product_key?: string
+          user_id?: string
         }
         Relationships: []
       }
