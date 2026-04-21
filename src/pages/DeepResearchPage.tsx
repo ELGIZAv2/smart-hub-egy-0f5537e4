@@ -495,7 +495,7 @@ const DeepResearchPage = () => {
                   </button>
                   {plusOpen && (
                     <>
-                      <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
+                      <div className="fixed inset-0 z-[60]" onMouseDown={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
                       <motion.div
                         initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
