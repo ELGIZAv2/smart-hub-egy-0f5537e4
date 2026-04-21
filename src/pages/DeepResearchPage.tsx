@@ -324,15 +324,14 @@ const DeepResearchPage = () => {
 
   const stop = () => { abortRef.current?.abort(); setIsLoading(false); };
 
-  const downloadReport = (s: ResearchSession) => {
-    const blob = new Blob([`# ${s.query}\n\n${s.report}`], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${s.query.slice(0, 40).replace(/[^a-z0-9]/gi, "-")}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Downloaded");
+  const share = async (s: ResearchSession) => {
+    if (navigator.share) {
+      try { await navigator.share({ title: s.query, text: s.report.slice(0, 200) }); }
+      catch { /* cancelled */ }
+    } else {
+      navigator.clipboard.writeText(s.report);
+      toast.success("Copied to clipboard");
+    }
   };
 
   const share = async (s: ResearchSession) => {
