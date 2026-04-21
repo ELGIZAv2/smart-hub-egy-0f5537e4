@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Download } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -32,10 +32,7 @@ const ResearchPreviewPage = () => {
       return;
     }
 
-    if (!id) {
-      setLoading(false);
-      return;
-    }
+    if (!id) { setLoading(false); return; }
 
     (async () => {
       const { data: user } = await supabase.auth.getUser();
@@ -76,6 +73,7 @@ const ResearchPreviewPage = () => {
 
   const cleanReport = normalizeResearchReport(data.report);
   const isRtl = detectResearchReportDirection(cleanReport) === "rtl";
+  const reportEmpty = cleanReport.trim().length < 10;
 
   const handleDownload = () => {
     const blob = new Blob([`# ${data.query}\n\n${cleanReport}`], { type: "text/markdown" });
@@ -88,7 +86,6 @@ const ResearchPreviewPage = () => {
     toast.success("Downloaded");
   };
 
-  // Distribute images: first 3 at top, rest in middle gallery
   const topImages = data.images.slice(0, 3);
   const restImages = data.images.slice(3);
 
@@ -111,7 +108,7 @@ const ResearchPreviewPage = () => {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto max-w-3xl px-5 py-8">
           {topImages.length > 0 && (
             <div className="-mx-5 mb-8 overflow-x-auto px-5 pb-2 scrollbar-thin">
@@ -125,43 +122,42 @@ const ResearchPreviewPage = () => {
             </div>
           )}
 
-          <article
-            dir={isRtl ? "rtl" : "ltr"}
-            className={`prose prose-neutral dark:prose-invert max-w-none
-              prose-headings:font-display prose-headings:tracking-tight prose-headings:text-foreground
-              prose-h1:text-3xl prose-h1:mb-5 prose-h1:mt-2
-              prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-3 prose-h2:border-b prose-h2:border-foreground/10 prose-h2:pb-2
-              prose-h3:text-base prose-h3:mt-6 prose-h3:mb-2
-              prose-p:my-3 prose-p:leading-[1.85] prose-p:text-foreground/85
-              prose-li:my-1.5 prose-li:leading-[1.8] prose-li:text-foreground/85
-              prose-ul:my-3 prose-ol:my-3 prose-ul:pl-6 prose-ol:pl-6
-              prose-strong:text-foreground prose-strong:font-semibold
-              prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-              prose-blockquote:border-l-2 prose-blockquote:border-foreground/30 prose-blockquote:text-foreground/75 prose-blockquote:not-italic
-              prose-hr:my-8 prose-hr:border-foreground/10
-              prose-code:rounded prose-code:bg-foreground/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[0.85em] prose-code:before:content-[''] prose-code:after:content-['']
-              prose-pre:rounded-2xl prose-pre:bg-foreground/5 prose-pre:border prose-pre:border-foreground/10
-              prose-table:my-5 prose-table:text-sm prose-table:w-full
-              prose-th:bg-foreground/[0.06] prose-th:px-3 prose-th:py-2 prose-th:text-foreground prose-th:font-semibold prose-th:border prose-th:border-foreground/10
-              prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-foreground/10 prose-td:align-top
-              ${isRtl ? "text-right [&_ul]:pr-6 [&_ul]:pl-0 [&_ol]:pr-6 [&_ol]:pl-0 [&_blockquote]:border-r-2 [&_blockquote]:border-l-0 [&_blockquote]:pr-4 [&_blockquote]:pl-0" : ""}`}
-          >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                table: ({ node: _n, ...props }) => (
-                  <div className="my-5 overflow-x-auto rounded-2xl border border-foreground/10">
-                    <table {...props} className="w-full border-collapse text-sm" />
-                  </div>
-                ),
-                img: ({ node: _n, ...props }) => (
-                  <img {...props} loading="lazy" className="my-4 rounded-2xl border border-foreground/10" />
-                ),
-              }}
+          {reportEmpty ? (
+            <div className="rounded-2xl border border-foreground/10 bg-foreground/5 p-6 text-center text-sm text-muted-foreground">
+              Report is still being prepared. Please wait a moment and try again.
+            </div>
+          ) : (
+            <article
+              dir={isRtl ? "rtl" : "ltr"}
+              className={`research-report ${isRtl ? "research-report--rtl" : ""}`}
             >
-              {cleanReport}
-            </ReactMarkdown>
-          </article>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  h1: ({ node: _n, ...props }) => <h1 dir="auto" {...props} />,
+                  h2: ({ node: _n, ...props }) => <h2 dir="auto" {...props} />,
+                  h3: ({ node: _n, ...props }) => <h3 dir="auto" {...props} />,
+                  h4: ({ node: _n, ...props }) => <h4 dir="auto" {...props} />,
+                  p: ({ node: _n, ...props }) => <p dir="auto" {...props} />,
+                  li: ({ node: _n, ...props }) => <li dir="auto" {...props} />,
+                  blockquote: ({ node: _n, ...props }) => <blockquote dir="auto" {...props} />,
+                  table: ({ node: _n, ...props }) => (
+                    <div className="research-report__table-wrap">
+                      <table {...props} />
+                    </div>
+                  ),
+                  th: ({ node: _n, ...props }) => <th dir="auto" {...props} />,
+                  td: ({ node: _n, ...props }) => <td dir="auto" {...props} />,
+                  img: () => null,
+                  a: ({ node: _n, ...props }) => (
+                    <a {...props} target="_blank" rel="noopener noreferrer" />
+                  ),
+                }}
+              >
+                {cleanReport}
+              </ReactMarkdown>
+            </article>
+          )}
 
           {restImages.length > 0 && (
             <div className="-mx-5 mt-10 overflow-x-auto px-5 pb-2 scrollbar-thin">
