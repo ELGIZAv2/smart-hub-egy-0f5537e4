@@ -459,48 +459,27 @@ const DeepResearchPage = () => {
                     </div>
                   )}
 
-                  {/* Report card — clean, no FileText icon. Inline Download + three-dot menu. */}
+                  {/* Report card — title + AI summary, single Share button on the right */}
                   {s.report && (
                     <div className="relative rounded-3xl border border-foreground/10 bg-background/60 backdrop-blur-xl overflow-hidden">
                       <button
                         onClick={() => openPreview(s)}
                         className="block w-full p-4 text-left transition hover:bg-foreground/[0.03]"
                       >
-                        <div className="pr-20">
+                        <div className="pr-12">
                           <h3 className="text-sm font-semibold text-foreground truncate">{s.query}</h3>
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">
-                            Report · {(s.report.length / 1024).toFixed(1)} KB
-                          </p>
-                          <p className="mt-2.5 line-clamp-3 text-xs text-foreground/60 leading-relaxed">
-                            {s.report.slice(0, 260).replace(/[#*`>]/g, "").trim()}
+                          <p className="mt-2 line-clamp-3 text-xs text-foreground/65 leading-relaxed">
+                            {s.summary || (isActive ? "Generating summary…" : s.report.slice(0, 200).replace(/[#*`>|]/g, "").trim())}
                           </p>
                         </div>
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); downloadReport(s); }}
-                        className="absolute right-12 top-3 flex h-8 w-8 items-center justify-center rounded-full hover:bg-foreground/10 transition"
-                        title="Download"
+                        onClick={(e) => { e.stopPropagation(); share(s); }}
+                        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full hover:bg-foreground/10 transition"
+                        title="Share"
                       >
-                        <Download className="h-4 w-4 text-muted-foreground" />
+                        <Share2 className="h-4 w-4 text-muted-foreground" />
                       </button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full hover:bg-foreground/10 transition"
-                          >
-                            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-2xl border-foreground/10 rounded-2xl">
-                          <DropdownMenuItem onClick={() => downloadReport(s)} className="rounded-xl">
-                            <Download className="mr-2 h-4 w-4" /> Download
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => share(s)} className="rounded-xl">
-                            <Share2 className="mr-2 h-4 w-4" /> Share
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </div>
                   )}
                 </div>
