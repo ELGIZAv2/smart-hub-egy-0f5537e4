@@ -548,7 +548,7 @@ serve(async (req) => {
       : messages;
 
     const body: any = {
-      model: modelId,
+      model: normalizeModelForProvider(modelId, provider),
       messages: isCasualMessage 
         ? [{ role: "system", content: `You are Megsy, a fast and friendly AI assistant. Reply briefly and naturally. Match the user's language.${userContext}` }, ...trimmedMessages]
         : [{ role: "system", content: systemPrompt }, ...trimmedMessages],
