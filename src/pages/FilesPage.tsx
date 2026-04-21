@@ -11,11 +11,16 @@ import { buildPreviewHtml } from "@/lib/filesHtmlBuilders";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu, ArrowUp, Plus, X, Download, Eye, FileText, Undo2, Redo2, Paperclip, Image, HardDrive, Upload } from "lucide-react";
 
+import type { SlideDeck } from "@/lib/slides/types";
+import SlideDeckPreview from "@/components/files/SlideDeckPreview";
+import { AnimatePresence as AP2 } from "framer-motion";
+
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   htmlContent?: string;
   downloadUrl?: string;
+  deck?: SlideDeck;
   isQuestion?: boolean;
   questionOptions?: string[];
 }
@@ -139,6 +144,7 @@ const FilesPage = () => {
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat");
   const [undoStack, setUndoStack] = useState<ChatMsg[][]>([]);
   const [redoStack, setRedoStack] = useState<ChatMsg[][]>([]);
+  const [activeDeck, setActiveDeck] = useState<SlideDeck | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState<"outer" | "inner" | null>(null);
   const [agentMode, setAgentMode] = useState<AgentMode>("work");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -294,24 +300,18 @@ Do NOT invent information. Only provide verified facts.`;
     });
     if (error || !data?.success) return null;
 
-    if (data?.download_url) {
-      addResearchStep("Preparing summary...");
-      let summary = `Your presentation "${userInput}" is ready with ${data.slide_count || slideCount || 10} professional slides.`;
-      try {
-        const summaryResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: `Write a brief, personalized 2-3 sentence summary. You just created a presentation about "${userInput}" with ${data.slide_count || slideCount || 10} slides. Describe what sections you covered and mention the preview button. Respond in the same language as the topic. Don't use emojis.` }],
-            model: "moonshotai/kimi-k2.5:nitro", mode: "files",
-          }),
-        });
-        if (summaryResp.ok && summaryResp.body) {
-          const s = await readSSEStreamWithStatus(summaryResp.body);
-          if (s.trim()) summary = s.trim();
-        }
-      } catch {}
+    // Premium React deck path
+    if (data?.engine === "react-native" && data?.deck) {
+      const deck = data.deck as SlideDeck;
+      const summary = `Your ${deck.slides.length}-slide presentation "${deck.title || userInput}" is ready. Tap Preview to view it or download as PPTX.`;
+      pushMessage({ role: "assistant", content: summary, deck });
+      if (convId) await saveMsg(convId, "assistant", summary, { htmlContent: JSON.stringify({ __deck: deck }) });
+      setActiveDeck(deck);
+      return true;
+    }
 
+    if (data?.download_url) {
+      const summary = `Your presentation "${userInput}" is ready with ${data.slide_count || slideCount || 10} professional slides.`;
       pushMessage({ role: "assistant", content: summary, downloadUrl: data.download_url });
       if (convId) await saveMsg(convId, "assistant", summary, { downloadUrl: data.download_url });
       return true;
@@ -919,6 +919,17 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                           </div>
                         </div>
                       </motion.div>
+                    )}
+
+                    {msg.deck && (
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        transition={spring}
+                        onClick={() => setActiveDeck(msg.deck!)}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                      >
+                        <Eye className="w-4 h-4" /> Preview Slides ({msg.deck.slides.length})
+                      </motion.button>
                     )}
 
                     {msg.downloadUrl && (

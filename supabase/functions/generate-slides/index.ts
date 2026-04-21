@@ -8,6 +8,81 @@ const corsHeaders = {
 
 const BASE_URL = "https://2slides.com";
 
+const REACT_TEMPLATES = new Set([
+  "premium-aurora-keynote",
+  "premium-editorial-noir",
+  "premium-neo-brutalist",
+  "premium-glass-pitch",
+  "premium-cairo-modern",
+]);
+
+const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg: string }> = {
+  "premium-aurora-keynote":  { primary: "#7c3aed", accent: "#06b6d4", bg: "#0b0b1a", fg: "#f5f5ff" },
+  "premium-editorial-noir":  { primary: "#111111", accent: "#b08d57", bg: "#fafaf7", fg: "#111111" },
+  "premium-neo-brutalist":   { primary: "#ff5722", accent: "#ffd60a", bg: "#fffaf0", fg: "#0a0a0a" },
+  "premium-glass-pitch":     { primary: "#3b82f6", accent: "#a855f7", bg: "#0a0f1f", fg: "#f8fafc" },
+  "premium-cairo-modern":    { primary: "#0f3057", accent: "#d4af37", bg: "#fffdf7", fg: "#0a1929" },
+};
+
+async function generateReactSlideDeck(opts: {
+  topic: string;
+  content: string;
+  templateId: string;
+  pageCount: number;
+  apiKey: string;
+}) {
+  const { topic, content, templateId, pageCount, apiKey } = opts;
+  const palette = PALETTES[templateId] ?? PALETTES["premium-aurora-keynote"];
+  const isCairo = templateId === "premium-cairo-modern";
+
+  const sys = `You are a presentation designer. Output ONLY a JSON object — no markdown, no fences.
+Schema:
+{
+  "title": "deck title",
+  "subtitle": "short subtitle",
+  "language": "ar|en|...",
+  "slides": [
+    {"type":"cover","title":"...","subtitle":"...","author":"..."},
+    {"type":"section","title":"section name","kicker":"01"},
+    {"type":"content","title":"slide title","bullets":["...", "..."],"body":"optional paragraph"},
+    {"type":"quote","quote":"...","attribution":"..."},
+    {"type":"stats","title":"...","stats":[{"label":"...","value":"42%"}]},
+    {"type":"closing","title":"Thank You","subtitle":"...","cta":"..."}
+  ]
+}
+Rules:
+- Produce exactly ${pageCount} slides.
+- First slide MUST be type "cover". Last slide MUST be type "closing".
+- Mix types. Use "section" every ~5-6 slides for chapter breaks.
+- Each "content" slide: 3-5 concise bullets (max 10 words each).
+- Detect language from topic and mirror it. ${isCairo ? "Strongly prefer Arabic." : ""}
+- Be specific, factual, and concise. No filler.`;
+
+  const userMsg = `Topic: ${topic}\n${content ? `Reference material:\n${content.slice(0, 4000)}` : ""}`;
+
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash-lite",
+      messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!resp.ok) throw new Error(`AI deck failed: ${resp.status}`);
+  const data = await resp.json();
+  const raw = data?.choices?.[0]?.message?.content ?? "{}";
+  let deck: any = {};
+  try { deck = JSON.parse(raw); } catch { deck = { title: topic, slides: [] }; }
+  deck.templateId = templateId;
+  deck.palette = palette;
+  if (!Array.isArray(deck.slides) || deck.slides.length === 0) {
+    deck.slides = [{ type: "cover", title: topic }, { type: "closing", title: "Thank You" }];
+  }
+  return deck;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -15,12 +90,46 @@ serve(async (req) => {
     const { topic, content, templateId, tier, userId, pageCount } = await req.json();
     if (!topic) throw new Error("Topic is required");
 
-    // Clamp pageCount: 1..60. 0 means auto-detect.
     let pages = 0;
     if (typeof pageCount === "number" && Number.isFinite(pageCount)) {
       pages = Math.max(0, Math.min(60, Math.floor(pageCount)));
     }
 
+    // -------- Premium React-native templates: return JSON deck --------
+    if (templateId && REACT_TEMPLATES.has(templateId)) {
+      const apiKey = Deno.env.get("LOVABLE_API_KEY");
+      if (!apiKey) {
+        return new Response(JSON.stringify({ success: false, fallback: true, error: "AI not configured." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      try {
+        const deck = await generateReactSlideDeck({
+          topic, content: content || "", templateId,
+          pageCount: pages > 0 ? pages : 10, apiKey,
+        });
+
+        if (userId) {
+          try {
+            const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+            await sb.rpc("deduct_credits", { p_user_id: userId, p_amount: 2, p_action_type: "slides_premium", p_description: "Premium React slides" });
+          } catch (e) { console.error("Credit deduction failed:", e); }
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          engine: "react-native",
+          deck,
+          slide_count: deck.slides?.length ?? 0,
+          title: deck.title || topic,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        console.error("react-native deck error:", e);
+        return new Response(JSON.stringify({ success: false, fallback: true, error: "Premium deck generation failed." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
+    // -------- Legacy 2Slides path --------
     const apiKey = Deno.env.get("TWOSLIDES_API_KEY");
     if (!apiKey) {
       return new Response(JSON.stringify({
@@ -29,12 +138,7 @@ serve(async (req) => {
     }
 
     const isPro = tier === "pro";
-    console.log("generate-slides:", JSON.stringify({ topic: topic.slice(0, 50), templateId, isPro, pages }));
-
-    const authHeaders = {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    };
+    const authHeaders = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
     if (isPro) {
       const body: Record<string, any> = {
@@ -42,21 +146,18 @@ serve(async (req) => {
         responseLanguage: "Auto",
         aspectRatio: "16:9",
         resolution: "2K",
-        page: pages, // 0 = auto-detect, 1..60 explicit
+        page: pages,
         contentDetail: "standard",
+        referenceImageUrl: "https://2slides.com/_next/image?url=/login_preview/st-1763716811881-gt30ikwgk_slide1.webp&w=640&q=75",
       };
-      body.referenceImageUrl = "https://2slides.com/_next/image?url=/login_preview/st-1763716811881-gt30ikwgk_slide1.webp&w=640&q=75";
 
       const resp = await fetch(`${BASE_URL}/api/v1/slides/create-like-this`, {
         method: "POST", headers: authHeaders, body: JSON.stringify(body),
       });
-
       if (!resp.ok) {
-        console.error("slides pro error:", resp.status);
         return new Response(JSON.stringify({ success: false, fallback: true, error: "Pro slide generation failed." }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
       const data = await resp.json();
       const downloadUrl = data?.data?.downloadUrl || data?.downloadUrl;
       const slideCount = data?.data?.slidePageCount || data?.data?.successCount || pages || 10;
@@ -66,35 +167,25 @@ serve(async (req) => {
           try {
             const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
             await sb.rpc("deduct_credits", { p_user_id: userId, p_amount: 2, p_action_type: "slides_pro", p_description: "Slides Pro generation" });
-          } catch (e) { console.error("Credit deduction failed:", e); }
+          } catch {}
         }
         return new Response(JSON.stringify({ success: true, download_url: downloadUrl, slide_count: slideCount, title: topic }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
-      return new Response(JSON.stringify({ success: false, fallback: true, error: data?.data?.message || "Pro generation failed." }),
+      return new Response(JSON.stringify({ success: false, fallback: true, error: "Pro generation failed." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
     } else {
-      // Fast PPT
-      const body: Record<string, any> = {
-        userInput: content || topic,
-        responseLanguage: "Auto",
-        mode: "sync",
-      };
+      const body: Record<string, any> = { userInput: content || topic, responseLanguage: "Auto", mode: "sync" };
       if (templateId) body.themeId = templateId;
       if (pages > 0) body.page = pages;
 
       const resp = await fetch(`${BASE_URL}/api/v1/slides/generate`, {
         method: "POST", headers: authHeaders, body: JSON.stringify(body),
       });
-
       if (!resp.ok) {
-        console.error("slides normal error:", resp.status);
         return new Response(JSON.stringify({ success: false, fallback: true, error: "Slide generation failed." }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
       const data = await resp.json();
       const downloadUrl = data?.data?.downloadUrl || data?.downloadUrl;
       const slideCount = data?.data?.slidePageCount || pages || 10;
@@ -105,9 +196,7 @@ serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Poll if async
       if (data?.success && jobId && !downloadUrl) {
-        // Longer polling window for big decks (up to ~5 minutes total)
         const maxPolls = pages > 30 ? 20 : 12;
         for (let i = 0; i < maxPolls; i++) {
           await new Promise(r => setTimeout(r, 15000));
@@ -128,7 +217,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: false, fallback: true, error: "Slide generation did not return a download." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
   } catch (e) {
     console.error("generate-slides error:", e);
     return new Response(JSON.stringify({ success: false, fallback: true, error: "Presentation generation failed." }),
