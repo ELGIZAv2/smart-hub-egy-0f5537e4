@@ -13,7 +13,15 @@ import { Menu, ArrowUp, Plus, X, Download, Eye, FileText, Undo2, Redo2, Papercli
 
 import type { SlideDeck } from "@/lib/slides/types";
 import SlideDeckPreview from "@/components/files/SlideDeckPreview";
+import BriefCard, { type FileBrief } from "@/components/files/BriefCard";
+import IntakeForm from "@/components/files/IntakeForm";
+import { getBuilder, type FileBuilderType } from "@/lib/builders";
 import { AnimatePresence as AP2 } from "framer-motion";
+
+const SPECIALIZED_BUILDERS: FileBuilderType[] = [
+  "document", "resume", "report", "spreadsheet",
+  "letter", "roadmap", "mindmap", "timeline",
+];
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -21,6 +29,11 @@ interface ChatMsg {
   htmlContent?: string;
   downloadUrl?: string;
   deck?: SlideDeck;
+  /** When set, this assistant message renders a BriefCard awaiting user confirmation. */
+  brief?: FileBrief;
+  briefForType?: FileBuilderType;
+  briefTopic?: string;
+  briefConsumed?: boolean;
   isQuestion?: boolean;
   questionOptions?: string[];
 }
@@ -145,6 +158,8 @@ const FilesPage = () => {
   const [undoStack, setUndoStack] = useState<ChatMsg[][]>([]);
   const [redoStack, setRedoStack] = useState<ChatMsg[][]>([]);
   const [activeDeck, setActiveDeck] = useState<SlideDeck | null>(null);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [pendingBuilder, setPendingBuilder] = useState<{ type: FileBuilderType; topic: string; extras: Record<string, string> } | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState<"outer" | "inner" | null>(null);
   const [agentMode, setAgentMode] = useState<AgentMode>("work");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -473,6 +488,18 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     const userInput = overrideInput || input;
     if (!userInput.trim() && attachedFiles.length === 0) return;
 
+    // Specialized builders: open Intake → Brief → Build flow.
+    if (
+      agentMode === "work" &&
+      activeAgent &&
+      SPECIALIZED_BUILDERS.includes(activeAgent as FileBuilderType) &&
+      !pendingBuilder
+    ) {
+      setPendingBuilder({ type: activeAgent as FileBuilderType, topic: userInput, extras: {} });
+      setIntakeOpen(true);
+      return;
+    }
+
     const userContent = userInput || `[Attached ${attachedFiles.length} file(s)]`;
     pushMessage({ role: "user", content: userContent });
     setInput("");
@@ -520,7 +547,95 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     setIsGenerating(false);
     setStatusText("");
     setResearchSteps([]);
-  }, [input, attachedFiles, activeAgent, conversationId, selectedTemplate, isMobile, agentMode]);
+  }, [input, attachedFiles, activeAgent, conversationId, selectedTemplate, isMobile, agentMode, pendingBuilder]);
+
+  // ---- Specialized builder flow: Intake -> Brief -> Build ----
+  const handleIntakeSubmit = async (topic: string, extras: Record<string, string>) => {
+    if (!pendingBuilder) return;
+    setIntakeOpen(false);
+    setInput("");
+    pushMessage({ role: "user", content: topic });
+    const convId = await getOrCreateConversation(topic);
+    if (convId) await saveMsg(convId, "user", topic);
+
+    setIsGenerating(true);
+    setStatusText("Drafting brief...");
+    try {
+      const { data } = await supabase.functions.invoke("generate-file-brief", {
+        body: { fileType: pendingBuilder.type, topic, extra: extras },
+      });
+      const brief: FileBrief = data?.brief ?? { summary: topic };
+      setPendingBuilder({ ...pendingBuilder, topic, extras });
+      pushMessage({
+        role: "assistant",
+        content: brief.summary || `Here's the plan for your ${pendingBuilder.type}.`,
+        brief,
+        briefForType: pendingBuilder.type,
+        briefTopic: topic,
+      });
+    } catch {
+      // On brief failure, build directly.
+      await runBuilder(pendingBuilder.type, topic, undefined, convId);
+    }
+    setIsGenerating(false);
+    setStatusText("");
+  };
+
+  const handleIntakeSkip = async () => {
+    if (!pendingBuilder) return;
+    setIntakeOpen(false);
+    const topic = pendingBuilder.topic || input || "Untitled";
+    setInput("");
+    pushMessage({ role: "user", content: topic });
+    const convId = await getOrCreateConversation(topic);
+    if (convId) await saveMsg(convId, "user", topic);
+    await runBuilder(pendingBuilder.type, topic, undefined, convId);
+    setPendingBuilder(null);
+  };
+
+  const runBuilder = async (
+    type: FileBuilderType,
+    topic: string,
+    brief: FileBrief | undefined,
+    convId: string | null
+  ) => {
+    const builder = getBuilder(type);
+    if (!builder) return;
+    setIsGenerating(true);
+    setResearchSteps([{ id: "build", label: `Building your ${type}...`, status: "active" }]);
+    try {
+      const result = await builder(topic, brief);
+      pushMessage({
+        role: "assistant",
+        content: result.summary,
+        htmlContent: result.previewHtml,
+        downloadUrl: result.downloadUrl,
+      });
+      if (convId) {
+        await saveMsg(convId, "assistant", result.summary, {
+          htmlContent: result.previewHtml,
+          downloadUrl: result.downloadUrl,
+        });
+      }
+      if (result.previewHtml) {
+        setPreviewHtml(result.previewHtml);
+        if (!isMobile) setActiveTab("preview");
+      }
+    } catch (e) {
+      console.error("builder failed:", e);
+      pushMessage({ role: "assistant", content: "Generation failed. Please try again." });
+    }
+    setIsGenerating(false);
+    setResearchSteps([]);
+  };
+
+  const handleBriefConfirm = async (msgIdx: number, editedBrief: FileBrief) => {
+    const msg = messages[msgIdx];
+    if (!msg?.briefForType || !msg.briefTopic) return;
+    setMessages(prev => prev.map((m, i) => i === msgIdx ? { ...m, briefConsumed: true } : m));
+    await runBuilder(msg.briefForType, msg.briefTopic, editedBrief, conversationId);
+    setPendingBuilder(null);
+  };
 
   const newChat = () => {
     setMessages([]); setInput(""); setPreviewHtml(null); setAttachedFiles([]);
@@ -877,6 +992,14 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                     <div className="text-foreground text-sm select-text leading-relaxed whitespace-pre-wrap">
                       {extractChatDisplay(msg.content)}
                     </div>
+
+                    {msg.brief && msg.briefForType && !msg.briefConsumed && (
+                      <BriefCard
+                        brief={msg.brief}
+                        fileType={msg.briefForType}
+                        onConfirm={(edited) => handleBriefConfirm(i, edited)}
+                      />
+                    )}
                     
                     {/* File thumbnail card */}
                     {msg.htmlContent && (
