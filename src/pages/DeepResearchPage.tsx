@@ -155,18 +155,38 @@ const DeepResearchPage = () => {
       .eq("conversation_id", cid)
       .order("created_at", { ascending: true });
     if (!msgs?.length) return;
+
+    // Fetch all persisted research reports for this user so we can hydrate images per query
+    const { data: { user } } = await supabase.auth.getUser();
+    let reportsByQuery = new Map<string, { images: string[]; steps: any[] }>();
+    if (user) {
+      const { data: reports } = await supabase
+        .from("research_reports")
+        .select("query, images, steps")
+        .eq("user_id", user.id);
+      if (reports) {
+        for (const r of reports) {
+          reportsByQuery.set(r.query, {
+            images: (r.images as any) || [],
+            steps: (r.steps as any) || [],
+          });
+        }
+      }
+    }
+
     const restored: ResearchSession[] = [];
     for (let i = 0; i < msgs.length; i += 2) {
       const u = msgs[i];
       const a = msgs[i + 1];
       if (u?.role !== "user" || !a) continue;
+      const persisted = reportsByQuery.get(u.content);
       restored.push({
         id: `dr-${cid}-${i}`,
         query: u.content,
         report: a.content,
         summary: a.content.slice(0, 240).replace(/[#*`>|]/g, "").trim(),
-        images: [],
-        steps: [],
+        images: persisted?.images ?? [],
+        steps: persisted?.steps ?? [],
         expandedStep: null,
       });
     }
