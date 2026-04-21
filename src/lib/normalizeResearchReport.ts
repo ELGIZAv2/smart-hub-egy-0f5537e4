@@ -38,11 +38,20 @@ export const normalizeResearchReport = (raw: string): string => {
   // 7) Ordered list items missing space
   s = s.replace(/^(\s*\d+\.)([^\s])/gm, "$1 $2");
 
-  // 8) Ensure blank line BEFORE block elements that follow plain text
+  // 8) Ensure blank line BEFORE headings & blockquotes (NOT tables — would break them)
   s = s
     .replace(/([^\n])\n(#{1,6}\s)/g, "$1\n\n$2")
-    .replace(/([^\n])\n(\|.+\|\s*)$/gm, "$1\n\n$2")
     .replace(/([^\n])\n(>\s)/g, "$1\n\n$2");
+
+  // 8b) Ensure blank line before a table row, but only when previous line is plain text
+  // (not another table row or separator)
+  s = s.replace(
+    /^([^\n|][^\n]*)\n(\|[^\n]+\|)\s*$/gm,
+    (_m, prev: string, table: string) => {
+      if (/^\s*$/.test(prev)) return _m;
+      return `${prev}\n\n${table}`;
+    },
+  );
 
   // 9) Repair tables: add separator row if missing after header
   const lines = s.split("\n");
