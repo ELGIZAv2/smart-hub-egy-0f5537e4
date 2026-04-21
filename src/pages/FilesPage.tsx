@@ -1211,6 +1211,25 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
             )}
           </div>
         )}
+
+        {/* Specialized builder Intake overlay */}
+        <AnimatePresence>
+          {intakeOpen && pendingBuilder && (
+            <IntakeForm
+              fileType={pendingBuilder.type}
+              onSubmit={handleIntakeSubmit}
+              onSkip={handleIntakeSkip}
+              onClose={() => { setIntakeOpen(false); setPendingBuilder(null); }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Premium slide deck preview overlay */}
+        <AnimatePresence>
+          {activeDeck && (
+            <SlideDeckPreview deck={activeDeck} onClose={() => setActiveDeck(null)} />
+          )}
+        </AnimatePresence>
       </div>
     </AppLayout>
   );
