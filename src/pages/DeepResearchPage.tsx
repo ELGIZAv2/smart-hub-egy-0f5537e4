@@ -334,16 +334,6 @@ const DeepResearchPage = () => {
     }
   };
 
-  const share = async (s: ResearchSession) => {
-    if (navigator.share) {
-      try { await navigator.share({ title: s.query, text: s.report.slice(0, 200) }); }
-      catch { /* cancelled */ }
-    } else {
-      navigator.clipboard.writeText(s.report);
-      toast.success("Copied to clipboard");
-    }
-  };
-
   const openPreview = (s: ResearchSession) => {
     // Report data is loaded from the backend in the preview page; pass id only.
     navigate(`/research/preview/${s.id}`);
