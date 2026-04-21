@@ -16,7 +16,7 @@ import SlideDeckPreview from "@/components/files/SlideDeckPreview";
 import BriefCard, { type FileBrief } from "@/components/files/BriefCard";
 import IntakeForm from "@/components/files/IntakeForm";
 import { getBuilder, type FileBuilderType } from "@/lib/builders";
-import { AnimatePresence as AP2 } from "framer-motion";
+
 
 const SPECIALIZED_BUILDERS: FileBuilderType[] = [
   "document", "resume", "report", "spreadsheet",
@@ -28,6 +28,7 @@ interface ChatMsg {
   content: string;
   htmlContent?: string;
   downloadUrl?: string;
+  mimeType?: string;
   deck?: SlideDeck;
   /** When set, this assistant message renders a BriefCard awaiting user confirmation. */
   brief?: FileBrief;
@@ -610,6 +611,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
         content: result.summary,
         htmlContent: result.previewHtml,
         downloadUrl: result.downloadUrl,
+        mimeType: result.mimeType,
       });
       if (convId) {
         await saveMsg(convId, "assistant", result.summary, {
@@ -1062,9 +1064,14 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                         href={msg.downloadUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        download
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
                       >
-                        <Download className="w-4 h-4" /> Download
+                        <Download className="w-4 h-4" />
+                        {msg.mimeType === "image/svg+xml" ? "Download SVG"
+                          : msg.mimeType === "application/pdf" ? "Download PDF"
+                          : msg.mimeType?.includes("spreadsheet") ? "Download XLSX"
+                          : "Download"}
                       </motion.a>
                     )}
                   </motion.div>
@@ -1204,6 +1211,25 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
             )}
           </div>
         )}
+
+        {/* Specialized builder Intake overlay */}
+        <AnimatePresence>
+          {intakeOpen && pendingBuilder && (
+            <IntakeForm
+              fileType={pendingBuilder.type}
+              onSubmit={handleIntakeSubmit}
+              onSkip={handleIntakeSkip}
+              onClose={() => { setIntakeOpen(false); setPendingBuilder(null); }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Premium slide deck preview overlay */}
+        <AnimatePresence>
+          {activeDeck && (
+            <SlideDeckPreview deck={activeDeck} onClose={() => setActiveDeck(null)} />
+          )}
+        </AnimatePresence>
       </div>
     </AppLayout>
   );
