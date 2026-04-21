@@ -28,6 +28,7 @@ interface ChatMsg {
   content: string;
   htmlContent?: string;
   downloadUrl?: string;
+  mimeType?: string;
   deck?: SlideDeck;
   /** When set, this assistant message renders a BriefCard awaiting user confirmation. */
   brief?: FileBrief;
