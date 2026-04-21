@@ -6,19 +6,20 @@ const corsHeaders = {
 };
 
 const SYSTEM = `You generate 3-5 short clarifying questions to help create a professional file for the user.
-Return ONLY JSON in this shape: {"questions":[{"title":"<short question>","options":["opt1","opt2","opt3","opt4"],"allowText":true}]}
+Return ONLY JSON: {"questions":[{"title":"<short question>","options":["opt1","opt2","opt3","opt4"],"allowText":true}]}
 Rules:
 - Detect the user's language from the topic and write the questions and options in THAT language exactly.
 - Each "title" is one short, friendly sentence (max 12 words).
 - Each "options" array has 3-4 concrete choices (max 5 words each).
 - Always set allowText: true so the user can type a custom answer.
-- Tailor the questions to the file type (resume → role/experience/highlights; document → audience/tone/length; report → KPIs/period/audience; spreadsheet → columns/use case; letter → tone/recipient/purpose; roadmap → horizon/team size; mindmap → depth/center idea; timeline → range/granularity; slides → audience/tone/structure).
+- Tailor questions to file type (resume → role/experience/highlights; document → audience/tone/length; report → KPIs/period/audience; spreadsheet → columns/use case; letter → tone/recipient/purpose; roadmap → horizon/team size; mindmap → depth/center idea; timeline → range/granularity; slides → audience/tone/structure).
+- IMPORTANT: vary your angle every call. Do NOT ask the same questions twice for the same topic.
 - Never wrap with markdown fences.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { fileType, topic, userLanguage } = await req.json();
+    const { fileType, topic, userLanguage, seed, avoidQuestions } = await req.json();
     if (!fileType || !topic) {
       return new Response(JSON.stringify({ success: false, error: "fileType and topic required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -31,6 +32,12 @@ serve(async (req) => {
     const langHint = userLanguage
       ? `Write everything in this language: ${userLanguage}.`
       : `Mirror the language of the topic.`;
+
+    const variationSeed = typeof seed === "number" ? seed : Date.now();
+    const avoidList = Array.isArray(avoidQuestions) && avoidQuestions.length
+      ? `\n\nDo NOT repeat or paraphrase any of these previous questions:\n${avoidQuestions.slice(0, 8).map((q: string, i: number) => `${i + 1}. ${q}`).join("\n")}\nAsk about completely different angles instead.`
+      : "";
+
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -38,8 +45,9 @@ serve(async (req) => {
         model: "google/gemini-2.5-flash-lite",
         messages: [
           { role: "system", content: SYSTEM },
-          { role: "user", content: `File type: ${fileType}\nTopic: ${topic}\n${langHint}` },
+          { role: "user", content: `File type: ${fileType}\nTopic: ${topic}\n${langHint}\nVariation seed: ${variationSeed} — produce a fresh angle different from previous runs.${avoidList}` },
         ],
+        temperature: 0.95,
         response_format: { type: "json_object" },
       }),
     });

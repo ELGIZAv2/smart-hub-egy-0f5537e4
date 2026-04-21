@@ -19,6 +19,8 @@ export interface BuilderResult {
   downloadUrl?: string;
   /** Optional inline HTML preview for the right-side panel. */
   previewHtml?: string;
+  /** Optional in-browser blob URL for previewing PDF artifacts inline. */
+  pdfPreviewUrl?: string;
   /** Mime type of the produced artifact. */
   mimeType?: string;
 }

@@ -8,7 +8,6 @@ const corsHeaders = {
 
 const BASE_URL = "https://2slides.com";
 
-// All 25 React-rendered templates handled in-app.
 const REACT_TEMPLATES = new Set([
   "premium-aurora-keynote", "premium-editorial-noir", "premium-neo-brutalist",
   "premium-glass-pitch", "premium-cairo-modern", "premium-sketch-hand",
@@ -49,6 +48,7 @@ const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg
   "premium-arabesque-gold":   { primary: "#b45309", accent: "#d4af37", bg: "#1a0f0a", fg: "#fef3c7" },
 };
 
+/* --------------- Pexels integration with smart fallback --------------- */
 async function fetchPexelsImage(query: string, apiKey: string): Promise<string | null> {
   try {
     const url = new URL("https://api.pexels.com/v1/search");
@@ -56,57 +56,95 @@ async function fetchPexelsImage(query: string, apiKey: string): Promise<string |
     url.searchParams.set("per_page", "1");
     url.searchParams.set("orientation", "landscape");
     const r = await fetch(url.toString(), { headers: { Authorization: apiKey } });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.warn("[pexels] http", r.status, "for", query);
+      return null;
+    }
     const d = await r.json();
     const photo = d?.photos?.[0];
     return photo?.src?.large2x || photo?.src?.large || photo?.src?.original || null;
-  } catch { return null; }
+  } catch (e) {
+    console.warn("[pexels] error", e);
+    return null;
+  }
 }
 
-async function generateReactSlideDeck(opts: {
+async function resolveImage(query: string | undefined, apiKey: string | undefined): Promise<string | null> {
+  if (!apiKey || !query) return null;
+  const cleaned = sanitizeQueryForPexels(query);
+  // Try full query
+  let url = await fetchPexelsImage(cleaned, apiKey);
+  if (url) return url;
+  // Fallback: first 2 words
+  const short = cleaned.split(/\s+/).slice(0, 2).join(" ");
+  if (short && short !== cleaned) {
+    url = await fetchPexelsImage(short, apiKey);
+    if (url) return url;
+  }
+  // Final fallback: very generic word
+  const first = cleaned.split(/\s+/)[0];
+  if (first) {
+    url = await fetchPexelsImage(first, apiKey);
+    if (url) return url;
+  }
+  console.warn("[pexels] no result for", query);
+  return null;
+}
+
+function sanitizeQueryForPexels(q: string): string {
+  // Strip non-latin chars; collapse whitespace.
+  return q.replace(/[^\p{Letter}\p{Number}\s-]/gu, " ")
+          .replace(/[\u0600-\u06FF\u0750-\u077F\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/g, " ")
+          .replace(/\s+/g, " ").trim();
+}
+
+function isMostlyEnglish(s: string): boolean {
+  if (!s) return false;
+  const latinChars = (s.match(/[A-Za-z]/g) || []).length;
+  return latinChars >= Math.max(3, s.replace(/\s/g, "").length * 0.6);
+}
+
+/* --------------- Stage A: Outline --------------- */
+async function generateOutline(opts: {
   topic: string;
   content: string;
   templateId: string;
-  pageCount: number; // 0 means "let AI decide"
+  pageCount: number;
   apiKey: string;
 }) {
   const { topic, content, templateId, pageCount, apiKey } = opts;
-  const palette = PALETTES[templateId] ?? PALETTES["premium-aurora-keynote"];
   const isCairo = templateId === "premium-cairo-modern" || templateId === "premium-arabesque-gold";
 
   const lengthRule = pageCount > 0
-    ? `Produce EXACTLY ${pageCount} slides.`
-    : `YOU decide the optimal slide count based on topic depth: 8 slides for simple topics, 12-15 for standard, 18-25 for deep/complex. Never fewer than 6 nor more than 30.`;
+    ? `Produce EXACTLY ${pageCount} slide entries.`
+    : `Decide the optimal slide count: 8 for simple topics, 12-15 for standard, 18-25 for deep/complex. Min 8, max 25.`;
 
-  const sys = `You are a world-class presentation designer. Output ONLY a JSON object — no markdown, no fences.
+  const sys = `You are a presentation strategist. Output ONLY a JSON object — no markdown.
 
 Schema:
 {
-  "title": "deck title",
+  "title": "deck title (in user language)",
   "subtitle": "short subtitle",
-  "language": "ar|en|...",
+  "language": "ar|en|fr|...",
   "slides": [
-    {"type":"cover","title":"...","subtitle":"...","author":"...","image_query":"2-4 english keywords"},
-    {"type":"section","title":"section name","kicker":"01","image_query":"keywords"},
-    {"type":"content","title":"slide title","bullets":["...","..."],"body":"optional paragraph","image_query":"english keywords"},
-    {"type":"quote","quote":"...","attribution":"..."},
-    {"type":"stats","title":"...","stats":[{"label":"...","value":"42%"}]},
+    {"type":"cover","title":"...","subtitle":"...","image_query":"3-5 ENGLISH visual keywords"},
+    {"type":"section","title":"section name","kicker":"01","image_query":"english keywords"},
+    {"type":"content","title":"slide title","image_query":"english keywords","focus":"1 sentence describing what this slide will explore in depth"},
+    {"type":"quote","focus":"who and on which sub-topic"},
+    {"type":"stats","title":"...","focus":"what kind of stats: percentages / growth / costs"},
     {"type":"closing","title":"Thank You","subtitle":"...","cta":"..."}
   ]
 }
 
 Rules:
 - ${lengthRule}
-- First slide MUST be type "cover". Last slide MUST be type "closing".
-- Mix types richly. Use "section" every 4-6 slides for chapter breaks. Include at least 1 "stats" slide and 1 "quote" slide if length >= 10.
-- Each "content" slide: 3-6 concise bullets (max 12 words each) AND a body paragraph of 1-2 sentences for richer context.
-- ALWAYS include "image_query" (2-4 ENGLISH keywords) for cover, section, and EVERY content slide. Skip only for quote/stats/closing.
-- "image_query" must always be in English (Pexels indexes English best). Be specific and visual ("modern office workspace", not "office").
-- Detect language from topic and mirror it in title/subtitle/bullets/body. ${isCairo ? "Strongly prefer Arabic." : ""}
-- Be specific, factual, and concise. No filler, no generic platitudes.
-- Stats values are bold and short ("87%", "$2.4M", "12x").`;
+- First slide MUST be "cover", last MUST be "closing".
+- Mix types: insert a "section" every 4-6 slides; include >=1 "stats" and >=1 "quote" slide if length >= 10.
+- "image_query" MUST be 3-5 visual ENGLISH keywords (e.g. "modern glass office skyline aerial"). NO arabic, NO chinese, NO punctuation other than spaces.
+- "focus" is a brief instruction for the next stage — what the deep-content writer should expand. Be specific about the angle.
+- Detect language from topic and put title/subtitle in THAT language. ${isCairo ? "Strongly prefer Arabic for title/subtitle." : ""}`;
 
-  const userMsg = `Topic: ${topic}\n${content ? `Reference material:\n${content.slice(0, 4000)}` : ""}`;
+  const userMsg = `Topic: ${topic}\n${content ? `Reference material:\n${content.slice(0, 6000)}` : ""}`;
 
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -118,27 +156,162 @@ Rules:
     }),
   });
 
-  if (!resp.ok) throw new Error(`AI deck failed: ${resp.status}`);
+  if (!resp.ok) throw new Error(`Outline failed: ${resp.status}`);
   const data = await resp.json();
   const raw = data?.choices?.[0]?.message?.content ?? "{}";
-  let deck: any = {};
-  try { deck = JSON.parse(raw); } catch { deck = { title: topic, slides: [] }; }
-  deck.templateId = templateId;
-  deck.palette = palette;
-  if (!Array.isArray(deck.slides) || deck.slides.length === 0) {
-    deck.slides = [{ type: "cover", title: topic }, { type: "closing", title: "Thank You" }];
+  let outline: any = {};
+  try { outline = JSON.parse(raw); } catch { outline = { title: topic, slides: [] }; }
+  if (!Array.isArray(outline.slides) || outline.slides.length === 0) {
+    outline.slides = [{ type: "cover", title: topic }, { type: "closing", title: "Thank You" }];
   }
+  return outline;
+}
 
-  // Inject Pexels images in parallel.
+/* --------------- Stage B: Deep Content --------------- */
+async function expandWithDeepContent(opts: {
+  outline: any;
+  topic: string;
+  content: string;
+  templateId: string;
+  apiKey: string;
+}) {
+  const { outline, topic, content, templateId, apiKey } = opts;
+  const isCairo = templateId === "premium-cairo-modern" || templateId === "premium-arabesque-gold";
+  const language = outline.language || "auto";
+
+  const sys = `You are a senior research writer creating a presentation. Output ONLY a JSON object — no markdown.
+
+You are given an OUTLINE and you must EXPAND every slide with rich, factual content.
+
+For each slide, return the same fields PLUS:
+- "title": polished slide title (keep or improve outline title) in the same language as outline
+- "body": REQUIRED for content/section slides — a substantive paragraph of 50-110 words explaining the point with specific facts, context, and insight. Never empty, never a single sentence.
+- "bullets": REQUIRED for content slides — 4-6 bullets, each 6-15 words, concrete and informative (NOT 2-word fragments, NOT generic "Improves efficiency").
+- "stats": REQUIRED for stats slides — array of 3-5 {label, value} where value is bold and short ("87%", "$2.4M", "12x growth").
+- "quote": REQUIRED for quote slides — 15-30 word memorable quote tied to the topic.
+- "attribution": REQUIRED for quote slides — plausible person + role.
+- Keep "image_query" exactly as outline gives it (English).
+- Keep "type", "kicker", "subtitle", "cta" as outline gives them.
+
+Hard rules:
+- Output language = ${language}. ${isCairo ? "Strongly prefer Arabic." : ""}
+- Use the reference material as ground truth; if material is sparse, expand with widely-known facts about the topic.
+- NEVER produce empty body or empty bullets.
+- NEVER write filler like "More info coming" or "TBD" or "Lorem ipsum".
+- Be specific: name people, products, dates, numbers, places when possible.
+
+Return JSON: { "slides": [ {full slide object}, ... ] } in the SAME ORDER as outline.`;
+
+  const userMsg = `Topic: ${topic}
+Outline (expand each slide deeply):
+${JSON.stringify({ slides: outline.slides }, null, 2)}
+
+${content ? `Reference material:\n${content.slice(0, 8000)}` : ""}`;
+
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-pro",
+      messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!resp.ok) {
+    console.warn("[deep-content] failed", resp.status, await resp.text().catch(() => ""));
+    return outline.slides;
+  }
+  const data = await resp.json();
+  const raw = data?.choices?.[0]?.message?.content ?? "{}";
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+      // Merge: take outline slide and override with deep version (preserve image_query if missing)
+      return outline.slides.map((o: any, i: number) => {
+        const deep = parsed.slides[i] || {};
+        return { ...o, ...deep, image_query: deep.image_query || o.image_query };
+      });
+    }
+  } catch (e) {
+    console.warn("[deep-content] parse error", e);
+  }
+  return outline.slides;
+}
+
+/* --------------- English image-query enforcement --------------- */
+async function ensureEnglishQueries(slides: any[], apiKey: string): Promise<void> {
+  const offenders: { idx: number; q: string }[] = [];
+  slides.forEach((s, idx) => {
+    if (s?.image_query && !isMostlyEnglish(s.image_query)) {
+      offenders.push({ idx, q: s.image_query });
+    }
+  });
+  if (offenders.length === 0) return;
+
+  console.log("[image-query] translating", offenders.length, "non-english queries");
+
+  const sys = `You translate short phrases into 3-5 visual ENGLISH keywords for stock-photo search. Output ONLY JSON: {"translations":[{"i":0,"q":"english keywords"}]}. No fluff, just visual nouns and adjectives.`;
+  const userMsg = `Translate each:\n${offenders.map((o, i) => `${i}. ${o.q}`).join("\n")}`;
+
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const raw = data?.choices?.[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.translations)) {
+      parsed.translations.forEach((t: any) => {
+        const slot = offenders[t.i];
+        if (slot && t.q) slides[slot.idx].image_query = t.q;
+      });
+    }
+  } catch (e) {
+    console.warn("[image-query] translation failed", e);
+  }
+}
+
+/* --------------- Main two-stage builder --------------- */
+async function generateReactSlideDeck(opts: {
+  topic: string;
+  content: string;
+  templateId: string;
+  pageCount: number;
+  apiKey: string;
+}) {
+  const { topic, content, templateId, pageCount, apiKey } = opts;
+  const palette = PALETTES[templateId] ?? PALETTES["premium-aurora-keynote"];
+
+  const outline = await generateOutline({ topic, content, templateId, pageCount, apiKey });
+  const deepSlides = await expandWithDeepContent({ outline, topic, content, templateId, apiKey });
+  await ensureEnglishQueries(deepSlides, apiKey);
+
+  const deck: any = {
+    title: outline.title || topic,
+    subtitle: outline.subtitle,
+    language: outline.language,
+    templateId,
+    palette,
+    slides: deepSlides,
+  };
+
+  // Inject Pexels images with fallback in parallel.
   const pexelsKey = Deno.env.get("PEXELS_API_KEY");
   if (pexelsKey) {
-    const tasks = deck.slides.map(async (slide: any) => {
+    await Promise.all(deck.slides.map(async (slide: any) => {
       if (slide?.image_query && !slide.image) {
-        const url = await fetchPexelsImage(slide.image_query, pexelsKey);
+        const url = await resolveImage(slide.image_query, pexelsKey);
         if (url) slide.image = url;
       }
-    });
-    await Promise.all(tasks);
+    }));
   }
 
   return deck;
@@ -151,7 +324,6 @@ serve(async (req) => {
     const { topic, content, templateId, tier, userId, pageCount } = await req.json();
     if (!topic) throw new Error("Topic is required");
 
-    // 0 / null / undefined => let AI decide. Cap to a sane window otherwise.
     let pages = 0;
     if (typeof pageCount === "number" && Number.isFinite(pageCount) && pageCount > 0) {
       pages = Math.max(0, Math.min(60, Math.floor(pageCount)));
