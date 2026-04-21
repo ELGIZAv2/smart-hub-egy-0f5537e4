@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Pencil, ArrowRight } from "lucide-react";
 
 export interface FileBrief {
   summary?: string;
@@ -51,12 +50,9 @@ const BriefCard = ({ brief, fileType, onConfirm, onCancel }: Props) => {
       transition={spring}
       className="liquid-glass rounded-3xl p-5 max-w-md"
     >
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-primary" />
-        </div>
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Brief · {fileType}</p>
-      </div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-3">
+        Brief · {fileType}
+      </p>
 
       {draft.summary && (
         <p className="text-sm text-foreground/90 leading-relaxed mb-4">{draft.summary}</p>
@@ -77,8 +73,8 @@ const BriefCard = ({ brief, fileType, onConfirm, onCancel }: Props) => {
           ) : (
             <ol className="space-y-1.5">
               {items.slice(0, 15).map((it, i) => (
-                <li key={i} className="text-sm text-foreground/80 flex gap-2">
-                  <span className="text-muted-foreground/50 shrink-0 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                <li key={i} className="text-sm text-foreground/85 flex gap-2">
+                  <span className="text-muted-foreground/60 shrink-0 tabular-nums font-medium">{String(i + 1).padStart(2, "0")}</span>
                   <span className="leading-snug">{it}</span>
                 </li>
               ))}
@@ -102,19 +98,17 @@ const BriefCard = ({ brief, fileType, onConfirm, onCancel }: Props) => {
           whileTap={{ scale: 0.96 }}
           transition={spring}
           onClick={() => setEditing(!editing)}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full liquid-glass-button text-sm font-medium text-foreground/80"
+          className="flex-1 px-4 py-2.5 rounded-full liquid-glass-button text-sm font-medium text-foreground/85"
         >
-          <Pencil className="w-3.5 h-3.5" />
           {editing ? "Done" : "Edit"}
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.96 }}
           transition={spring}
           onClick={() => onConfirm(draft)}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-lg shadow-primary/20"
+          className="flex-1 px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-lg shadow-primary/20"
         >
           Generate
-          <ArrowRight className="w-3.5 h-3.5" />
         </motion.button>
       </div>
       {onCancel && (
