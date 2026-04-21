@@ -296,8 +296,19 @@ const ShoppingModePage = () => {
   );
 
   return (
-    <AppLayout>
-      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={() => navigate("/")} currentMode="shopping" />
+    <AppLayout
+      onSelectConversation={loadConversation}
+      onNewChat={startNewSession}
+      activeConversationId={conversationId}
+    >
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={startNewSession}
+        onSelectConversation={loadConversation}
+        activeConversationId={conversationId}
+        currentMode="shopping"
+      />
 
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "file")} />
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
