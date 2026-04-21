@@ -555,48 +555,91 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     setResearchSteps([]);
   }, [input, attachedFiles, activeAgent, conversationId, selectedTemplate, isMobile, agentMode, pendingBuilder]);
 
-  // ---- Specialized builder flow: Intake -> Brief -> Build ----
-  const handleIntakeSubmit = async (topic: string, extras: Record<string, string>) => {
-    if (!pendingBuilder) return;
-    setIntakeOpen(false);
+  // ---- Specialized builder flow: Smart Questions -> Brief -> Build ----
+
+  /** Step 1 — show topic, fetch in-language smart questions, render in chat. */
+  const startSmartQuestionFlow = async (type: FileBuilderType, topic: string) => {
+    const userLanguage = detectLanguage(topic);
+    setPendingBuilder({ type, topic, extras: { userLanguage } });
     setInput("");
     pushMessage({ role: "user", content: topic });
     const convId = await getOrCreateConversation(topic);
     if (convId) await saveMsg(convId, "user", topic);
+    if (isMobile) setActiveTab("chat");
 
     setIsGenerating(true);
-    setStatusText("Drafting brief...");
+    setStatusText("");
+    setResearchSteps([{ id: "qs", label: "Preparing a few quick questions...", status: "active" }]);
+    try {
+      const { data } = await supabase.functions.invoke("generate-file-questions", {
+        body: { fileType: type, topic, userLanguage },
+      });
+      const qs: SmartQuestion[] = Array.isArray(data?.questions) ? data.questions : [];
+      if (qs.length > 0) {
+        pushMessage({
+          role: "assistant",
+          content: "",
+          questions: qs,
+          questionsForType: type,
+          questionsTopic: topic,
+          questionsLanguage: userLanguage,
+        });
+      } else {
+        // No questions returned — go straight to brief.
+        await draftBriefAndShow(type, topic, "", userLanguage, convId);
+      }
+    } catch {
+      await draftBriefAndShow(type, topic, "", userLanguage, convId);
+    }
+    setIsGenerating(false);
+    setResearchSteps([]);
+  };
+
+  /** Step 2 — when user finishes the smart-question card. */
+  const handleQuestionsComplete = async (msgIdx: number, mergedAnswer: string) => {
+    const msg = messages[msgIdx];
+    if (!msg?.questionsForType || !msg.questionsTopic) return;
+    setMessages(prev => prev.map((m, i) =>
+      i === msgIdx ? { ...m, questionsAnswered: true, questionsAnswer: mergedAnswer } : m
+    ));
+    const convId = conversationId ?? (await getOrCreateConversation(msg.questionsTopic));
+    await draftBriefAndShow(msg.questionsForType, msg.questionsTopic, mergedAnswer, msg.questionsLanguage || detectLanguage(msg.questionsTopic), convId);
+  };
+
+  /** Step 3 — call brief generator (in user language) and render BriefCard. */
+  const draftBriefAndShow = async (
+    type: FileBuilderType,
+    topic: string,
+    questionAnswers: string,
+    userLanguage: string,
+    convId: string | null
+  ) => {
+    setIsGenerating(true);
+    setResearchSteps([{ id: "brief", label: "Drafting your plan...", status: "active" }]);
     try {
       const { data } = await supabase.functions.invoke("generate-file-brief", {
-        body: { fileType: pendingBuilder.type, topic, extra: extras },
+        body: {
+          fileType: type,
+          topic,
+          userLanguage,
+          extra: { answers: questionAnswers, language: userLanguage },
+        },
       });
-      const brief: FileBrief = data?.brief ?? { summary: topic };
-      setPendingBuilder({ ...pendingBuilder, topic, extras });
+      const brief: FileBrief = data?.brief ?? { summary: topic, language: userLanguage };
+      if (!brief.language) brief.language = userLanguage;
+      setPendingBuilder({ type, topic, extras: { userLanguage, answers: questionAnswers } });
       pushMessage({
         role: "assistant",
-        content: brief.summary || `Here's the plan for your ${pendingBuilder.type}.`,
+        content: brief.summary || "",
         brief,
-        briefForType: pendingBuilder.type,
+        briefForType: type,
         briefTopic: topic,
       });
     } catch {
-      // On brief failure, build directly.
-      await runBuilder(pendingBuilder.type, topic, undefined, convId);
+      await runBuilder(type, topic, { language: userLanguage }, convId);
     }
     setIsGenerating(false);
-    setStatusText("");
-  };
-
-  const handleIntakeSkip = async () => {
-    if (!pendingBuilder) return;
-    setIntakeOpen(false);
-    const topic = pendingBuilder.topic || input || "Untitled";
-    setInput("");
-    pushMessage({ role: "user", content: topic });
-    const convId = await getOrCreateConversation(topic);
-    if (convId) await saveMsg(convId, "user", topic);
-    await runBuilder(pendingBuilder.type, topic, undefined, convId);
-    setPendingBuilder(null);
+    setResearchSteps([]);
   };
 
   const runBuilder = async (
