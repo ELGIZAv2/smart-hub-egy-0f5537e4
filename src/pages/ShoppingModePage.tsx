@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Menu, Plus, X, ShoppingCart, ArrowUp, Square, Image as ImageIcon, FileUp, Camera, Star, MoreHorizontal, Download, Share2 } from "lucide-react";
+import { Menu, Plus, X, ShoppingCart, ArrowUp, Square, Image as ImageIcon, FileUp, Camera, Star, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AppSidebar from "@/components/AppSidebar";
@@ -9,7 +9,8 @@ import AppLayout from "@/layouts/AppLayout";
 import ChatMessage from "@/components/ChatMessage";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getModeDescription } from "@/lib/modeDescriptions";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface Product {
   title: string;
@@ -31,11 +32,9 @@ interface Message {
 const SHOPPING_PROMPT =
   "You are a smart shopping assistant. " +
   "CRITICAL: ALWAYS reply in the user's EXACT language and dialect. " +
-  "FORMAT: Product cards appear automatically — your TEXT response must be a brief expert summary in this exact structure: " +
-  "1) One sentence saying which product is the best pick and why. " +
-  "2) A short comparison (2-3 bullets) of the top 2-3 options on price, quality, value. " +
-  "3) One closing line with a buying tip. " +
-  "Keep it under 120 words. Never write long essays. Never list every product — the cards already do that.";
+  "WORKFLOW: 1) Verify each product matches the user's exact request. 2) Convert all prices to the user's local currency. " +
+  "3) Provide a brief expert summary (under 100 words): one sentence on the best pick + 2-3 bullets comparing top options + one closing tip. " +
+  "Never list every product — the cards already display them. Never write long essays.";
 
 const ShoppingModePage = () => {
   const navigate = useNavigate();
@@ -45,16 +44,19 @@ const ShoppingModePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; data: string }[]>([]);
-  const [livePreview, setLivePreview] = useState<Product[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+
+  // Product detail sheet
+  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [productReport, setProductReport] = useState<string>("");
+  const [reportLoading, setReportLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const liveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -65,26 +67,6 @@ const ShoppingModePage = () => {
   }, [messages, isLoading]);
 
   const hasResults = messages.length > 0;
-
-  // Live preview as user types — 300ms debounce, fires on every keystroke
-  useEffect(() => {
-    if (!input.trim() || input.trim().length < 2 || hasResults) {
-      setLivePreview([]);
-      return;
-    }
-    if (liveDebounce.current) clearTimeout(liveDebounce.current);
-    liveDebounce.current = setTimeout(async () => {
-      try {
-        const { data } = await supabase.functions.invoke("search", {
-          body: { query: input, type: "shopping", limit: 8 },
-        });
-        if (data?.products) setLivePreview(data.products.slice(0, 8));
-      } catch { /* silent */ }
-    }, 300);
-    return () => { if (liveDebounce.current) clearTimeout(liveDebounce.current); };
-  }, [input, hasResults]);
-
-  // (outside-click handled via fixed backdrop overlay inside the menu)
 
   const handleFile = useCallback((files: FileList | null, kind: "image" | "file") => {
     if (!files) return;
@@ -103,7 +85,6 @@ const ShoppingModePage = () => {
     if (!input.trim() && attachedFiles.length === 0) return;
     if (isLoading) return;
 
-    setLivePreview([]);
     const userMsg: Message = {
       role: "user",
       content: input.trim() || "(attached)",
@@ -167,16 +148,81 @@ const ShoppingModePage = () => {
       },
       onError: (e) => { toast.error(e); setIsLoading(false); },
     });
-  }, [input, attachedFiles, isLoading, messages, userId]);
+  }, [input, attachedFiles, isLoading, messages, userId, conversationId]);
 
   const stop = () => { abortRef.current?.abort(); setIsLoading(false); };
 
+  // Open the product detail sheet — fetch a quick AI report and persist to backend
+  const openProduct = useCallback(async (p: Product) => {
+    setActiveProduct(p);
+    setProductReport("");
+    setReportLoading(true);
+
+    const productKey = `${(p.seller || "").slice(0, 40)}::${p.title.slice(0, 80)}`;
+
+    // 1) Try cache from backend first
+    if (userId) {
+      const { data: cached } = await supabase
+        .from("shopping_product_reports")
+        .select("ai_report")
+        .eq("user_id", userId)
+        .eq("product_key", productKey)
+        .maybeSingle();
+      if (cached?.ai_report) {
+        setProductReport(cached.ai_report);
+        setReportLoading(false);
+        return;
+      }
+    }
+
+    // 2) Generate a fresh report
+    let rep = "";
+    const ac = new AbortController();
+    await streamChat({
+      messages: [
+        {
+          role: "assistant",
+          content:
+            "You are a buying-advice expert. Reply in the user's language. Generate a SHORT product brief in this exact structure:\n" +
+            "**About this product** — 1-2 sentences.\n" +
+            "**Pros** — 2-3 bullets.\n" +
+            "**Cons** — 1-2 bullets.\n" +
+            "**Verdict** — one buying tip. Keep under 90 words.",
+        },
+        {
+          role: "user",
+          content: `Product: ${p.title}\nSeller: ${p.seller || "Unknown"}\nPrice: ${p.price}${p.rating ? `\nRating: ${p.rating}` : ""}`,
+        },
+      ] as any,
+      model: "google/gemini-2.5-flash-lite-preview-09-2025",
+      chatMode: "chat",
+      user_id: userId ?? undefined,
+      signal: ac.signal,
+      onDelta: (d) => {
+        rep += d;
+        setProductReport(rep);
+      },
+      onDone: async () => {
+        setReportLoading(false);
+        if (userId && rep) {
+          await supabase.from("shopping_product_reports").insert({
+            user_id: userId,
+            product_key: productKey,
+            product_data: p as any,
+            ai_report: rep,
+            currency: "auto",
+          });
+        }
+      },
+      onError: () => setReportLoading(false),
+    });
+  }, [userId]);
+
   const ProductCard = ({ p }: { p: Product }) => (
-    <a
-      href={p.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-background/40 backdrop-blur-xl transition hover:border-amber-400/40 hover:shadow-[0_8px_30px_rgba(245,158,11,0.2)]"
+    <button
+      type="button"
+      onClick={() => openProduct(p)}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-background/40 backdrop-blur-xl text-left transition hover:border-amber-400/40 hover:shadow-[0_8px_30px_rgba(245,158,11,0.2)]"
     >
       <div className="relative aspect-square w-full overflow-hidden bg-white/5">
         {p.image ? (
@@ -195,7 +241,7 @@ const ShoppingModePage = () => {
         )}
         <div className="mt-auto pt-1.5 text-sm font-bold text-foreground">{p.price}</div>
       </div>
-    </a>
+    </button>
   );
 
   return (
@@ -231,17 +277,14 @@ const ShoppingModePage = () => {
             >
               Shop Smart
             </motion.h2>
-
-            {/* Live preview as user types */}
-            {livePreview.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-8 grid w-full grid-cols-2 gap-3 sm:grid-cols-3"
-              >
-                {livePreview.map((p, i) => <ProductCard key={i} p={p} />)}
-              </motion.div>
-            )}
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mt-2 text-sm font-medium text-muted-foreground"
+            >
+              {getModeDescription("shopping")}
+            </motion.p>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-5xl px-4 pb-48 pt-20">
@@ -304,13 +347,14 @@ const ShoppingModePage = () => {
 
                   {plusOpen && (
                     <>
-                      <div className="fixed inset-0 z-[45]" onClick={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
+                      <div className="fixed inset-0 z-[60]" onMouseDown={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
                       <motion.div
                         initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute bottom-full mb-2 left-0 z-[46] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
+                        className="absolute bottom-full mb-2 left-0 z-[61] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                       >
                         <div className="grid grid-cols-3 gap-2">
                           {[
@@ -360,6 +404,59 @@ const ShoppingModePage = () => {
             </div>
           </div>
         </div>
+
+        {/* Product detail sheet */}
+        <Sheet open={!!activeProduct} onOpenChange={(o) => { if (!o) setActiveProduct(null); }}>
+          <SheetContent side="bottom" className="rounded-t-3xl border-foreground/10 bg-background/95 backdrop-blur-2xl max-h-[85dvh] overflow-y-auto">
+            {activeProduct && (
+              <>
+                <SheetHeader className="text-left">
+                  <SheetTitle className="text-base text-foreground">
+                    Found in {activeProduct.seller || "online stores"}
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="mt-3 flex gap-3">
+                  {activeProduct.image && (
+                    <img src={activeProduct.image} alt="" className="h-28 w-28 shrink-0 rounded-2xl object-cover" />
+                  )}
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-foreground line-clamp-3">{activeProduct.title}</h3>
+                    <div className="mt-1.5 text-lg font-bold text-amber-400">{activeProduct.price}</div>
+                    {activeProduct.rating && (
+                      <div className="mt-1 flex items-center gap-1 text-xs text-amber-400">
+                        <Star className="h-3 w-3 fill-current" /> {activeProduct.rating}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Expert review</h4>
+                  {reportLoading && !productReport ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Analyzing the product…
+                    </div>
+                  ) : (
+                    <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                      {productReport || "—"}
+                    </div>
+                  )}
+                </div>
+
+                {activeProduct.link && (
+                  <a
+                    href={activeProduct.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 py-3 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.01]"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Open at {activeProduct.seller || "store"}
+                  </a>
+                )}
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </AppLayout>
   );

@@ -13,6 +13,7 @@ import ChatMessage from "@/components/ChatMessage";
 import ThinkingLoader from "@/components/ThinkingLoader";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
+import { getModeDescription } from "@/lib/modeDescriptions";
 
 interface Message {
   role: "user" | "assistant";
@@ -207,6 +208,14 @@ const LearningModePage = () => {
             >
               Learn Anything
             </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mt-2 text-sm font-medium text-muted-foreground"
+            >
+              {getModeDescription("learning")}
+            </motion.p>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-3xl px-4 pb-48 pt-20">
@@ -228,6 +237,13 @@ const LearningModePage = () => {
         )}
 
         {/* Floating Tools button — pyramid menu (memoized, no remount) */}
+        {toolsOpen && (
+          <div
+            className="fixed inset-0 z-40"
+            onMouseDown={() => setToolsOpen(false)}
+            onTouchStart={() => setToolsOpen(false)}
+          />
+        )}
         <div className="fixed bottom-32 right-4 z-50 md:right-8">
           <AnimatePresence initial={false}>
             {toolsOpen && (
@@ -237,6 +253,8 @@ const LearningModePage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
                 transition={{ duration: 0.2 }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 className="absolute bottom-16 right-0 flex flex-col items-end gap-2"
               >
                 {toolsList.map((t) => (
@@ -246,7 +264,7 @@ const LearningModePage = () => {
                     initial={{ opacity: 0, x: 20, scale: 0.9 }}
                     animate={{ opacity: 1, x: 0, scale: 1 }}
                     exit={{ opacity: 0, x: 20, scale: 0.9 }}
-                    transition={{ delay: t.idx * 0.04, type: "spring", damping: 20, stiffness: 300 }}
+                    transition={{ type: "spring", damping: 20, stiffness: 300 }}
                     onClick={() => { navigate(t.route); setToolsOpen(false); }}
                     className={`${t.sizeClass} flex items-center justify-end gap-2.5 rounded-full border border-white/15 bg-background/60 px-4 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] hover:scale-[1.02] transition-transform`}
                   >
@@ -261,7 +279,7 @@ const LearningModePage = () => {
           </AnimatePresence>
 
           <button
-            onClick={() => setToolsOpen((v) => !v)}
+            onClick={(e) => { e.stopPropagation(); setToolsOpen((v) => !v); }}
             className={`flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-[0_10px_40px_rgba(16,185,129,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-2xl transition hover:scale-105 ${toolsOpen ? "rotate-45" : ""}`}
           >
             <Wrench className="h-5 w-5 text-white" />

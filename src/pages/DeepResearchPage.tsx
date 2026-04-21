@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Menu, Plus, X, ArrowUp, Square, Image as ImageIcon, FileUp, Camera,
-  ChevronDown, MoreHorizontal, Download, Share2, FileText, Sparkles,
+  ChevronDown, MoreHorizontal, Download, Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,9 +11,32 @@ import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import { streamChat } from "@/lib/streamChat";
 import { saveConversation } from "@/lib/conversationPersistence";
+import { saveResearch, loadRecentResearch } from "@/lib/researchPersistence";
+import { getModeDescription } from "@/lib/modeDescriptions";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+// Pegtop star animation (same as the main chat thinking loader)
+const PegtopStar = ({ active }: { active: boolean }) => (
+  <motion.svg
+    viewBox="0 0 24 24"
+    className="h-4 w-4 shrink-0"
+    animate={active ? { rotate: [0, 360], scale: [1, 1.15, 1] } : { rotate: 0, scale: 1 }}
+    transition={active ? { rotate: { duration: 4, repeat: Infinity, ease: "linear" }, scale: { duration: 1.4, repeat: Infinity } } : { duration: 0.3 }}
+  >
+    <path
+      d="M12 2 L14.2 9.2 L21.6 9.6 L15.8 14.2 L18 21.4 L12 17.2 L6 21.4 L8.2 14.2 L2.4 9.6 L9.8 9.2 Z"
+      fill={active ? "url(#pgrad)" : "hsl(var(--primary) / 0.85)"}
+    />
+    <defs>
+      <linearGradient id="pgrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="hsl(265 90% 70%)" />
+        <stop offset="100%" stopColor="hsl(220 90% 65%)" />
+      </linearGradient>
+    </defs>
+  </motion.svg>
+);
 
 interface TimelineStep {
   id: string;
@@ -92,12 +115,22 @@ const DeepResearchPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [sessions, isLoading]);
 
-  // Persist completed reports in sessionStorage so the preview route can read them
+  // Restore prior research from backend on mount (replaces sessionStorage)
   useEffect(() => {
-    if (sessions.length > 0) {
-      sessionStorage.setItem("dr_sessions", JSON.stringify(sessions));
-    }
-  }, [sessions]);
+    if (!userId) return;
+    loadRecentResearch(userId, 10).then((rows) => {
+      if (!rows.length) return;
+      const restored: ResearchSession[] = rows.reverse().map((r) => ({
+        id: r.session_key,
+        query: r.query,
+        report: r.report,
+        images: r.images,
+        steps: r.steps as TimelineStep[],
+        expandedStep: null,
+      }));
+      setSessions((prev) => (prev.length ? prev : restored));
+    });
+  }, [userId]);
 
   const handleFile = useCallback((files: FileList | null, kind: "image" | "file") => {
     if (!files) return;
@@ -210,11 +243,15 @@ const DeepResearchPage = () => {
       },
       onDone: async () => {
         if (phaseTimer) { clearInterval(phaseTimer); phaseTimer = null; }
-        updateLastSession((s) => ({
-          ...s,
-          steps: s.steps.map((x) => ({ ...x, status: "done" as const })),
-          expandedStep: null,
-        }));
+        let finalSession: ResearchSession | null = null;
+        updateLastSession((s) => {
+          const updated = {
+            ...s,
+            steps: s.steps.map((x) => ({ ...x, status: "done" as const })),
+          };
+          finalSession = updated;
+          return updated;
+        });
         setIsLoading(false);
         abortRef.current = null;
         if (userId && reportBuf) {
@@ -227,6 +264,15 @@ const DeepResearchPage = () => {
             ],
           });
           if (cid && !conversationId) setConversationId(cid);
+          if (finalSession) {
+            await saveResearch(userId, {
+              session_key: finalSession.id,
+              query: finalSession.query,
+              report: finalSession.report,
+              images: finalSession.images,
+              steps: finalSession.steps,
+            });
+          }
         }
       },
       onError: (e) => {
@@ -260,7 +306,7 @@ const DeepResearchPage = () => {
   };
 
   const openPreview = (s: ResearchSession) => {
-    sessionStorage.setItem(`dr_report_${s.id}`, JSON.stringify({ query: s.query, report: s.report, images: s.images }));
+    // Report data is loaded from the backend in the preview page; pass id only.
     navigate(`/research/preview/${s.id}`);
   };
 
@@ -307,6 +353,13 @@ const DeepResearchPage = () => {
             >
               Research Deeply
             </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mt-2 text-sm font-medium text-muted-foreground"
+            >
+              {getModeDescription("research")}
+            </motion.p>
           </div>
         ) : (
           <div className="relative z-10 mx-auto max-w-2xl px-4 pb-48 pt-20 space-y-8">
@@ -333,9 +386,7 @@ const DeepResearchPage = () => {
                             onClick={() => toggleStep(idx, step.id)}
                             className="w-full flex items-center gap-2.5 py-1.5 text-left hover:opacity-80 transition"
                           >
-                            <div className={`shrink-0 ${isStepActive ? "text-violet-400" : "text-emerald-400/80"}`}>
-                              <Sparkles className={`h-4 w-4 ${isStepActive ? "animate-pulse" : ""}`} />
-                            </div>
+                            <PegtopStar active={isStepActive} />
                             <span className={`flex-1 text-sm font-bold truncate ${isStepActive ? "text-foreground" : "text-foreground/85"}`}>
                               {step.label}
                             </span>
@@ -360,8 +411,8 @@ const DeepResearchPage = () => {
                     })}
                     {isActive && s.steps.length === 0 && (
                       <div className="flex items-center gap-2.5 py-1.5">
-                        <Sparkles className="h-4 w-4 text-violet-400 animate-pulse" />
-                        <span className="text-sm font-bold text-foreground">جاري بدء البحث…</span>
+                        <PegtopStar active />
+                        <span className="text-sm font-bold text-foreground">Starting research…</span>
                       </div>
                     )}
                   </div>
@@ -379,29 +430,30 @@ const DeepResearchPage = () => {
                     </div>
                   )}
 
-                  {/* Report card — clean, no icons except subtle FileText, three-dot menu */}
+                  {/* Report card — clean, no FileText icon. Inline Download + three-dot menu. */}
                   {s.report && (
                     <div className="relative rounded-3xl border border-foreground/10 bg-background/60 backdrop-blur-xl overflow-hidden">
                       <button
                         onClick={() => openPreview(s)}
                         className="block w-full p-4 text-left transition hover:bg-foreground/[0.03]"
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
-                            <FileText className="h-5 w-5 text-blue-400" />
-                          </div>
-                          <div className="flex-1 min-w-0 pr-8">
-                            <h3 className="text-sm font-semibold text-foreground truncate">{s.query}</h3>
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">
-                              Markdown · {(s.report.length / 1024).toFixed(1)} KB
-                            </p>
-                            <p className="mt-2.5 line-clamp-3 text-xs text-foreground/60 leading-relaxed">
-                              {s.report.slice(0, 260).replace(/[#*`>]/g, "").trim()}
-                            </p>
-                          </div>
+                        <div className="pr-20">
+                          <h3 className="text-sm font-semibold text-foreground truncate">{s.query}</h3>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            Report · {(s.report.length / 1024).toFixed(1)} KB
+                          </p>
+                          <p className="mt-2.5 line-clamp-3 text-xs text-foreground/60 leading-relaxed">
+                            {s.report.slice(0, 260).replace(/[#*`>]/g, "").trim()}
+                          </p>
                         </div>
                       </button>
-
+                      <button
+                        onClick={(e) => { e.stopPropagation(); downloadReport(s); }}
+                        className="absolute right-12 top-3 flex h-8 w-8 items-center justify-center rounded-full hover:bg-foreground/10 transition"
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4 text-muted-foreground" />
+                      </button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
@@ -413,7 +465,7 @@ const DeepResearchPage = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-2xl border-foreground/10 rounded-2xl">
                           <DropdownMenuItem onClick={() => downloadReport(s)} className="rounded-xl">
-                            <Download className="mr-2 h-4 w-4" /> Download as PDF
+                            <Download className="mr-2 h-4 w-4" /> Download
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => share(s)} className="rounded-xl">
                             <Share2 className="mr-2 h-4 w-4" /> Share
