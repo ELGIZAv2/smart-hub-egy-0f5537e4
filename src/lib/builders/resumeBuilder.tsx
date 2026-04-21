@@ -82,11 +82,13 @@ export async function buildResume(topic: string, brief?: unknown): Promise<Build
   const blob = await pdfToBlob(doc);
   const safe = (schema.name || "resume").replace(/[^a-z0-9-_ ]/gi, "_").slice(0, 50);
   const url = await uploadArtifact(blob, `${safe}-resume.pdf`);
+  const pdfPreviewUrl = URL.createObjectURL(blob);
 
   return {
     title: `${schema.name || "Resume"} — Resume`,
     summary: `Resume for ${schema.name || "you"} is ready (${schema.experience?.length ?? 0} roles, ${schema.skills?.length ?? 0} skills).`,
     downloadUrl: url ?? undefined,
+    pdfPreviewUrl,
     mimeType: "application/pdf",
   };
 }

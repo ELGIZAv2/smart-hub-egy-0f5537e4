@@ -40,11 +40,13 @@ export async function buildDocument(topic: string, brief?: unknown): Promise<Bui
   const blob = await pdfToBlob(doc);
   const safe = (schema.title || "document").replace(/[^a-z0-9-_ ]/gi, "_").slice(0, 50);
   const url = await uploadArtifact(blob, `${safe}.pdf`);
+  const pdfPreviewUrl = URL.createObjectURL(blob);
 
   return {
     title: schema.title,
     summary: `Your document "${schema.title}" is ready with ${schema.sections?.length ?? 0} sections.`,
     downloadUrl: url ?? undefined,
+    pdfPreviewUrl,
     mimeType: "application/pdf",
   };
 }

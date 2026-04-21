@@ -45,11 +45,13 @@ export async function buildLetter(topic: string, brief?: unknown): Promise<Build
   const blob = await pdfToBlob(doc);
   const safe = (schema.subject || "letter").replace(/[^a-z0-9-_ ]/gi, "_").slice(0, 50);
   const url = await uploadArtifact(blob, `${safe}.pdf`);
+  const pdfPreviewUrl = URL.createObjectURL(blob);
 
   return {
     title: schema.subject || "Letter",
     summary: `Your letter${schema.recipient?.name ? ` to ${schema.recipient.name}` : ""} is ready.`,
     downloadUrl: url ?? undefined,
+    pdfPreviewUrl,
     mimeType: "application/pdf",
   };
 }

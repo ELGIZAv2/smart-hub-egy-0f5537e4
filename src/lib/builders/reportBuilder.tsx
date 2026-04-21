@@ -75,11 +75,13 @@ export async function buildReport(topic: string, brief?: unknown): Promise<Build
   const blob = await pdfToBlob(doc);
   const safe = (schema.title || "report").replace(/[^a-z0-9-_ ]/gi, "_").slice(0, 50);
   const url = await uploadArtifact(blob, `${safe}.pdf`);
+  const pdfPreviewUrl = URL.createObjectURL(blob);
 
   return {
     title: schema.title,
     summary: `Your report "${schema.title}" is ready (${schema.sections?.length ?? 0} sections, ${schema.kpis?.length ?? 0} KPIs).`,
     downloadUrl: url ?? undefined,
+    pdfPreviewUrl,
     mimeType: "application/pdf",
   };
 }

@@ -28,6 +28,7 @@ interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   htmlContent?: string;
+  pdfPreviewUrl?: string;
   downloadUrl?: string;
   mimeType?: string;
   deck?: SlideDeck;
@@ -149,6 +150,7 @@ const FilesPage = () => {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
@@ -571,11 +573,19 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     setStatusText("");
     setResearchSteps([{ id: "qs", label: "Preparing a few quick questions...", status: "active" }]);
     try {
+      const avoidKey = `files_qs_history_${type}`;
+      let avoidQuestions: string[] = [];
+      try { avoidQuestions = JSON.parse(localStorage.getItem(avoidKey) || "[]"); } catch {}
       const { data } = await supabase.functions.invoke("generate-file-questions", {
-        body: { fileType: type, topic, userLanguage },
+        body: { fileType: type, topic, userLanguage, seed: Date.now(), avoidQuestions },
       });
       const qs: SmartQuestion[] = Array.isArray(data?.questions) ? data.questions : [];
       if (qs.length > 0) {
+        try {
+          const titles = qs.map(q => q.title).filter(Boolean);
+          const updated = [...titles, ...avoidQuestions].slice(0, 12);
+          localStorage.setItem(avoidKey, JSON.stringify(updated));
+        } catch {}
         pushMessage({
           role: "assistant",
           content: "",
@@ -658,6 +668,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
         role: "assistant",
         content: result.summary,
         htmlContent: result.previewHtml,
+        pdfPreviewUrl: result.pdfPreviewUrl,
         downloadUrl: result.downloadUrl,
         mimeType: result.mimeType,
       });
@@ -667,8 +678,13 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
           downloadUrl: result.downloadUrl,
         });
       }
-      if (result.previewHtml) {
+      if (result.pdfPreviewUrl) {
+        setPreviewPdfUrl(result.pdfPreviewUrl);
+        setPreviewHtml(null);
+        if (!isMobile) setActiveTab("preview");
+      } else if (result.previewHtml) {
         setPreviewHtml(result.previewHtml);
+        setPreviewPdfUrl(null);
         if (!isMobile) setActiveTab("preview");
       }
     } catch (e) {
@@ -1053,8 +1069,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                     )}
 
                     
-                    {/* File thumbnail card */}
-                    {msg.htmlContent && (
+                    {(msg.htmlContent || msg.pdfPreviewUrl) && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1062,13 +1077,21 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                         className="rounded-3xl overflow-hidden liquid-glass-subtle max-w-sm"
                       >
                         <div className="relative h-[120px] overflow-hidden bg-white rounded-t-3xl">
-                          <iframe
-                            srcDoc={msg.htmlContent}
-                            className="w-full h-full pointer-events-none"
-                            sandbox=""
-                            title="File thumbnail"
-                            style={{ transform: "scale(0.5)", transformOrigin: "top left", width: "200%", height: "200%" }}
-                          />
+                          {msg.pdfPreviewUrl ? (
+                            <iframe
+                              src={`${msg.pdfPreviewUrl}#toolbar=0&navpanes=0&view=FitH`}
+                              className="w-full h-full pointer-events-none"
+                              title="PDF thumbnail"
+                            />
+                          ) : (
+                            <iframe
+                              srcDoc={msg.htmlContent}
+                              className="w-full h-full pointer-events-none"
+                              sandbox=""
+                              title="File thumbnail"
+                              style={{ transform: "scale(0.5)", transformOrigin: "top left", width: "200%", height: "200%" }}
+                            />
+                          )}
                         </div>
                         <div className="px-4 py-3 flex items-center justify-between gap-2">
                           <p className="text-xs font-medium text-foreground truncate">
@@ -1086,7 +1109,11 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                             <motion.button
                               whileTap={{ scale: 0.9 }}
                               transition={spring}
-                              onClick={() => { setPreviewHtml(msg.htmlContent!); if (isMobile) setActiveTab("preview"); }}
+                              onClick={() => {
+                                if (msg.pdfPreviewUrl) { setPreviewPdfUrl(msg.pdfPreviewUrl); setPreviewHtml(null); }
+                                else if (msg.htmlContent) { setPreviewHtml(msg.htmlContent); setPreviewPdfUrl(null); }
+                                if (isMobile) setActiveTab("preview");
+                              }}
                               className="text-xs text-primary font-medium hover:text-primary/80 transition-colors px-2 py-1 rounded-lg"
                             >
                               Preview
@@ -1211,13 +1238,14 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     </div>
   );
 
-  const previewPanel = previewHtml ? (
+  const previewPanel = (previewHtml || previewPdfUrl) ? (
     <FilePreviewPanel
       html={previewHtml}
+      pdfUrl={previewPdfUrl}
       title={messages.find(m => m.role === "user")?.content?.slice(0, 50) || "Preview"}
-      onClose={() => { if (isMobile) setActiveTab("chat"); else setPreviewHtml(null); }}
+      onClose={() => { if (isMobile) setActiveTab("chat"); else { setPreviewHtml(null); setPreviewPdfUrl(null); } }}
       onEdit={() => { if (isMobile) setActiveTab("chat"); }}
-      onDownload={() => { setExportHtml(previewHtml); setShowExport(true); }}
+      onDownload={() => { if (previewHtml) { setExportHtml(previewHtml); setShowExport(true); } else if (previewPdfUrl) { window.open(previewPdfUrl, "_blank"); } }}
     />
   ) : null;
 
