@@ -323,7 +323,7 @@ const ShoppingModePage = () => {
                 {m.content && <ChatMessage role={m.role} content={m.content} />}
                 {m.products && m.products.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {m.products.map((p, j) => <ProductCard key={j} p={p} />)}
+                    {(m.showAllProducts ? m.products : m.products.slice(0, 4)).map((p, j) => <ProductCard key={j} p={p} />)}
                   </div>
                 )}
               </div>
@@ -362,6 +362,7 @@ const ShoppingModePage = () => {
               <div className="flex items-end gap-2">
                 <div className="relative">
                   <button
+                    ref={plusButtonRef}
                     onClick={(e) => { e.stopPropagation(); setPlusOpen((v) => !v); }}
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
                   >
@@ -372,6 +373,7 @@ const ShoppingModePage = () => {
                     <>
                       <div className="fixed inset-0 z-[60]" onMouseDown={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
                       <motion.div
+                        ref={plusMenuRef}
                         initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.15 }}
@@ -466,16 +468,9 @@ const ShoppingModePage = () => {
                   )}
                 </div>
 
-                {activeProduct.link && (
-                  <a
-                    href={activeProduct.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 py-3 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.01]"
-                  >
-                    <ExternalLink className="h-4 w-4" /> Open at {activeProduct.seller || "store"}
-                  </a>
-                )}
+                <div className="mt-6 rounded-2xl border border-foreground/10 bg-foreground/5 px-4 py-3 text-sm text-muted-foreground">
+                  Source: {activeProduct.seller || "Verified store listing"}
+                </div>
               </>
             )}
           </SheetContent>

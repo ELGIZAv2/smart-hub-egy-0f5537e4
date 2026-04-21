@@ -24,7 +24,5 @@ const map: Record<Mode, Record<string, string>> = {
 };
 
 export const getModeDescription = (mode: Mode): string => {
-  if (typeof navigator === "undefined") return map[mode].en;
-  const lang = (navigator.language || "en").slice(0, 2).toLowerCase();
-  return map[mode][lang] || map[mode].en;
+  return map[mode].en;
 };
