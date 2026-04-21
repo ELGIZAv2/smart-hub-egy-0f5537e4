@@ -101,9 +101,14 @@ const DeepResearchPage = () => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
+  // Auto-scroll only when the user just sent a message — let the user scroll freely otherwise.
+  const userJustSentRef = useRef(false);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [sessions, isLoading]);
+    if (userJustSentRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      userJustSentRef.current = false;
+    }
+  }, [sessions.length]);
 
   useEffect(() => {
     if (!plusOpen) return;
@@ -119,22 +124,32 @@ const DeepResearchPage = () => {
     return () => window.removeEventListener("pointerdown", handlePointerDown, true);
   }, [plusOpen]);
 
-  // Restore prior research from backend on mount (replaces sessionStorage)
-  useEffect(() => {
-    if (!userId) return;
-    loadRecentResearch(userId, 10).then((rows) => {
-      if (!rows.length) return;
-      const restored: ResearchSession[] = rows.reverse().map((r) => ({
-        id: r.session_key,
-        query: r.query,
-        report: r.report,
-        images: r.images,
-        steps: r.steps as TimelineStep[],
+  // Load a previous conversation from the sidebar (mirrors ChatPage behavior).
+  const loadConversation = useCallback(async (cid: string) => {
+    setConversationId(cid);
+    const { data: msgs } = await supabase
+      .from("messages")
+      .select("role, content")
+      .eq("conversation_id", cid)
+      .order("created_at", { ascending: true });
+    if (!msgs?.length) return;
+    const restored: ResearchSession[] = [];
+    for (let i = 0; i < msgs.length; i += 2) {
+      const u = msgs[i];
+      const a = msgs[i + 1];
+      if (u?.role !== "user" || !a) continue;
+      restored.push({
+        id: `dr-${cid}-${i}`,
+        query: u.content,
+        report: a.content,
+        summary: a.content.slice(0, 240).replace(/[#*`>|]/g, "").trim(),
+        images: [],
+        steps: [],
         expandedStep: null,
-      }));
-      setSessions((prev) => (prev.length ? prev : restored));
-    });
-  }, [userId]);
+      });
+    }
+    setSessions(restored);
+  }, []);
 
   const handleFile = useCallback((files: FileList | null, kind: "image" | "file") => {
     if (!files) return;
