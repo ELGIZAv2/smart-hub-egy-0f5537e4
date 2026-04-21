@@ -4,6 +4,7 @@ import { ArrowLeft, Download } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
+import { detectResearchReportDirection, normalizeResearchReport } from "@/lib/normalizeResearchReport";
 import { toast } from "sonner";
 
 interface ReportData {
@@ -11,63 +12,6 @@ interface ReportData {
   report: string;
   images: string[];
 }
-
-/**
- * Heavy-duty markdown normalizer for the AI research report.
- * Fixes the formatting issues we keep seeing in the preview:
- *   - dropped blank lines before/after headings, lists, tables, blockquotes
- *   - bullets/numbers stuck to the previous line ("text- item" or "text 1.")
- *   - mid-sentence line breaks inside Arabic paragraphs
- *   - stray "thinking/reasoning" preamble blocks
- *   - Latin punctuation hugging Arabic text without spaces
- *   - normalized list markers and stripped excessive blank lines
- */
-const normalizeReport = (raw: string): string => {
-  if (!raw) return "";
-  let s = raw;
-
-  // 1. Strip internal/thinking blocks
-  s = s.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
-  s = s.replace(/^\s*>\s*(thinking|reasoning|internal)[\s\S]*?(?=\n##|\n#|$)/gim, "");
-
-  // 2. Normalize line endings & non-breaking spaces
-  s = s.replace(/\r\n?/g, "\n").replace(/\u00A0/g, " ").replace(/\t/g, "    ");
-
-  // 3. Force a blank line BEFORE block elements that are jammed onto a previous line
-  s = s.replace(/([^\n])\n(#{1,6}\s)/g, "$1\n\n$2");           // headings
-  s = s.replace(/([^\n])\n(\|.+\|)/g, "$1\n\n$2");             // tables
-  s = s.replace(/([^\n])\n(>\s)/g, "$1\n\n$2");                // blockquotes
-  s = s.replace(/([^\n])\n([-*+]\s)/g, "$1\n\n$2");            // bullets
-  s = s.replace(/([^\n])\n(\d+\.\s)/g, "$1\n\n$2");            // numbered
-
-  // 4. When the model glued a bullet onto the SAME line: "intro: - item" -> "intro:\n\n- item"
-  s = s.replace(/([^\s])\s+([-*+])\s+(?=\S)/g, (m, pre, bullet) =>
-    /[(\[]/.test(pre) ? m : `${pre}\n\n${bullet} `
-  );
-
-  // 5. Normalize bullet markers to "-" for consistent rendering
-  s = s.replace(/^[\s]*[•●◦∙·]\s+/gm, "- ");
-
-  // 6. Fix headings without a space after the # (e.g. "##Title" -> "## Title")
-  s = s.replace(/^(#{1,6})([^\s#])/gm, "$1 $2");
-
-  // 7. Re-flow accidental mid-sentence breaks INSIDE paragraphs only.
-  //    A break is an "accident" when the next line starts with a lowercase/Arabic letter
-    //    AND the previous line did not end with terminal punctuation.
-  s = s.replace(
-    /([^\n.!?؟:。！？\-•\|>])\n(?!\n)([^\s#\->\d\|])/g,
-    "$1 $2"
-  );
-
-  // 8. Add a space between Arabic and Latin/numeric runs that are jammed together
-  s = s.replace(/([\u0600-\u06FF])([A-Za-z0-9])/g, "$1 $2");
-  s = s.replace(/([A-Za-z0-9])([\u0600-\u06FF])/g, "$1 $2");
-
-  // 9. Collapse 3+ blank lines down to 2
-  s = s.replace(/\n{3,}/g, "\n\n");
-
-  return s.trim();
-};
 
 const ResearchPreviewPage = () => {
   const navigate = useNavigate();
@@ -114,8 +58,8 @@ const ResearchPreviewPage = () => {
     );
   }
 
-  const cleanReport = normalizeReport(data.report);
-  const isRtl = /[\u0600-\u06FF]/.test(cleanReport);
+  const cleanReport = normalizeResearchReport(data.report);
+  const isRtl = detectResearchReportDirection(cleanReport) === "rtl";
 
   const handleDownload = () => {
     const blob = new Blob([`# ${data.query}\n\n${cleanReport}`], { type: "text/markdown" });
