@@ -9,46 +9,149 @@ const corsHeaders = {
 const BASE_URL = "https://2slides.com";
 
 const REACT_TEMPLATES = new Set([
-  "premium-aurora-keynote", "premium-editorial-noir", "premium-neo-brutalist",
-  "premium-glass-pitch", "premium-cairo-modern", "premium-sketch-hand",
-  "premium-cinema-3d", "premium-ios-glass", "premium-terminal-dev",
-  "premium-magazine-fold", "premium-neon-cyber", "premium-paper-origami",
-  "premium-minimal-swiss", "premium-gradient-wave", "premium-dark-luxe",
-  "premium-kids-playful", "premium-corporate-navy", "premium-nature-organic",
-  "premium-glitch-art", "premium-isometric-tech", "premium-watercolor-soft",
-  "premium-retro-arcade", "premium-scientific-paper", "premium-pitch-yc",
-  "premium-arabesque-gold",
+  "premium-glass-pitch", "premium-sketch-hand", "premium-cinema-3d",
+  "premium-terminal-dev", "premium-magazine-fold", "premium-paper-origami",
+  "premium-minimal-swiss", "premium-gradient-wave", "premium-glitch-art",
 ]);
 
 const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg: string }> = {
-  "premium-aurora-keynote":   { primary: "#8b5cf6", accent: "#22d3ee", bg: "#070417", fg: "#f5f3ff" },
-  "premium-editorial-noir":   { primary: "#0a0a0a", accent: "#c9a55c", bg: "#f5f1e8", fg: "#0a0a0a" },
-  "premium-neo-brutalist":    { primary: "#ff3d00", accent: "#ffea00", bg: "#fff5e1", fg: "#0a0a0a" },
-  "premium-glass-pitch":      { primary: "#3b82f6", accent: "#a855f7", bg: "#070b1f", fg: "#f8fafc" },
-  "premium-cairo-modern":     { primary: "#0f3057", accent: "#d4af37", bg: "#fffdf3", fg: "#0a1929" },
-  "premium-sketch-hand":      { primary: "#1f2937", accent: "#ef4444", bg: "#fdf6e3", fg: "#1f2937" },
-  "premium-cinema-3d":        { primary: "#06b6d4", accent: "#f43f5e", bg: "#000814", fg: "#ffffff" },
-  "premium-ios-glass":        { primary: "#0a84ff", accent: "#ff375f", bg: "#0b1020", fg: "#ffffff" },
-  "premium-terminal-dev":     { primary: "#00ff9c", accent: "#00b3ff", bg: "#0a0e14", fg: "#cdd9e5" },
-  "premium-magazine-fold":    { primary: "#dc2626", accent: "#0a0a0a", bg: "#fafaf7", fg: "#0a0a0a" },
-  "premium-neon-cyber":       { primary: "#ff0080", accent: "#00f0ff", bg: "#05010d", fg: "#ffe9ff" },
-  "premium-paper-origami":    { primary: "#fb7185", accent: "#fbbf24", bg: "#fef3ec", fg: "#1f1147" },
-  "premium-minimal-swiss":    { primary: "#dc143c", accent: "#000000", bg: "#ffffff", fg: "#000000" },
-  "premium-gradient-wave":    { primary: "#f97316", accent: "#a855f7", bg: "#1e0a3c", fg: "#ffffff" },
-  "premium-dark-luxe":        { primary: "#d4af37", accent: "#9ca3af", bg: "#0a0a0a", fg: "#f5e9c8" },
-  "premium-kids-playful":     { primary: "#fb923c", accent: "#22d3ee", bg: "#fff8e7", fg: "#1e3a8a" },
-  "premium-corporate-navy":   { primary: "#1e3a8a", accent: "#0ea5e9", bg: "#f8fafc", fg: "#0a1929" },
-  "premium-nature-organic":   { primary: "#15803d", accent: "#a3e635", bg: "#f7f6ee", fg: "#14532d" },
-  "premium-glitch-art":       { primary: "#ff006e", accent: "#3a86ff", bg: "#0a0a0a", fg: "#fbbf24" },
-  "premium-isometric-tech":   { primary: "#7c3aed", accent: "#06b6d4", bg: "#0f172a", fg: "#e0e7ff" },
-  "premium-watercolor-soft":  { primary: "#fb7185", accent: "#67e8f9", bg: "#fff8f8", fg: "#4a044e" },
-  "premium-retro-arcade":     { primary: "#ff006e", accent: "#ffbe0b", bg: "#1a0033", fg: "#ffffff" },
-  "premium-scientific-paper": { primary: "#1e40af", accent: "#dc2626", bg: "#ffffff", fg: "#0f172a" },
-  "premium-pitch-yc":         { primary: "#ff6600", accent: "#000000", bg: "#ffffff", fg: "#0a0a0a" },
-  "premium-arabesque-gold":   { primary: "#b45309", accent: "#d4af37", bg: "#1a0f0a", fg: "#fef3c7" },
+  "premium-glass-pitch":   { primary: "#3b82f6", accent: "#a855f7", bg: "#070b1f", fg: "#f8fafc" },
+  "premium-sketch-hand":   { primary: "#1f2937", accent: "#ef4444", bg: "#fdf6e3", fg: "#1f2937" },
+  "premium-cinema-3d":     { primary: "#06b6d4", accent: "#f43f5e", bg: "#000814", fg: "#ffffff" },
+  "premium-terminal-dev":  { primary: "#00ff9c", accent: "#00b3ff", bg: "#0a0e14", fg: "#cdd9e5" },
+  "premium-magazine-fold": { primary: "#dc2626", accent: "#0a0a0a", bg: "#fafaf7", fg: "#0a0a0a" },
+  "premium-paper-origami": { primary: "#fb7185", accent: "#fbbf24", bg: "#fef3ec", fg: "#1f1147" },
+  "premium-minimal-swiss": { primary: "#dc143c", accent: "#000000", bg: "#ffffff", fg: "#000000" },
+  "premium-gradient-wave": { primary: "#f97316", accent: "#a855f7", bg: "#1e0a3c", fg: "#ffffff" },
+  "premium-glitch-art":    { primary: "#ff006e", accent: "#3a86ff", bg: "#0a0a0a", fg: "#fbbf24" },
 };
 
-/* --------------- Pexels integration with smart fallback --------------- */
+/* ============================================================
+ * MULTI-PROVIDER AI HELPER
+ * Tries Lovable AI → OpenRouter → LemonData in order.
+ * On 402/429/404/5xx or "model not found", falls through.
+ * ========================================================== */
+type AIProvider = {
+  name: string;
+  key: string | undefined;
+  url: string;
+  modelPrefix: string;
+  supportsJsonMode: boolean;
+};
+
+function providers(): AIProvider[] {
+  return [
+    {
+      name: "lovable",
+      key: Deno.env.get("LOVABLE_API_KEY"),
+      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+      modelPrefix: "google/",
+      supportsJsonMode: true,
+    },
+    {
+      name: "openrouter",
+      key: Deno.env.get("OPENROUTER_API_KEY"),
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      modelPrefix: "google/",
+      supportsJsonMode: true,
+    },
+    {
+      name: "lemondata",
+      key: Deno.env.get("DEAPI_API_KEY"),
+      url: "https://api.lemondata.ai/v1/chat/completions",
+      modelPrefix: "",
+      supportsJsonMode: false,
+    },
+  ];
+}
+
+async function callAIWithFallback(
+  messages: Array<{ role: string; content: string }>,
+  opts: { model?: string; jsonMode?: boolean } = {},
+): Promise<string> {
+  const model = opts.model ?? "gemini-2.5-flash";
+  const wantJson = !!opts.jsonMode;
+  let lastErr = "no provider configured";
+
+  for (const p of providers()) {
+    if (!p.key) continue;
+    try {
+      const finalMessages = wantJson && !p.supportsJsonMode
+        ? [
+            ...messages.slice(0, 1),
+            { role: "system", content: "Return raw JSON only. No markdown fences. No prose." },
+            ...messages.slice(1),
+          ]
+        : messages;
+
+      const body: Record<string, unknown> = {
+        model: `${p.modelPrefix}${model}`,
+        messages: finalMessages,
+      };
+      if (wantJson && p.supportsJsonMode) body.response_format = { type: "json_object" };
+
+      const r = await fetch(p.url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (r.ok) {
+        const d = await r.json();
+        const content = d?.choices?.[0]?.message?.content;
+        if (content) {
+          console.log(`[ai] ✓ ${p.name} (${model})`);
+          return content;
+        }
+        lastErr = `${p.name}: empty content`;
+        continue;
+      }
+
+      const txt = await r.text().catch(() => "");
+      console.warn(`[ai] ✗ ${p.name} ${r.status}: ${txt.slice(0, 200)}`);
+      lastErr = `${p.name}: ${r.status}`;
+      // Continue to next provider regardless of error type
+    } catch (e) {
+      console.warn(`[ai] ✗ ${p.name} threw:`, e);
+      lastErr = `${p.name}: ${String(e).slice(0, 80)}`;
+    }
+  }
+
+  throw new Error(`All AI providers failed: ${lastErr}`);
+}
+
+function safeParseJson<T = unknown>(raw: string): T | null {
+  try { return JSON.parse(raw) as T; } catch { /* fall through */ }
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]) as T; } catch { /* */ } }
+  return null;
+}
+
+/* ============================================================
+ * DEEP IMAGE SEARCH — Serper (Google Images) → Pexels → null
+ * ========================================================== */
+async function fetchSerperImage(query: string, key: string): Promise<string | null> {
+  try {
+    const r = await fetch("https://google.serper.dev/images", {
+      method: "POST",
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: query, num: 5, safe: "active" }),
+    });
+    if (!r.ok) { console.warn("[serper-img] http", r.status); return null; }
+    const d = await r.json();
+    const list = d?.images;
+    if (!Array.isArray(list)) return null;
+    // Filter to https + reasonable dimensions
+    const ok = list.find((it: { imageUrl?: string; imageWidth?: number }) =>
+      it?.imageUrl && it.imageUrl.startsWith("https://") && (it.imageWidth ?? 800) >= 600
+    );
+    return ok?.imageUrl ?? list[0]?.imageUrl ?? null;
+  } catch (e) {
+    console.warn("[serper-img] error", e);
+    return null;
+  }
+}
+
 async function fetchPexelsImage(query: string, apiKey: string): Promise<string | null> {
   try {
     const url = new URL("https://api.pexels.com/v1/search");
@@ -56,10 +159,7 @@ async function fetchPexelsImage(query: string, apiKey: string): Promise<string |
     url.searchParams.set("per_page", "1");
     url.searchParams.set("orientation", "landscape");
     const r = await fetch(url.toString(), { headers: { Authorization: apiKey } });
-    if (!r.ok) {
-      console.warn("[pexels] http", r.status, "for", query);
-      return null;
-    }
+    if (!r.ok) { console.warn("[pexels] http", r.status, "for", query); return null; }
     const d = await r.json();
     const photo = d?.photos?.[0];
     return photo?.src?.large2x || photo?.src?.large || photo?.src?.original || null;
@@ -69,33 +169,36 @@ async function fetchPexelsImage(query: string, apiKey: string): Promise<string |
   }
 }
 
-async function resolveImage(query: string | undefined, apiKey: string | undefined): Promise<string | null> {
-  if (!apiKey || !query) return null;
-  const cleaned = sanitizeQueryForPexels(query);
-  // Try full query
-  let url = await fetchPexelsImage(cleaned, apiKey);
-  if (url) return url;
-  // Fallback: first 2 words
-  const short = cleaned.split(/\s+/).slice(0, 2).join(" ");
-  if (short && short !== cleaned) {
-    url = await fetchPexelsImage(short, apiKey);
-    if (url) return url;
-  }
-  // Final fallback: very generic word
-  const first = cleaned.split(/\s+/)[0];
-  if (first) {
-    url = await fetchPexelsImage(first, apiKey);
-    if (url) return url;
-  }
-  console.warn("[pexels] no result for", query);
-  return null;
+function sanitizeQueryForSearch(q: string): string {
+  return q
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, " ")
+    .replace(/[\u0600-\u06FF\u0750-\u077F\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/g, " ")
+    .replace(/\s+/g, " ").trim();
 }
 
-function sanitizeQueryForPexels(q: string): string {
-  // Strip non-latin chars; collapse whitespace.
-  return q.replace(/[^\p{Letter}\p{Number}\s-]/gu, " ")
-          .replace(/[\u0600-\u06FF\u0750-\u077F\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/g, " ")
-          .replace(/\s+/g, " ").trim();
+async function deepImageSearch(query: string | undefined): Promise<string | null> {
+  if (!query) return null;
+  const cleaned = sanitizeQueryForSearch(query);
+  if (!cleaned) return null;
+
+  const serperKey = Deno.env.get("SERPER_API_KEY");
+  const pexelsKey = Deno.env.get("PEXELS_API_KEY");
+
+  const tries = [cleaned, cleaned.split(/\s+/).slice(0, 3).join(" "), cleaned.split(/\s+/)[0]]
+    .filter((q, i, arr) => q && arr.indexOf(q) === i);
+
+  for (const q of tries) {
+    if (serperKey) {
+      const url = await fetchSerperImage(q, serperKey);
+      if (url) return url;
+    }
+    if (pexelsKey) {
+      const url = await fetchPexelsImage(q, pexelsKey);
+      if (url) return url;
+    }
+  }
+  console.warn("[deep-image] no result for", query);
+  return null;
 }
 
 function isMostlyEnglish(s: string): boolean {
@@ -104,16 +207,15 @@ function isMostlyEnglish(s: string): boolean {
   return latinChars >= Math.max(3, s.replace(/\s/g, "").length * 0.6);
 }
 
-/* --------------- Stage A: Outline --------------- */
+/* ============================================================
+ * Stage A: Outline
+ * ========================================================== */
 async function generateOutline(opts: {
   topic: string;
   content: string;
-  templateId: string;
   pageCount: number;
-  apiKey: string;
 }) {
-  const { topic, content, templateId, pageCount, apiKey } = opts;
-  const isCairo = templateId === "premium-cairo-modern" || templateId === "premium-arabesque-gold";
+  const { topic, content, pageCount } = opts;
 
   const lengthRule = pageCount > 0
     ? `Produce EXACTLY ${pageCount} slide entries.`
@@ -140,64 +242,57 @@ Rules:
 - ${lengthRule}
 - First slide MUST be "cover", last MUST be "closing".
 - Mix types: insert a "section" every 4-6 slides; include >=1 "stats" and >=1 "quote" slide if length >= 10.
-- "image_query" MUST be 3-5 visual ENGLISH keywords (e.g. "modern glass office skyline aerial"). NO arabic, NO chinese, NO punctuation other than spaces.
+- "image_query" MUST be 3-5 visual ENGLISH keywords. NO arabic, NO chinese, NO punctuation other than spaces.
 - "focus" is a brief instruction for the next stage — what the deep-content writer should expand. Be specific about the angle.
-- Detect language from topic and put title/subtitle in THAT language. ${isCairo ? "Strongly prefer Arabic for title/subtitle." : ""}`;
+- Detect language from topic and put title/subtitle in THAT language.`;
 
   const userMsg = `Topic: ${topic}\n${content ? `Reference material:\n${content.slice(0, 6000)}` : ""}`;
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      response_format: { type: "json_object" },
-    }),
-  });
+  const raw = await callAIWithFallback(
+    [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+    { model: "gemini-2.5-flash", jsonMode: true },
+  );
 
-  if (!resp.ok) throw new Error(`Outline failed: ${resp.status}`);
-  const data = await resp.json();
-  const raw = data?.choices?.[0]?.message?.content ?? "{}";
-  let outline: any = {};
-  try { outline = JSON.parse(raw); } catch { outline = { title: topic, slides: [] }; }
+  let outline = safeParseJson<{ title?: string; slides?: unknown[]; language?: string; subtitle?: string }>(raw)
+    ?? { title: topic, slides: [] };
   if (!Array.isArray(outline.slides) || outline.slides.length === 0) {
     outline.slides = [{ type: "cover", title: topic }, { type: "closing", title: "Thank You" }];
   }
   return outline;
 }
 
-/* --------------- Stage B: Deep Content --------------- */
+/* ============================================================
+ * Stage B: Deep Content
+ * ========================================================== */
+type RawSlide = Record<string, unknown> & { type?: string; title?: string; body?: string; bullets?: string[] };
+
 async function expandWithDeepContent(opts: {
-  outline: any;
+  outline: { language?: string; slides: RawSlide[] };
   topic: string;
   content: string;
-  templateId: string;
-  apiKey: string;
-}) {
-  const { outline, topic, content, templateId, apiKey } = opts;
-  const isCairo = templateId === "premium-cairo-modern" || templateId === "premium-arabesque-gold";
+}): Promise<RawSlide[]> {
+  const { outline, topic, content } = opts;
   const language = outline.language || "auto";
 
-  const sys = `You are a senior research writer creating a presentation. Output ONLY a JSON object — no markdown.
+  const sys = `You are a senior research writer creating a presentation. Output ONLY a JSON object.
 
 You are given an OUTLINE and you must EXPAND every slide with rich, factual content.
 
-For each slide, return the same fields PLUS:
-- "title": polished slide title (keep or improve outline title) in the same language as outline
-- "body": REQUIRED for content/section slides — a substantive paragraph of 50-110 words explaining the point with specific facts, context, and insight. Never empty, never a single sentence.
-- "bullets": REQUIRED for content slides — 4-6 bullets, each 6-15 words, concrete and informative (NOT 2-word fragments, NOT generic "Improves efficiency").
-- "stats": REQUIRED for stats slides — array of 3-5 {label, value} where value is bold and short ("87%", "$2.4M", "12x growth").
+For each slide return the same fields PLUS:
+- "title": polished slide title in the same language as outline
+- "body": REQUIRED for content/section slides — 60-120 words, specific facts, NEVER empty.
+- "bullets": REQUIRED for content slides — 4-6 bullets, 6-15 words each, concrete (NOT 2-word fragments).
+- "stats": REQUIRED for stats slides — 3-5 {label, value} ("87%", "$2.4M", "12x growth").
 - "quote": REQUIRED for quote slides — 15-30 word memorable quote tied to the topic.
 - "attribution": REQUIRED for quote slides — plausible person + role.
 - Keep "image_query" exactly as outline gives it (English).
 - Keep "type", "kicker", "subtitle", "cta" as outline gives them.
 
 Hard rules:
-- Output language = ${language}. ${isCairo ? "Strongly prefer Arabic." : ""}
-- Use the reference material as ground truth; if material is sparse, expand with widely-known facts about the topic.
-- NEVER produce empty body or empty bullets.
-- NEVER write filler like "More info coming" or "TBD" or "Lorem ipsum".
+- Output language = ${language}.
+- Use the reference material as ground truth; expand with widely-known facts when sparse.
+- NEVER produce empty body or empty bullets for content/section slides.
+- NEVER write filler ("More info coming", "TBD", "Lorem ipsum").
 - Be specific: name people, products, dates, numbers, places when possible.
 
 Return JSON: { "slides": [ {full slide object}, ... ] } in the SAME ORDER as outline.`;
@@ -208,93 +303,115 @@ ${JSON.stringify({ slides: outline.slides }, null, 2)}
 
 ${content ? `Reference material:\n${content.slice(0, 8000)}` : ""}`;
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-pro",
-      messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!resp.ok) {
-    console.warn("[deep-content] failed", resp.status, await resp.text().catch(() => ""));
-    return outline.slides;
-  }
-  const data = await resp.json();
-  const raw = data?.choices?.[0]?.message?.content ?? "{}";
   try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.slides) && parsed.slides.length > 0) {
-      // Merge: take outline slide and override with deep version (preserve image_query if missing)
-      return outline.slides.map((o: any, i: number) => {
-        const deep = parsed.slides[i] || {};
-        return { ...o, ...deep, image_query: deep.image_query || o.image_query };
+    const raw = await callAIWithFallback(
+      [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+      { model: "gemini-2.5-flash", jsonMode: true },
+    );
+    const parsed = safeParseJson<{ slides?: RawSlide[] }>(raw);
+    if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+      return outline.slides.map((o, i) => {
+        const deep = parsed.slides![i] || {};
+        return { ...o, ...deep, image_query: (deep.image_query as string) || (o.image_query as string) };
       });
     }
   } catch (e) {
-    console.warn("[deep-content] parse error", e);
+    console.warn("[deep-content] failed:", e);
   }
   return outline.slides;
 }
 
-/* --------------- English image-query enforcement --------------- */
-async function ensureEnglishQueries(slides: any[], apiKey: string): Promise<void> {
-  const offenders: { idx: number; q: string }[] = [];
+/* ============================================================
+ * Empty-slide retry: re-generate any slide left blank
+ * ========================================================== */
+async function fillEmptySlides(slides: RawSlide[], topic: string, language: string): Promise<RawSlide[]> {
+  const empties: { idx: number; slide: RawSlide }[] = [];
   slides.forEach((s, idx) => {
-    if (s?.image_query && !isMostlyEnglish(s.image_query)) {
-      offenders.push({ idx, q: s.image_query });
+    const t = (s.type as string) ?? "content";
+    if (t === "cover" || t === "closing") return;
+    const hasBody = typeof s.body === "string" && s.body.trim().length > 30;
+    const hasBullets = Array.isArray(s.bullets) && s.bullets.length >= 2;
+    const hasQuote = typeof (s as { quote?: string }).quote === "string" && (s as { quote: string }).quote.length > 10;
+    const hasStats = Array.isArray((s as { stats?: unknown[] }).stats) && ((s as { stats: unknown[] }).stats.length > 0);
+    if (!hasBody && !hasBullets && !hasQuote && !hasStats) {
+      empties.push({ idx, slide: s });
     }
   });
-  if (offenders.length === 0) return;
 
-  console.log("[image-query] translating", offenders.length, "non-english queries");
+  if (empties.length === 0) return slides;
+  console.log(`[fill-empty] regenerating ${empties.length} empty slide(s)`);
 
-  const sys = `You translate short phrases into 3-5 visual ENGLISH keywords for stock-photo search. Output ONLY JSON: {"translations":[{"i":0,"q":"english keywords"}]}. No fluff, just visual nouns and adjectives.`;
-  const userMsg = `Translate each:\n${offenders.map((o, i) => `${i}. ${o.q}`).join("\n")}`;
+  const sys = `You fill in blank presentation slides with rich, factual content. Return ONLY JSON: {"slides":[{"i":<index>,"body":"60-120 words","bullets":["...","...","...","...","..."]}]}. Language: ${language}. Be specific and informative.`;
+  const userMsg = `Topic: ${topic}\n\nFill these slides:\n${empties.map(e => `Index ${e.idx}: title="${e.slide.title}" type=${e.slide.type}`).join("\n")}`;
 
   try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (!resp.ok) return;
-    const data = await resp.json();
-    const raw = data?.choices?.[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.translations)) {
-      parsed.translations.forEach((t: any) => {
-        const slot = offenders[t.i];
-        if (slot && t.q) slides[slot.idx].image_query = t.q;
+    const raw = await callAIWithFallback(
+      [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+      { model: "gemini-2.5-flash", jsonMode: true },
+    );
+    const parsed = safeParseJson<{ slides?: { i: number; body?: string; bullets?: string[] }[] }>(raw);
+    if (parsed?.slides) {
+      parsed.slides.forEach(fill => {
+        const target = slides[fill.i];
+        if (target) {
+          if (fill.body) target.body = fill.body;
+          if (fill.bullets?.length) target.bullets = fill.bullets;
+        }
       });
     }
   } catch (e) {
-    console.warn("[image-query] translation failed", e);
+    console.warn("[fill-empty] failed:", e);
+  }
+  return slides;
+}
+
+/* ============================================================
+ * English image-query enforcement
+ * ========================================================== */
+async function ensureEnglishQueries(slides: RawSlide[]): Promise<void> {
+  const offenders: { idx: number; q: string }[] = [];
+  slides.forEach((s, idx) => {
+    const q = s.image_query as string | undefined;
+    if (q && !isMostlyEnglish(q)) offenders.push({ idx, q });
+  });
+  if (offenders.length === 0) return;
+
+  const sys = `Translate each phrase into 3-5 visual ENGLISH keywords for image search. Output ONLY JSON: {"translations":[{"i":0,"q":"english keywords"}]}.`;
+  const userMsg = `Translate each:\n${offenders.map((o, i) => `${i}. ${o.q}`).join("\n")}`;
+
+  try {
+    const raw = await callAIWithFallback(
+      [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+      { model: "gemini-2.5-flash-lite", jsonMode: true },
+    );
+    const parsed = safeParseJson<{ translations?: { i: number; q: string }[] }>(raw);
+    parsed?.translations?.forEach(t => {
+      const slot = offenders[t.i];
+      if (slot && t.q) slides[slot.idx].image_query = t.q;
+    });
+  } catch (e) {
+    console.warn("[image-query] translation failed:", e);
   }
 }
 
-/* --------------- Main two-stage builder --------------- */
+/* ============================================================
+ * Main two-stage builder
+ * ========================================================== */
 async function generateReactSlideDeck(opts: {
   topic: string;
   content: string;
   templateId: string;
   pageCount: number;
-  apiKey: string;
 }) {
-  const { topic, content, templateId, pageCount, apiKey } = opts;
-  const palette = PALETTES[templateId] ?? PALETTES["premium-aurora-keynote"];
+  const { topic, content, templateId, pageCount } = opts;
+  const palette = PALETTES[templateId] ?? PALETTES["premium-glass-pitch"];
 
-  const outline = await generateOutline({ topic, content, templateId, pageCount, apiKey });
-  const deepSlides = await expandWithDeepContent({ outline, topic, content, templateId, apiKey });
-  await ensureEnglishQueries(deepSlides, apiKey);
+  const outline = await generateOutline({ topic, content, pageCount });
+  let deepSlides = await expandWithDeepContent({ outline, topic, content });
+  await ensureEnglishQueries(deepSlides);
+  deepSlides = await fillEmptySlides(deepSlides, topic, outline.language ?? "auto");
 
-  const deck: any = {
+  const deck = {
     title: outline.title || topic,
     subtitle: outline.subtitle,
     language: outline.language,
@@ -303,16 +420,14 @@ async function generateReactSlideDeck(opts: {
     slides: deepSlides,
   };
 
-  // Inject Pexels images with fallback in parallel.
-  const pexelsKey = Deno.env.get("PEXELS_API_KEY");
-  if (pexelsKey) {
-    await Promise.all(deck.slides.map(async (slide: any) => {
-      if (slide?.image_query && !slide.image) {
-        const url = await resolveImage(slide.image_query, pexelsKey);
-        if (url) slide.image = url;
-      }
-    }));
-  }
+  // Inject deep-search images in parallel.
+  await Promise.all(deck.slides.map(async (slide: RawSlide) => {
+    const q = slide.image_query as string | undefined;
+    if (q && !slide.image) {
+      const url = await deepImageSearch(q);
+      if (url) (slide as { image?: string }).image = url;
+    }
+  }));
 
   return deck;
 }
@@ -330,15 +445,9 @@ serve(async (req) => {
     }
 
     if (templateId && REACT_TEMPLATES.has(templateId)) {
-      const apiKey = Deno.env.get("LOVABLE_API_KEY");
-      if (!apiKey) {
-        return new Response(JSON.stringify({ success: false, fallback: true, error: "AI not configured." }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
       try {
         const deck = await generateReactSlideDeck({
-          topic, content: content || "", templateId,
-          pageCount: pages, apiKey,
+          topic, content: content || "", templateId, pageCount: pages,
         });
 
         if (userId) {
@@ -365,25 +474,19 @@ serve(async (req) => {
     // -------- Legacy 2Slides path --------
     const apiKey = Deno.env.get("TWOSLIDES_API_KEY");
     if (!apiKey) {
-      return new Response(JSON.stringify({
-        success: false, fallback: true, error: "Slides service not configured.",
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ success: false, fallback: true, error: "Slides service not configured." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const isPro = tier === "pro";
     const authHeaders = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
     if (isPro) {
-      const body: Record<string, any> = {
-        userInput: content || topic,
-        responseLanguage: "Auto",
-        aspectRatio: "16:9",
-        resolution: "2K",
-        page: pages,
-        contentDetail: "standard",
+      const body: Record<string, unknown> = {
+        userInput: content || topic, responseLanguage: "Auto", aspectRatio: "16:9", resolution: "2K",
+        page: pages, contentDetail: "standard",
         referenceImageUrl: "https://2slides.com/_next/image?url=/login_preview/st-1763716811881-gt30ikwgk_slide1.webp&w=640&q=75",
       };
-
       const resp = await fetch(`${BASE_URL}/api/v1/slides/create-like-this`, {
         method: "POST", headers: authHeaders, body: JSON.stringify(body),
       });
@@ -394,13 +497,12 @@ serve(async (req) => {
       const data = await resp.json();
       const downloadUrl = data?.data?.downloadUrl || data?.downloadUrl;
       const slideCount = data?.data?.slidePageCount || data?.data?.successCount || pages || 10;
-
       if (data?.success && downloadUrl) {
         if (userId) {
           try {
             const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
             await sb.rpc("deduct_credits", { p_user_id: userId, p_amount: 2, p_action_type: "slides_pro", p_description: "Slides Pro generation" });
-          } catch {}
+          } catch { /* ignore */ }
         }
         return new Response(JSON.stringify({ success: true, download_url: downloadUrl, slide_count: slideCount, title: topic }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -408,7 +510,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: false, fallback: true, error: "Pro generation failed." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } else {
-      const body: Record<string, any> = { userInput: content || topic, responseLanguage: "Auto", mode: "sync" };
+      const body: Record<string, unknown> = { userInput: content || topic, responseLanguage: "Auto", mode: "sync" };
       if (templateId) body.themeId = templateId;
       if (pages > 0) body.page = pages;
 
@@ -428,7 +530,6 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true, download_url: downloadUrl, slide_count: slideCount, title: topic }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
       if (data?.success && jobId && !downloadUrl) {
         const maxPolls = pages > 30 ? 20 : 12;
         for (let i = 0; i < maxPolls; i++) {
@@ -443,10 +544,9 @@ serve(async (req) => {
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
             if (jd.status === "failed") break;
-          } catch {}
+          } catch { /* keep polling */ }
         }
       }
-
       return new Response(JSON.stringify({ success: false, fallback: true, error: "Slide generation did not return a download." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
