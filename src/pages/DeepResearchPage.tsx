@@ -17,24 +17,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Pegtop star animation (same as the main chat thinking loader)
-const PegtopStar = ({ active }: { active: boolean }) => (
+const ChatThinkingStar = ({ active }: { active: boolean }) => (
   <motion.svg
-    viewBox="0 0 24 24"
-    className="h-4 w-4 shrink-0"
-    animate={active ? { rotate: [0, 360], scale: [1, 1.15, 1] } : { rotate: 0, scale: 1 }}
-    transition={active ? { rotate: { duration: 4, repeat: Infinity, ease: "linear" }, scale: { duration: 1.4, repeat: Infinity } } : { duration: 0.3 }}
+    width="14" height="14" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"
+    className={`shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`}
+    animate={active ? { rotate: [0, 180, 360], scale: [1, 1.1, 1] } : { rotate: 0, scale: 1 }}
+    transition={active ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
   >
-    <path
-      d="M12 2 L14.2 9.2 L21.6 9.6 L15.8 14.2 L18 21.4 L12 17.2 L6 21.4 L8.2 14.2 L2.4 9.6 L9.8 9.2 Z"
-      fill={active ? "url(#pgrad)" : "hsl(var(--primary) / 0.85)"}
-    />
-    <defs>
-      <linearGradient id="pgrad" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="hsl(265 90% 70%)" />
-        <stop offset="100%" stopColor="hsl(220 90% 65%)" />
-      </linearGradient>
-    </defs>
+    <path d="M50 5 L60 40 L95 50 L60 60 L50 95 L40 60 L5 50 L40 40 Z" fill="currentColor" />
   </motion.svg>
 );
 
@@ -71,23 +61,23 @@ const RESEARCH_PROMPT =
 const buildStatusFromQuery = (query: string, phase: number): { label: string; detail: string } => {
   const q = query.length > 30 ? query.slice(0, 30) + "…" : query;
   const phases = [
-    { label: "البحث في الويب", detail: `أبحث عن "${q}" — أفتح أهم 10 مصادر من Google و Wikipedia.` },
-    { label: "تحليل المصادر", detail: `لقد وجدت معلومات قيمة. أقرأ الآن المقالات التفصيلية وأستخرج الحقائق المهمة.` },
-    { label: "جمع الصور", detail: `أحضر أفضل الصور والوسائط المتعلقة بـ "${q}".` },
-    { label: "مقارنة المعلومات", detail: `أقارن البيانات من المصادر المتعددة وأتحقق من الدقة.` },
-    { label: "كتابة التقرير", detail: `أنظم النتائج وأكتب التقرير النهائي بصيغة احترافية.` },
+    { label: "Searching the web", detail: `Looking up "${q}" and opening the strongest sources.` },
+    { label: "Analyzing sources", detail: "Reading detailed sources and extracting the most useful facts." },
+    { label: "Collecting images", detail: `Gathering the best relevant visuals for "${q}".` },
+    { label: "Comparing information", detail: "Cross-checking details across multiple sources for accuracy." },
+    { label: "Writing the report", detail: "Organizing the findings into a polished final report." },
   ];
   return phases[Math.min(phase, phases.length - 1)];
 };
 
 const labelFromStatus = (s: string): string => {
   const l = s.toLowerCase();
-  if (/search|gathering|browsing|opening|navigat|بحث/i.test(l)) return "البحث في الويب";
-  if (/analyz|reviewing|reading|تحليل/i.test(l)) return "تحليل المصادر";
-  if (/image|صور/i.test(l)) return "جمع الصور";
-  if (/compar|مقارنة/i.test(l)) return "مقارنة المعلومات";
-  if (/writing|summar|report|composing|كتابة/i.test(l)) return "كتابة التقرير";
-  return "جاري العمل";
+  if (/search|gathering|browsing|opening|navigat|بحث/i.test(l)) return "Searching the web";
+  if (/analyz|reviewing|reading|تحليل/i.test(l)) return "Analyzing sources";
+  if (/image|صور/i.test(l)) return "Collecting images";
+  if (/compar|مقارنة/i.test(l)) return "Comparing information";
+  if (/writing|summar|report|composing|كتابة/i.test(l)) return "Writing the report";
+  return "Working";
 };
 
 const DeepResearchPage = () => {
@@ -106,6 +96,8 @@ const DeepResearchPage = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const plusButtonRef = useRef<HTMLButtonElement>(null);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -114,6 +106,20 @@ const DeepResearchPage = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [sessions, isLoading]);
+
+  useEffect(() => {
+    if (!plusOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (plusMenuRef.current?.contains(target) || plusButtonRef.current?.contains(target)) return;
+      setPlusOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    return () => window.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [plusOpen]);
 
   // Restore prior research from backend on mount (replaces sessionStorage)
   useEffect(() => {
@@ -230,8 +236,8 @@ const DeepResearchPage = () => {
             const updated: TimelineStep[] = s.steps.map((x) => ({ ...x, status: "done" }));
             updated.push({
               id: `${Date.now()}-writing`,
-              label: "كتابة التقرير",
-              detail: "أنظم النتائج وأكتب التقرير النهائي…",
+              label: "Writing the report",
+              detail: "Organizing the findings and writing the final report…",
               status: "active",
               ts: Date.now(),
             });
@@ -386,7 +392,7 @@ const DeepResearchPage = () => {
                             onClick={() => toggleStep(idx, step.id)}
                             className="w-full flex items-center gap-2.5 py-1.5 text-left hover:opacity-80 transition"
                           >
-                            <PegtopStar active={isStepActive} />
+                            <ChatThinkingStar active={isStepActive} />
                             <span className={`flex-1 text-sm font-bold truncate ${isStepActive ? "text-foreground" : "text-foreground/85"}`}>
                               {step.label}
                             </span>
@@ -411,7 +417,7 @@ const DeepResearchPage = () => {
                     })}
                     {isActive && s.steps.length === 0 && (
                       <div className="flex items-center gap-2.5 py-1.5">
-                        <PegtopStar active />
+                        <ChatThinkingStar active />
                         <span className="text-sm font-bold text-foreground">Starting research…</span>
                       </div>
                     )}
@@ -488,6 +494,7 @@ const DeepResearchPage = () => {
               <div className="flex items-end gap-2">
                 <div className="relative">
                   <button
+                    ref={plusButtonRef}
                     onClick={(e) => { e.stopPropagation(); setPlusOpen((v) => !v); }}
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
                   >
@@ -497,10 +504,12 @@ const DeepResearchPage = () => {
                     <>
                       <div className="fixed inset-0 z-[60]" onMouseDown={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
                       <motion.div
+                        ref={plusMenuRef}
                         initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.15 }}
-                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                         className="absolute bottom-full mb-2 left-0 z-[61] w-72 rounded-3xl border border-white/10 bg-background/80 p-3 backdrop-blur-2xl shadow-2xl"
                       >
                         <div className="grid grid-cols-3 gap-2">

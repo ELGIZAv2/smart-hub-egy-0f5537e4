@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Menu, Plus, X, ShoppingCart, ArrowUp, Square, Image as ImageIcon, FileUp, Camera, Star, ExternalLink, Loader2 } from "lucide-react";
+import { Menu, Plus, X, ShoppingCart, ArrowUp, Square, Image as ImageIcon, FileUp, Camera, Star, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AppSidebar from "@/components/AppSidebar";
@@ -27,14 +27,19 @@ interface Message {
   content: string;
   products?: Product[];
   attachedImages?: string[];
+  showAllProducts?: boolean;
 }
 
 const SHOPPING_PROMPT =
   "You are a smart shopping assistant. " +
   "CRITICAL: ALWAYS reply in the user's EXACT language and dialect. " +
   "WORKFLOW: 1) Verify each product matches the user's exact request. 2) Convert all prices to the user's local currency. " +
-  "3) Provide a brief expert summary (under 100 words): one sentence on the best pick + 2-3 bullets comparing top options + one closing tip. " +
-  "Never list every product — the cards already display them. Never write long essays.";
+  "3) Show at most 4 verified product cards unless the user explicitly asks for more options. " +
+  "4) Provide a brief expert summary (under 100 words): one sentence on the best pick + 2-3 bullets comparing top options + one closing tip. " +
+  "Never list every product — the cards already display them. Never write long essays. Never ask a follow-up question.";
+
+const wantsMoreProducts = (text: string) =>
+  /(\bmore\b|show more|more options|more products|المزيد|اكتر|أكثر|زيد|plus d'options|más opciones)/i.test(text);
 
 const ShoppingModePage = () => {
   const navigate = useNavigate();
@@ -57,6 +62,8 @@ const ShoppingModePage = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const plusButtonRef = useRef<HTMLButtonElement>(null);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -65,6 +72,20 @@ const ShoppingModePage = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!plusOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (plusMenuRef.current?.contains(target) || plusButtonRef.current?.contains(target)) return;
+      setPlusOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    return () => window.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [plusOpen]);
 
   const hasResults = messages.length > 0;
 
@@ -107,7 +128,8 @@ const ShoppingModePage = () => {
 
     let buf = "";
     let prods: Product[] = [];
-    setMessages((m) => [...m, { role: "assistant", content: "" }]);
+    const showAllProducts = wantsMoreProducts(sentInput);
+    setMessages((m) => [...m, { role: "assistant", content: "", showAllProducts }]);
 
     await streamChat({
       messages: apiMessages as any,
@@ -119,7 +141,7 @@ const ShoppingModePage = () => {
         buf += d;
         setMessages((m) => {
           const c = [...m];
-          c[c.length - 1] = { role: "assistant", content: buf, products: prods };
+          c[c.length - 1] = { role: "assistant", content: buf, products: prods, showAllProducts };
           return c;
         });
       },
@@ -127,7 +149,7 @@ const ShoppingModePage = () => {
         prods = p;
         setMessages((m) => {
           const c = [...m];
-          c[c.length - 1] = { ...c[c.length - 1], products: p };
+          c[c.length - 1] = { ...c[c.length - 1], products: p, showAllProducts };
           return c;
         });
       },
@@ -159,6 +181,7 @@ const ShoppingModePage = () => {
     setReportLoading(true);
 
     const productKey = `${(p.seller || "").slice(0, 40)}::${p.title.slice(0, 80)}`;
+    const latestUserRequest = [...messages].reverse().find((message) => message.role === "user")?.content ?? p.title;
 
     // 1) Try cache from backend first
     if (userId) {
@@ -183,7 +206,7 @@ const ShoppingModePage = () => {
         {
           role: "assistant",
           content:
-            "You are a buying-advice expert. Reply in the user's language. Generate a SHORT product brief in this exact structure:\n" +
+            "You are a buying-advice expert. Use the same language as the user's request text. Never ask the user a question. Generate a SHORT product brief in this exact structure:\n" +
             "**About this product** — 1-2 sentences.\n" +
             "**Pros** — 2-3 bullets.\n" +
             "**Cons** — 1-2 bullets.\n" +
@@ -191,7 +214,7 @@ const ShoppingModePage = () => {
         },
         {
           role: "user",
-          content: `Product: ${p.title}\nSeller: ${p.seller || "Unknown"}\nPrice: ${p.price}${p.rating ? `\nRating: ${p.rating}` : ""}`,
+          content: `User request: ${latestUserRequest}\nProduct: ${p.title}\nSeller: ${p.seller || "Unknown"}\nPrice: ${p.price}${p.rating ? `\nRating: ${p.rating}` : ""}`,
         },
       ] as any,
       model: "google/gemini-2.5-flash-lite-preview-09-2025",
@@ -216,7 +239,7 @@ const ShoppingModePage = () => {
       },
       onError: () => setReportLoading(false),
     });
-  }, [userId]);
+  }, [messages, userId]);
 
   const ProductCard = ({ p }: { p: Product }) => (
     <button
@@ -300,7 +323,7 @@ const ShoppingModePage = () => {
                 {m.content && <ChatMessage role={m.role} content={m.content} />}
                 {m.products && m.products.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {m.products.map((p, j) => <ProductCard key={j} p={p} />)}
+                    {(m.showAllProducts ? m.products : m.products.slice(0, 4)).map((p, j) => <ProductCard key={j} p={p} />)}
                   </div>
                 )}
               </div>
@@ -339,6 +362,7 @@ const ShoppingModePage = () => {
               <div className="flex items-end gap-2">
                 <div className="relative">
                   <button
+                    ref={plusButtonRef}
                     onClick={(e) => { e.stopPropagation(); setPlusOpen((v) => !v); }}
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10 ${plusOpen ? "rotate-45" : ""}`}
                   >
@@ -349,6 +373,7 @@ const ShoppingModePage = () => {
                     <>
                       <div className="fixed inset-0 z-[60]" onMouseDown={() => setPlusOpen(false)} onTouchStart={() => setPlusOpen(false)} />
                       <motion.div
+                        ref={plusMenuRef}
                         initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.15 }}
@@ -443,16 +468,9 @@ const ShoppingModePage = () => {
                   )}
                 </div>
 
-                {activeProduct.link && (
-                  <a
-                    href={activeProduct.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 py-3 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.01]"
-                  >
-                    <ExternalLink className="h-4 w-4" /> Open at {activeProduct.seller || "store"}
-                  </a>
-                )}
+                <div className="mt-6 rounded-2xl border border-foreground/10 bg-foreground/5 px-4 py-3 text-sm text-muted-foreground">
+                  Source: {activeProduct.seller || "Verified store listing"}
+                </div>
               </>
             )}
           </SheetContent>
