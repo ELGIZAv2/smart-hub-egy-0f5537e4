@@ -77,15 +77,67 @@ const ResearchPreviewPage = () => {
   const isRtl = detectResearchReportDirection(cleanReport) === "rtl";
   const reportEmpty = cleanReport.trim().length < 10;
 
-  const handleDownload = () => {
-    const blob = new Blob([`# ${data.query}\n\n${cleanReport}`], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${data.query.slice(0, 40).replace(/[^a-z0-9]/gi, "-")}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Downloaded");
+  const handleDownload = async () => {
+    if (!reportRef.current || exporting) return;
+    setExporting(true);
+    const loadingToast = toast.loading(isRtl ? "جارٍ إنشاء ملف PDF…" : "Generating PDF…");
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      // Capture the entire report as a high-res canvas
+      const node = reportRef.current;
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: node.scrollWidth,
+      });
+
+      // A4 portrait in mm
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const usableW = pageW - margin * 2;
+      const usableH = pageH - margin * 2;
+
+      // Compute the pixel slice height that fits one PDF page
+      const pxPerMm = canvas.width / usableW;
+      const sliceH = Math.floor(usableH * pxPerMm);
+
+      let rendered = 0;
+      let pageIndex = 0;
+      while (rendered < canvas.height) {
+        const currentSliceH = Math.min(sliceH, canvas.height - rendered);
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = currentSliceH;
+        const ctx = sliceCanvas.getContext("2d");
+        if (!ctx) break;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(canvas, 0, rendered, canvas.width, currentSliceH, 0, 0, canvas.width, currentSliceH);
+        const imgData = sliceCanvas.toDataURL("image/jpeg", 0.92);
+        const imgHmm = currentSliceH / pxPerMm;
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(imgData, "JPEG", margin, margin, usableW, imgHmm, undefined, "FAST");
+        rendered += currentSliceH;
+        pageIndex++;
+      }
+
+      const safeName = data!.query.slice(0, 60).replace(/[\\/:*?"<>|]/g, "-").trim() || "research-report";
+      pdf.save(`${safeName}.pdf`);
+      toast.success(isRtl ? "تم التحميل" : "Downloaded", { id: loadingToast });
+    } catch (err) {
+      console.error("[PDF export]", err);
+      toast.error(isRtl ? "فشل إنشاء الملف" : "Failed to generate PDF", { id: loadingToast });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const topImages = data.images.slice(0, 3);
