@@ -11,11 +11,16 @@ import { buildPreviewHtml } from "@/lib/filesHtmlBuilders";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu, ArrowUp, Plus, X, Download, Eye, FileText, Undo2, Redo2, Paperclip, Image, HardDrive, Upload } from "lucide-react";
 
+import type { SlideDeck } from "@/lib/slides/types";
+import SlideDeckPreview from "@/components/files/SlideDeckPreview";
+import { AnimatePresence as AP2 } from "framer-motion";
+
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   htmlContent?: string;
   downloadUrl?: string;
+  deck?: SlideDeck;
   isQuestion?: boolean;
   questionOptions?: string[];
 }
