@@ -38,28 +38,54 @@ export const normalizeResearchReport = (raw: string): string => {
   // 7) Ordered list items missing space
   s = s.replace(/^(\s*\d+\.)([^\s])/gm, "$1 $2");
 
-  // 8) Ensure blank line BEFORE block elements that follow plain text
+  // 8) Ensure blank line BEFORE headings & blockquotes (NOT tables — would break them)
   s = s
     .replace(/([^\n])\n(#{1,6}\s)/g, "$1\n\n$2")
-    .replace(/([^\n])\n(\|.+\|\s*)$/gm, "$1\n\n$2")
     .replace(/([^\n])\n(>\s)/g, "$1\n\n$2");
 
-  // 9) Repair tables: add separator row if missing after header
+  // 8b) Ensure blank line before a table row, but only when previous line is plain text
+  // (not another table row or separator)
+  s = s.replace(
+    /^([^\n|][^\n]*)\n(\|[^\n]+\|)\s*$/gm,
+    (_m, prev: string, table: string) => {
+      if (/^\s*$/.test(prev)) return _m;
+      return `${prev}\n\n${table}`;
+    },
+  );
+
+  // 9) Repair tables: ensure separator after header AND remove blank lines inside table
   const lines = s.split("\n");
-  const out: string[] = [];
+  const isTableLine = (l: string) => /^\|.*\|\s*$/.test(l.trim());
+  const isSepLine = (l: string) =>
+    /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(l.trim());
+
+  // Pass 1: drop blank lines between two table rows (GFM breaks otherwise)
+  const compact: string[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const cur = lines[i];
+    if (cur.trim() === "") {
+      const prev = lines[i - 1] ?? "";
+      // look ahead past additional blank lines
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() === "") j++;
+      const next = lines[j] ?? "";
+      if (isTableLine(prev) && isTableLine(next)) continue;
+    }
+    compact.push(cur);
+  }
+
+  // Pass 2: insert separator row after header if missing
+  const out: string[] = [];
+  for (let i = 0; i < compact.length; i++) {
+    const line = compact[i];
     out.push(line);
-    const trimmed = line.trim();
-    const isTable = /^\|.*\|\s*$/.test(trimmed);
-    const isSep = /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(trimmed);
-    if (isTable && !isSep) {
-      const prev = (lines[i - 1] ?? "").trim();
-      const next = (lines[i + 1] ?? "").trim();
-      const prevIsTable = /^\|.*\|\s*$/.test(prev);
-      const nextIsSep = /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(next);
+    if (isTableLine(line) && !isSepLine(line)) {
+      const prev = compact[i - 1] ?? "";
+      const next = compact[i + 1] ?? "";
+      const prevIsTable = isTableLine(prev);
+      const nextIsSep = isSepLine(next);
       if (!prevIsTable && !nextIsSep) {
-        const cells = trimmed.split("|").filter((c) => c.length > 0);
+        const cells = line.trim().split("|").filter((c) => c.length > 0);
         out.push("| " + Array(Math.max(cells.length, 2)).fill("---").join(" | ") + " |");
       }
     }
