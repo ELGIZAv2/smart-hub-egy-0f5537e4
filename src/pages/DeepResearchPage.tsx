@@ -115,12 +115,22 @@ const DeepResearchPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [sessions, isLoading]);
 
-  // Persist completed reports in sessionStorage so the preview route can read them
+  // Restore prior research from backend on mount (replaces sessionStorage)
   useEffect(() => {
-    if (sessions.length > 0) {
-      sessionStorage.setItem("dr_sessions", JSON.stringify(sessions));
-    }
-  }, [sessions]);
+    if (!userId) return;
+    loadRecentResearch(userId, 10).then((rows) => {
+      if (!rows.length) return;
+      const restored: ResearchSession[] = rows.reverse().map((r) => ({
+        id: r.session_key,
+        query: r.query,
+        report: r.report,
+        images: r.images,
+        steps: r.steps as TimelineStep[],
+        expandedStep: null,
+      }));
+      setSessions((prev) => (prev.length ? prev : restored));
+    });
+  }, [userId]);
 
   const handleFile = useCallback((files: FileList | null, kind: "image" | "file") => {
     if (!files) return;
@@ -283,7 +293,7 @@ const DeepResearchPage = () => {
   };
 
   const openPreview = (s: ResearchSession) => {
-    sessionStorage.setItem(`dr_report_${s.id}`, JSON.stringify({ query: s.query, report: s.report, images: s.images }));
+    // Report data is loaded from the backend in the preview page; pass id only.
     navigate(`/research/preview/${s.id}`);
   };
 
