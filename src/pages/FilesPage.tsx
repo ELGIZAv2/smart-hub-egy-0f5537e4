@@ -37,6 +37,10 @@ interface SlideTemplate {
   id: string;
   template_id: string;
   image_url: string | null;
+  name?: string | null;
+  description?: string | null;
+  template_engine?: string | null;
+  component_name?: string | null;
 }
 
 const FILE_SERVICES = [
@@ -278,19 +282,26 @@ Do NOT invent information. Only provide verified facts.`;
     addResearchStep("Creating your presentation...");
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase.functions.invoke("generate-slides", {
-      body: { topic: userInput, content: researchContent || userInput, templateId: selectedTemplate?.template_id || undefined, tier: "normal", userId: user?.id },
+      body: {
+        topic: userInput,
+        content: researchContent || userInput,
+        templateId: selectedTemplate?.template_id || undefined,
+        tier: "normal",
+        userId: user?.id,
+        pageCount: slideCount,
+      },
     });
     if (error || !data?.success) return null;
 
     if (data?.download_url) {
       addResearchStep("Preparing summary...");
-      let summary = `Your presentation "${userInput}" is ready with ${data.slide_count || 10} professional slides.`;
+      let summary = `Your presentation "${userInput}" is ready with ${data.slide_count || slideCount || 10} professional slides.`;
       try {
         const summaryResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
           body: JSON.stringify({
-            messages: [{ role: "user", content: `Write a brief, personalized 2-3 sentence summary. You just created a presentation about "${userInput}" with ${data.slide_count || 10} slides. Describe what sections you covered and mention the preview button. Respond in the same language as the topic. Don't use emojis.` }],
+            messages: [{ role: "user", content: `Write a brief, personalized 2-3 sentence summary. You just created a presentation about "${userInput}" with ${data.slide_count || slideCount || 10} slides. Describe what sections you covered and mention the preview button. Respond in the same language as the topic. Don't use emojis.` }],
             model: "moonshotai/kimi-k2.5:nitro", mode: "files",
           }),
         });
