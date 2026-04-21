@@ -19,6 +19,8 @@ const ResearchPreviewPage = () => {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
   const stateReport = (location.state as { reportData?: ReportData } | null)?.reportData ?? null;
 
   useEffect(() => {
