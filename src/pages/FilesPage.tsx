@@ -14,8 +14,9 @@ import { Menu, ArrowUp, Plus, X, Download, Eye, FileText, Undo2, Redo2, Papercli
 import type { SlideDeck } from "@/lib/slides/types";
 import SlideDeckPreview from "@/components/files/SlideDeckPreview";
 import BriefCard, { type FileBrief } from "@/components/files/BriefCard";
-import IntakeForm from "@/components/files/IntakeForm";
+import SmartQuestionFlow, { type SmartQuestion } from "@/components/files/SmartQuestionFlow";
 import { getBuilder, type FileBuilderType } from "@/lib/builders";
+import { detectLanguage } from "@/lib/detectLanguage";
 
 
 const SPECIALIZED_BUILDERS: FileBuilderType[] = [
@@ -35,8 +36,13 @@ interface ChatMsg {
   briefForType?: FileBuilderType;
   briefTopic?: string;
   briefConsumed?: boolean;
-  isQuestion?: boolean;
-  questionOptions?: string[];
+  /** When set, this assistant message renders a SmartQuestionFlow card. */
+  questions?: SmartQuestion[];
+  questionsForType?: FileBuilderType;
+  questionsTopic?: string;
+  questionsAnswered?: boolean;
+  questionsAnswer?: string;
+  questionsLanguage?: string;
 }
 
 interface AttachedFile {
@@ -159,7 +165,7 @@ const FilesPage = () => {
   const [undoStack, setUndoStack] = useState<ChatMsg[][]>([]);
   const [redoStack, setRedoStack] = useState<ChatMsg[][]>([]);
   const [activeDeck, setActiveDeck] = useState<SlideDeck | null>(null);
-  const [intakeOpen, setIntakeOpen] = useState(false);
+  // (intake state removed — replaced by in-chat SmartQuestionFlow)
   const [pendingBuilder, setPendingBuilder] = useState<{ type: FileBuilderType; topic: string; extras: Record<string, string> } | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState<"outer" | "inner" | null>(null);
   const [agentMode, setAgentMode] = useState<AgentMode>("work");
@@ -489,15 +495,14 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     const userInput = overrideInput || input;
     if (!userInput.trim() && attachedFiles.length === 0) return;
 
-    // Specialized builders: open Intake → Brief → Build flow.
+    // Specialized builders: ask smart questions in-chat first, then brief, then build.
     if (
       agentMode === "work" &&
       activeAgent &&
       SPECIALIZED_BUILDERS.includes(activeAgent as FileBuilderType) &&
       !pendingBuilder
     ) {
-      setPendingBuilder({ type: activeAgent as FileBuilderType, topic: userInput, extras: {} });
-      setIntakeOpen(true);
+      await startSmartQuestionFlow(activeAgent as FileBuilderType, userInput);
       return;
     }
 
@@ -550,48 +555,91 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     setResearchSteps([]);
   }, [input, attachedFiles, activeAgent, conversationId, selectedTemplate, isMobile, agentMode, pendingBuilder]);
 
-  // ---- Specialized builder flow: Intake -> Brief -> Build ----
-  const handleIntakeSubmit = async (topic: string, extras: Record<string, string>) => {
-    if (!pendingBuilder) return;
-    setIntakeOpen(false);
+  // ---- Specialized builder flow: Smart Questions -> Brief -> Build ----
+
+  /** Step 1 — show topic, fetch in-language smart questions, render in chat. */
+  const startSmartQuestionFlow = async (type: FileBuilderType, topic: string) => {
+    const userLanguage = detectLanguage(topic);
+    setPendingBuilder({ type, topic, extras: { userLanguage } });
     setInput("");
     pushMessage({ role: "user", content: topic });
     const convId = await getOrCreateConversation(topic);
     if (convId) await saveMsg(convId, "user", topic);
+    if (isMobile) setActiveTab("chat");
 
     setIsGenerating(true);
-    setStatusText("Drafting brief...");
+    setStatusText("");
+    setResearchSteps([{ id: "qs", label: "Preparing a few quick questions...", status: "active" }]);
+    try {
+      const { data } = await supabase.functions.invoke("generate-file-questions", {
+        body: { fileType: type, topic, userLanguage },
+      });
+      const qs: SmartQuestion[] = Array.isArray(data?.questions) ? data.questions : [];
+      if (qs.length > 0) {
+        pushMessage({
+          role: "assistant",
+          content: "",
+          questions: qs,
+          questionsForType: type,
+          questionsTopic: topic,
+          questionsLanguage: userLanguage,
+        });
+      } else {
+        // No questions returned — go straight to brief.
+        await draftBriefAndShow(type, topic, "", userLanguage, convId);
+      }
+    } catch {
+      await draftBriefAndShow(type, topic, "", userLanguage, convId);
+    }
+    setIsGenerating(false);
+    setResearchSteps([]);
+  };
+
+  /** Step 2 — when user finishes the smart-question card. */
+  const handleQuestionsComplete = async (msgIdx: number, mergedAnswer: string) => {
+    const msg = messages[msgIdx];
+    if (!msg?.questionsForType || !msg.questionsTopic) return;
+    setMessages(prev => prev.map((m, i) =>
+      i === msgIdx ? { ...m, questionsAnswered: true, questionsAnswer: mergedAnswer } : m
+    ));
+    const convId = conversationId ?? (await getOrCreateConversation(msg.questionsTopic));
+    await draftBriefAndShow(msg.questionsForType, msg.questionsTopic, mergedAnswer, msg.questionsLanguage || detectLanguage(msg.questionsTopic), convId);
+  };
+
+  /** Step 3 — call brief generator (in user language) and render BriefCard. */
+  const draftBriefAndShow = async (
+    type: FileBuilderType,
+    topic: string,
+    questionAnswers: string,
+    userLanguage: string,
+    convId: string | null
+  ) => {
+    setIsGenerating(true);
+    setResearchSteps([{ id: "brief", label: "Drafting your plan...", status: "active" }]);
     try {
       const { data } = await supabase.functions.invoke("generate-file-brief", {
-        body: { fileType: pendingBuilder.type, topic, extra: extras },
+        body: {
+          fileType: type,
+          topic,
+          userLanguage,
+          extra: { answers: questionAnswers, language: userLanguage },
+        },
       });
-      const brief: FileBrief = data?.brief ?? { summary: topic };
-      setPendingBuilder({ ...pendingBuilder, topic, extras });
+      const brief: FileBrief = data?.brief ?? { summary: topic, language: userLanguage };
+      if (!brief.language) brief.language = userLanguage;
+      setPendingBuilder({ type, topic, extras: { userLanguage, answers: questionAnswers } });
       pushMessage({
         role: "assistant",
-        content: brief.summary || `Here's the plan for your ${pendingBuilder.type}.`,
+        content: brief.summary || "",
         brief,
-        briefForType: pendingBuilder.type,
+        briefForType: type,
         briefTopic: topic,
       });
     } catch {
-      // On brief failure, build directly.
-      await runBuilder(pendingBuilder.type, topic, undefined, convId);
+      await runBuilder(type, topic, { language: userLanguage }, convId);
     }
     setIsGenerating(false);
-    setStatusText("");
-  };
-
-  const handleIntakeSkip = async () => {
-    if (!pendingBuilder) return;
-    setIntakeOpen(false);
-    const topic = pendingBuilder.topic || input || "Untitled";
-    setInput("");
-    pushMessage({ role: "user", content: topic });
-    const convId = await getOrCreateConversation(topic);
-    if (convId) await saveMsg(convId, "user", topic);
-    await runBuilder(pendingBuilder.type, topic, undefined, convId);
-    setPendingBuilder(null);
+    setResearchSteps([]);
   };
 
   const runBuilder = async (
@@ -992,6 +1040,15 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                       {extractChatDisplay(msg.content)}
                     </div>
 
+                    {msg.questions && msg.questionsForType && (
+                      <SmartQuestionFlow
+                        questions={msg.questions}
+                        answered={msg.questionsAnswered}
+                        finalAnswer={msg.questionsAnswer}
+                        onComplete={(ans) => handleQuestionsComplete(i, ans)}
+                      />
+                    )}
+
                     {msg.brief && msg.briefForType && !msg.briefConsumed && (
                       <BriefCard
                         brief={msg.brief}
@@ -999,6 +1056,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                         onConfirm={(edited) => handleBriefConfirm(i, edited)}
                       />
                     )}
+
                     
                     {/* File thumbnail card */}
                     {msg.htmlContent && (
@@ -1192,17 +1250,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
           </div>
         )}
 
-        {/* Specialized builder Intake overlay */}
-        <AnimatePresence>
-          {intakeOpen && pendingBuilder && (
-            <IntakeForm
-              fileType={pendingBuilder.type}
-              onSubmit={handleIntakeSubmit}
-              onSkip={handleIntakeSkip}
-              onClose={() => { setIntakeOpen(false); setPendingBuilder(null); }}
-            />
-          )}
-        </AnimatePresence>
+        {/* IntakeForm removed — replaced by in-chat SmartQuestionFlow */}
 
         {/* Premium slide deck preview overlay */}
         <AnimatePresence>
