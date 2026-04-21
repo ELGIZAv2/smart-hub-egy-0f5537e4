@@ -39,6 +39,7 @@ interface ResearchSession {
   steps: TimelineStep[];
   images: string[];
   report: string;
+  summary: string;
   expandedStep: string | null;
 }
 
