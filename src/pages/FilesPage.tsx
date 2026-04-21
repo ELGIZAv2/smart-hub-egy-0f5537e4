@@ -573,11 +573,19 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     setStatusText("");
     setResearchSteps([{ id: "qs", label: "Preparing a few quick questions...", status: "active" }]);
     try {
+      const avoidKey = `files_qs_history_${type}`;
+      let avoidQuestions: string[] = [];
+      try { avoidQuestions = JSON.parse(localStorage.getItem(avoidKey) || "[]"); } catch {}
       const { data } = await supabase.functions.invoke("generate-file-questions", {
-        body: { fileType: type, topic, userLanguage },
+        body: { fileType: type, topic, userLanguage, seed: Date.now(), avoidQuestions },
       });
       const qs: SmartQuestion[] = Array.isArray(data?.questions) ? data.questions : [];
       if (qs.length > 0) {
+        try {
+          const titles = qs.map(q => q.title).filter(Boolean);
+          const updated = [...titles, ...avoidQuestions].slice(0, 12);
+          localStorage.setItem(avoidKey, JSON.stringify(updated));
+        } catch {}
         pushMessage({
           role: "assistant",
           content: "",
@@ -660,6 +668,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
         role: "assistant",
         content: result.summary,
         htmlContent: result.previewHtml,
+        pdfPreviewUrl: result.pdfPreviewUrl,
         downloadUrl: result.downloadUrl,
         mimeType: result.mimeType,
       });
@@ -669,8 +678,13 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
           downloadUrl: result.downloadUrl,
         });
       }
-      if (result.previewHtml) {
+      if (result.pdfPreviewUrl) {
+        setPreviewPdfUrl(result.pdfPreviewUrl);
+        setPreviewHtml(null);
+        if (!isMobile) setActiveTab("preview");
+      } else if (result.previewHtml) {
         setPreviewHtml(result.previewHtml);
+        setPreviewPdfUrl(null);
         if (!isMobile) setActiveTab("preview");
       }
     } catch (e) {
@@ -1213,13 +1227,14 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
     </div>
   );
 
-  const previewPanel = previewHtml ? (
+  const previewPanel = (previewHtml || previewPdfUrl) ? (
     <FilePreviewPanel
       html={previewHtml}
+      pdfUrl={previewPdfUrl}
       title={messages.find(m => m.role === "user")?.content?.slice(0, 50) || "Preview"}
-      onClose={() => { if (isMobile) setActiveTab("chat"); else setPreviewHtml(null); }}
+      onClose={() => { if (isMobile) setActiveTab("chat"); else { setPreviewHtml(null); setPreviewPdfUrl(null); } }}
       onEdit={() => { if (isMobile) setActiveTab("chat"); }}
-      onDownload={() => { setExportHtml(previewHtml); setShowExport(true); }}
+      onDownload={() => { if (previewHtml) { setExportHtml(previewHtml); setShowExport(true); } else if (previewPdfUrl) { window.open(previewPdfUrl, "_blank"); } }}
     />
   ) : null;
 
