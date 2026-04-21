@@ -351,9 +351,27 @@ const DeepResearchPage = () => {
 
   // (outside-click handled via fixed backdrop overlay inside the menu)
 
+  const startNewSession = useCallback(() => {
+    setSessions([]);
+    setConversationId(null);
+    setInput("");
+    setAttachedFiles([]);
+  }, []);
+
   return (
-    <AppLayout>
-      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={() => navigate("/")} currentMode="research" />
+    <AppLayout
+      onSelectConversation={loadConversation}
+      onNewChat={startNewSession}
+      activeConversationId={conversationId}
+    >
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={startNewSession}
+        onSelectConversation={loadConversation}
+        activeConversationId={conversationId}
+        currentMode="research"
+      />
 
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "file")} />
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
