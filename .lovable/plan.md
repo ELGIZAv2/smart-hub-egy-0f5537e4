@@ -1,129 +1,113 @@
 
 
-## الخطة النهائية: Files & Slides بلغات UI متخصصة + Pexels + 5 قوالب Premium
+## خطة شاملة: قوالب سلايدس فاخرة + Builders ذكية + محادثة تفاعلية
 
-### 1) إصلاح Cleanup (الصور فقط، ليس التقرير)
+### 1) إصلاحات السلايدس الفورية
 
-تعديل `cleanup_old_research_reports` لتفريغ `images='[]'::jsonb` فقط بدلاً من `DELETE`. التقرير النصي + steps يبقوا للأبد. وفي `ResearchPreviewPage.tsx` تظهر شارة "الصور انتهت صلاحيتها — التقرير محفوظ" عند images فارغة.
+**المشاكل الحالية في 5 قوالب React**: نصوص بـ`text-2xl/3xl` (صغيرة على 1920×1080)، لا توجد صور، لا توجد thumbnails، شريط القوالب بسيط.
 
----
+**الحلول**:
+- **رفع أحجام النصوص**: العنوان الرئيسي `text-8xl/9xl` (140-180px)، العناوين الفرعية `text-5xl/6xl`، المحتوى `text-3xl/4xl`. تطبيق scale موحد عبر CSS class `.slide-content` مع `font-size` floor 28px للجسم.
+- **محتوى عملاق + صور**: كل سلايد content يأخذ صورة من Pexels تلقائياً (حقل `image_query` في schema). الـcover slide يصبح half-bleed image (نصف الشاشة صورة، نصف نص). slides من نوع `stats` تعرض أرقام بحجم 200px+.
+- **استدعاء Pexels داخل generate-slides**: بعد توليد JSON من Gemini، loop على slides واستدعاء `pexels-search` للحصول على URL لكل `image_query`. الصور تُحقن في الـdeck قبل إرساله للفرونت.
+- **حذف زر "معاينة" العائم**: إزالة الـfloating preview button من `FilesPage.tsx`.
 
-### 2) Slides — بناء React/TypeScript أصلي + Reveal.js (لا HTML خام)
+### 2) معرض قوالب فاخر iOS 26 + thumbnails حقيقية
 
-**التحول التقني**: نتخلى عن إرسال HTML خام إلى 2Slides لكل قالب. بدلاً منه:
-- **محرك العرض**: `Reveal.js` (للعرض داخل الموقع) + `PptxGenJS` (للتصدير PPTX حقيقي قابل للتعديل في PowerPoint).
-- **محرك السلايدات داخل التطبيق**: مكونات React مخصصة لكل قالب باستخدام:
-  - `framer-motion` للأنيميشن.
-  - `Recharts` للرسوم البيانية.
-  - `lucide-react` للأيقونات.
-  - `tsParticles` للخلفيات المتحركة.
-  - Google Fonts (Inter, Playfair, Cairo, IBM Plex).
-- كل قالب = مكون React منفصل في `src/lib/slides/templates/` يستقبل `slideData` ويرندر حسب نوع السلايد (cover/section/content/chart/quote/closing).
+- **حذف كلمة "Premium"** من badges في `FilesPage.tsx`.
+- **شريط القوالب الجديد**: `TemplateGallery.tsx` بستايل iOS 26 — بطاقات أفقية بـ`backdrop-blur-3xl`, `border-white/10`, gradient overlay، ثمبنيل صورة فعلية للقالب، اسم القالب أسفل، scroll أفقي ناعم بـsnap-x.
+- **Thumbnails حقيقية**: لكل قالب صورة JPG مولدة بـhtml-to-image من السلايد الأول (cover) ومخزنة في `slide-images` bucket. سأولد 25 thumbnail (5 موجودة + 20 جديدة) برمجياً عبر سكريبت رفع لـ DB.
 
-**5 قوالب Premium جديدة** (display_order سالب لتظهر أولاً):
-1. **Aurora Keynote** — gradient متحرك + glassmorphism + framer-motion transitions (ستايل Apple Keynote).
-2. **Editorial Noir** — أبيض/أسود فاخر + Playfair Display + خطوط رفيعة (ستايل NYT/Vogue).
-3. **Neo Brutalist** — ألوان جريئة + ظلال صلبة + Inter Bold (ستايل Gumroad/Linear).
-4. **Glass Pitch** — backdrop-blur + tsParticles + Recharts charts (ستايل YC pitch decks).
-5. **Cairo Modern** — RTL أصلي + خط Cairo + ذهبي/كحلي (ستايل عربي راقٍ).
+### 3) إضافة 20 قالب جديد متنوع
 
-كل قالب له ملف `<TemplateName>.tsx` + thumbnail SVG + metadata في DB.
+كل قالب = مكون React جديد في `src/lib/slides/templates/` + إدخال DB:
 
-**دعم 50+ سلايد**: 
-- `generate-slides/index.ts` يقبل `pageCount` (1..60) ويمرره لـ 2Slides API كـ `page: pageCount`.
-- timeout الـedge function يرفع لـ 180s.
-- لو القالب من الجديدة (Premium React)، **لا نستخدم 2Slides أصلاً** — نولد JSON منظم من AI ثم نرندره عبر مكون React → نصدره PPTX عبر PptxGenJS.
+| # | القالب | الستايل |
+|---|---|---|
+| 1 | **SketchHand** | خطوط يدوية (Rough.js)، خط Caveat، ورقة beige |
+| 2 | **Cinema3D** | Three.js gradient mesh background، depth layers |
+| 3 | **iOSGlass** | iOS 26 liquid glass، SF Pro، depth blur |
+| 4 | **TerminalDev** | مونوسبيس JetBrains Mono، أخضر/أسود hacker |
+| 5 | **MagazineFold** | تخطيط مجلة (CSS columns)، Playfair + Lora |
+| 6 | **NeonCyber** | cyberpunk، neon glow، Orbitron font |
+| 7 | **PaperOrigami** | folded paper shadows، CSS clip-path |
+| 8 | **MinimalSwiss** | Helvetica Neue، grid system، أبيض نقي |
+| 9 | **GradientWave** | SVG wave dividers، pastel gradients |
+| 10 | **DarkLuxe** | أسود مخملي + ذهبي، Bodoni font |
+| 11 | **KidsPlayful** | Comic Neue، أيقونات ملونة كبيرة، فقاعات |
+| 12 | **CorporateNavy** | navy/أبيض شركاتي، Inter |
+| 13 | **NatureOrganic** | ألوان طبيعية، أوراق SVG، Source Serif |
+| 14 | **GlitchArt** | RGB shift، CSS distortions |
+| 15 | **IsometricTech** | isometric SVG illustrations |
+| 16 | **WatercolorSoft** | watercolor backgrounds (PNG)، Dancing Script |
+| 17 | **RetroArcade** | 80s، Press Start 2P font، CRT scanlines |
+| 18 | **ScientificPaper** | LaTeX-style، Computer Modern، figures |
+| 19 | **PitchYC** | YC pitch deck، Inter، charts (Recharts) |
+| 20 | **ArabesqueGold** | زخارف عربية SVG، خط Amiri، ذهبي/أزرق |
 
-**تقرير قبل التوليد (Brief)**:
-- edge function جديدة `generate-file-brief` ترجع: ملخص + outline لكل سلايد + اللون/الخط المختار + عدد السلايدات.
-- يظهر داخل الـchat كـ`BriefCard` فيه: **"ابدأ التوليد"** أو **"تعديل"** (textarea لتعديل outline).
-- بعد التعديل، outline المعدل يمرر للـbuilder.
+**أيقونات ضخمة من 4 مكتبات**:
+- `lucide-react` (موجودة)
+- `react-icons` (يضم: Font Awesome, Material, Bootstrap, Heroicons, Phosphor, Feather, Tabler, Remix, Ionicons, Octicons — 100,000+ أيقونة في مكتبة واحدة)
+- `@phosphor-icons/react` (تنوع weights)
+- `lottie-react` (للأنيميشنات داخل السلايدات)
 
----
+كل قالب يستخدم مكتبة الأيقونات المناسبة لطابعه (مثلاً TerminalDev = Octicons, Cinema3D = Phosphor duotone).
 
-### 3) Files — Builders متخصصة بلغات UI لكل نوع
+**Engine اختيار الأيقونة**: `iconRegistry.ts` يستقبل `keyword` ويعيد component أيقونة من المكتبة المناسبة.
 
-**التخلي الكامل عن HTML خام**. كل نوع يصبح **مكون React + مكتبة متخصصة** + تصدير نظيف:
+### 4) الاستبيان الذكي بدلاً من Form
 
-| النوع | اللغة/المكتبة | الإخراج | بيانات مطلوبة من المستخدم |
-|---|---|---|---|
-| **Document** | React + `@tiptap/react` (rich editor) + Tailwind typography | PDF (via jsPDF + html2canvas) | عنوان، أقسام، نبرة، طول |
-| **Resume** | React مكونات + `react-pdf/renderer` (PDF أصلي vector) | PDF حقيقي vector | اسم، خبرة، تعليم، مهارات، لغات |
-| **Report** | React + `Recharts` + `react-pdf/renderer` | PDF + charts | موضوع، KPIs، مصادر |
-| **Spreadsheet** | `SheetJS (xlsx)` + JSON schema | XLSX حقيقي بصيغ | نوع جدول، أعمدة، صفوف |
-| **Letter** | React + `react-pdf/renderer` | PDF رسمي | مرسل، مستلم، نبرة |
-| **Roadmap** | React + `framer-motion` + SVG vector | PNG/PDF عبر html2canvas | هدف، مراحل، تواريخ |
-| **Mindmap** | `@xyflow/react` (React Flow) interactive | PNG عبر html-to-image + JSON | فكرة مركزية، فروع |
-| **Timeline** | React + `framer-motion` + SVG vector | PNG/PDF | أحداث (تاريخ + عنوان) |
+- **حذف `IntakeForm.tsx`** من تجربة المستخدم.
+- **`SmartQuestionCard.tsx` (موجود بالفعل)**: استخدامه داخل المحادثة. عند طلب توليد ملف، edge function `generate-file-questions` (جديدة) يولد 3-5 أسئلة ذكية قصيرة بلغة المستخدم (مكتشفة من النص أو من `navigator.language`).
+- **مثال (طلب Resume)**: يطرح: "ما اسمك الكامل؟" → "ما تخصصك؟" → "أبرز 3 إنجازات؟" → كل سؤال بطاقة منفصلة، خيارات سريعة + حقل نص حر + زر "تخطي".
+- بعد الانتهاء، تجمع الإجابات في `brief context` يمر للـbuilder.
 
-**Pexels Integration** (للصور فقط):
-- edge function جديدة `pexels-search` تستخدم `PEXELS_API_KEY`.
-- عند ما builder يحتاج صورة (cover slide, document hero, report illustration)، يستدعي pexels بكلمة مفتاحية مستخرجة من المحتوى.
-- لا نستخدم unsplash/pixabay لتجنب rate limits، Pexels فقط.
-- الصور المختارة تخزن في `slide-images` bucket لتجنب hotlinking.
+### 5) BriefCard بدون أيقونات + لغة المستخدم
 
-**Intake Flow**:
-- مكون جديد `IntakeForm.tsx` يظهر كـsheet بعد اختيار النوع.
-- 3-6 حقول minimal فقط (الإلزامي قليل، Optional يوضح بـ"تخطي = توليد ذكي").
-- زر "تخطي + توليد سريع" متاح دوماً.
-- بعد الإرسال → `BriefCard` (تقرير قبل التوليد) → "ابدأ".
+- إزالة جميع الأيقونات من `BriefCard.tsx` و`SmartQuestionCard.tsx`.
+- `generate-file-brief` يستقبل `userLanguage` ويولد التقرير بنفس اللغة (auto-detect من نص المحادثة).
+- استبدال الأيقونات بأرقام/نقاط نصية أنيقة.
 
----
+### 6) إصلاح Builders المعطلة (Document/Resume/Report/Spreadsheet/Letter)
 
-### 4) الملفات والـ Dependencies
+**السبب الجذري**: `aiSchema.ts` يستدعي edge function `generate-file-brief` بدور مزدوج (brief + schema). يحتاج فصل + JSON mode صارم + معالجة أخطاء واضحة.
 
-**Dependencies جديدة**:
-- `reveal.js` + `@types/reveal.js`
-- `pptxgenjs`
-- `@react-pdf/renderer`
-- `@tiptap/react` + `@tiptap/starter-kit`
-- `xlsx` (SheetJS)
-- `@xyflow/react`
-- `tsparticles` + `@tsparticles/react`
-- `html-to-image` (لتصدير mindmap/roadmap)
-- (موجود: framer-motion, recharts, lucide-react, html2canvas, jspdf)
+**الإصلاحات لكل builder**:
+- **`generate-builder-schema` (edge function جديدة)**: تستقبل `type` و`brief` وتعيد JSON صارم باستخدام `responseFormat: json_schema` على Gemini مع schema لكل نوع.
+- **التخلص الكامل من HTML**: كل builder يبني الإخراج برمجياً:
+  - **Document**: `@react-pdf/renderer` ينتج PDF vector حقيقي (لا html2canvas، لا jsPDF خام).
+  - **Resume**: `@react-pdf/renderer` بقالب modern، صورة hero من Pexels.
+  - **Report**: `@react-pdf/renderer` + `Recharts` → SVG → PDF embed.
+  - **Spreadsheet**: `xlsx` (موجودة) + cell styling + formulas — يعمل، يحتاج فقط إصلاح الـschema.
+  - **Letter**: `@react-pdf/renderer` بترويسة رسمية.
+- **Preview داخل التطبيق**: لكل ملف، iframe يعرض blob URL من PDF (PDF.js عبر متصفح).
+- **Logging**: كل builder يطبع logs في console + يعرض رسائل خطأ واضحة في الـchat إن فشل.
 
-**Migrations**:
-- `<new>.sql` — إصلاح cleanup ليفرغ images فقط.
-- `<new>.sql` — إدراج 5 قوالب Premium بـdisplay_order = -5..-1، مع `template_engine='react-native'` (column جديد) + `component_name` لاستهداف المكون.
+### 7) ترتيب التنفيذ
 
-**Edge Functions**:
-- `supabase/functions/generate-slides/index.ts` — دعم `pageCount` 60 + branching: قوالب Premium = توليد JSON بدلاً من PPTX من 2Slides.
-- `supabase/functions/generate-file-brief/index.ts` (جديد) — توليد brief لكل نوع.
-- `supabase/functions/pexels-search/index.ts` (جديد) — بحث صور + cache في storage bucket.
+1. **DB Migration**: إضافة 20 قالب جديد (display_order = -25..-6)، حذف عمود `name` المتكرر إن لزم، إضافة `thumbnail_url`.
+2. **Edge Functions**:
+   - تحديث `generate-slides` → استدعاء Pexels لكل سلايد + حقن صور.
+   - `generate-file-questions` (جديدة) → أسئلة ذكية بلغة المستخدم.
+   - `generate-builder-schema` (جديدة) → JSON صارم لكل نوع ملف.
+   - `generate-file-brief` → دعم `userLanguage`.
+3. **Frontend Components**:
+   - 20 مكون قالب جديد في `src/lib/slides/templates/`.
+   - تكبير نصوص 5 قوالب موجودة + إضافة صور Pexels لها.
+   - `iconRegistry.ts` (موحد لـ 100k+ أيقونة).
+   - `TemplateGallery.tsx` (iOS 26 style).
+   - `SmartQuestionFlow.tsx` (يستبدل IntakeForm).
+   - تنظيف `BriefCard` و`SmartQuestionCard` من الأيقونات.
+4. **Builders Rewrite**: إعادة كتابة 5 builders بـ `@react-pdf/renderer` (Document, Resume, Report, Letter) و`xlsx` نظيف (Spreadsheet).
+5. **FilesPage Integration**: حذف floating preview button، حذف IntakeForm overlay، توصيل SmartQuestionFlow.
+6. **Thumbnails**: سكريبت يولد 25 صورة JPG ويرفعها لـ`slide-images/templates/`، update DB rows.
 
-**Frontend جديد**:
-- `src/lib/slides/templates/` — 5 مكونات React للقوالب الجديدة.
-- `src/lib/slides/SlideRenderer.tsx` — renderer موحد يختار القالب + يصدر PPTX.
-- `src/lib/slides/pptxExporter.ts` — تحويل React slides إلى PptxGenJS.
-- `src/lib/builders/` — 8 builders متخصصة (document/resume/report/spreadsheet/letter/roadmap/mindmap/timeline).
-- `src/lib/builders/schemas.ts` — JSON schemas لكل نوع (يجبر AI على إخراج منظم).
-- `src/lib/builders/pexelsClient.ts` — wrapper للـedge function.
-- `src/components/files/IntakeForm.tsx` — نماذج ديناميكية حسب النوع.
-- `src/components/files/BriefCard.tsx` — بطاقة معاينة قبل التوليد.
-- `src/components/files/SlidePreview.tsx` — معاينة Reveal.js للسلايدات داخل التطبيق.
-- `src/pages/FilesPage.tsx` — flow جديد Intake → Brief → Generate → Preview.
-- `src/pages/ResearchPreviewPage.tsx` — شارة "صور منتهية".
+### 8) Dependencies جديدة
+- `react-icons` (100k+ أيقونة)
+- `@phosphor-icons/react`
+- `lottie-react`
+- `roughjs` (للـSketchHand)
+- `three` + `@react-three/fiber` (للـCinema3D)
 
----
-
-### 5) Secrets المطلوبة
-
-- `PEXELS_API_KEY` — **يحتاج إضافة**. سأطلبه عند بدء التنفيذ.
-- `TWOSLIDES_API_KEY` — موجود (للقوالب القديمة فقط).
-
----
-
-### 6) ترتيب التنفيذ
-
-1. Migration: إصلاح cleanup (images فقط).
-2. Migration: إضافة column `template_engine` + `component_name` + إدراج 5 قوالب Premium.
-3. طلب `PEXELS_API_KEY` من المستخدم.
-4. edge function `pexels-search`.
-5. تحديث `generate-slides` لدعم 60 + branching للقوالب Premium.
-6. edge function `generate-file-brief`.
-7. بناء 5 مكونات React للقوالب الجديدة + Reveal.js renderer + PptxGenJS exporter.
-8. بناء 8 builders للملفات (document/resume/report/spreadsheet/letter/roadmap/mindmap/timeline) — كل واحد بمكتبته المتخصصة.
-9. `IntakeForm` + `BriefCard` + ربط FilesPage بـflow الجديد.
-10. شارة "صور منتهية" في ResearchPreview.
+PEXELS_API_KEY موجود ✓.
 
