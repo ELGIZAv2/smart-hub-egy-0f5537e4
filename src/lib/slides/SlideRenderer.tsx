@@ -4,10 +4,34 @@ import EditorialNoir from "./templates/EditorialNoir";
 import NeoBrutalist from "./templates/NeoBrutalist";
 import GlassPitch from "./templates/GlassPitch";
 import CairoModern from "./templates/CairoModern";
+import SketchHand from "./templates/SketchHand";
+import Cinema3D from "./templates/Cinema3D";
+import iOSGlass from "./templates/iOSGlass";
+import TerminalDev from "./templates/TerminalDev";
+import MagazineFold from "./templates/MagazineFold";
+import NeonCyber from "./templates/NeonCyber";
+import PaperOrigami from "./templates/PaperOrigami";
+import MinimalSwiss from "./templates/MinimalSwiss";
+import GradientWave from "./templates/GradientWave";
+import DarkLuxe from "./templates/DarkLuxe";
+import KidsPlayful from "./templates/KidsPlayful";
+import CorporateNavy from "./templates/CorporateNavy";
+import NatureOrganic from "./templates/NatureOrganic";
+import GlitchArt from "./templates/GlitchArt";
+import IsometricTech from "./templates/IsometricTech";
+import WatercolorSoft from "./templates/WatercolorSoft";
+import RetroArcade from "./templates/RetroArcade";
+import ScientificPaper from "./templates/ScientificPaper";
+import PitchYC from "./templates/PitchYC";
+import ArabesqueGold from "./templates/ArabesqueGold";
 import type { SlideDeck, Slide, SlidePalette } from "./types";
 
 const TEMPLATE_MAP: Record<string, React.ComponentType<{ slide: Slide; palette: SlidePalette; index: number; total: number }>> = {
   AuroraKeynote, EditorialNoir, NeoBrutalist, GlassPitch, CairoModern,
+  SketchHand, Cinema3D, iOSGlass, TerminalDev, MagazineFold, NeonCyber,
+  PaperOrigami, MinimalSwiss, GradientWave, DarkLuxe, KidsPlayful,
+  CorporateNavy, NatureOrganic, GlitchArt, IsometricTech, WatercolorSoft,
+  RetroArcade, ScientificPaper, PitchYC, ArabesqueGold,
 };
 
 const TEMPLATE_BY_ID: Record<string, string> = {
@@ -16,6 +40,26 @@ const TEMPLATE_BY_ID: Record<string, string> = {
   "premium-neo-brutalist": "NeoBrutalist",
   "premium-glass-pitch": "GlassPitch",
   "premium-cairo-modern": "CairoModern",
+  "premium-sketch-hand": "SketchHand",
+  "premium-cinema-3d": "Cinema3D",
+  "premium-ios-glass": "iOSGlass",
+  "premium-terminal-dev": "TerminalDev",
+  "premium-magazine-fold": "MagazineFold",
+  "premium-neon-cyber": "NeonCyber",
+  "premium-paper-origami": "PaperOrigami",
+  "premium-minimal-swiss": "MinimalSwiss",
+  "premium-gradient-wave": "GradientWave",
+  "premium-dark-luxe": "DarkLuxe",
+  "premium-kids-playful": "KidsPlayful",
+  "premium-corporate-navy": "CorporateNavy",
+  "premium-nature-organic": "NatureOrganic",
+  "premium-glitch-art": "GlitchArt",
+  "premium-isometric-tech": "IsometricTech",
+  "premium-watercolor-soft": "WatercolorSoft",
+  "premium-retro-arcade": "RetroArcade",
+  "premium-scientific-paper": "ScientificPaper",
+  "premium-pitch-yc": "PitchYC",
+  "premium-arabesque-gold": "ArabesqueGold",
 };
 
 interface Props { deck: SlideDeck; }
@@ -45,7 +89,7 @@ export function SlideCanvas({ deck, index }: { deck: SlideDeck; index: number })
   return (
     <div id="slide-scale-wrap" className="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
       <div
-        className="absolute"
+        className="absolute slide-content"
         style={{
           width: 1920, height: 1080,
           left: "50%", top: "50%",
