@@ -905,7 +905,6 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                     </div>
                     <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none px-1">
                       {slideTemplates.map(tmpl => {
-                        const isPremium = tmpl.template_engine === "react-native";
                         const selected = selectedTemplate?.id === tmpl.id;
                         return (
                           <motion.button
@@ -924,9 +923,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                               ) : (
                                 <span className="text-[10px] text-muted-foreground/60 font-mono px-2 text-center">{tmpl.name || tmpl.template_id.slice(-8)}</span>
                               )}
-                              {isPremium && (
-                                <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold uppercase tracking-wider">Premium</span>
-                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
                             </div>
                             {tmpl.name && (
                               <div className="px-2.5 py-1.5">
@@ -1092,24 +1089,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
         )}
       </div>
 
-      {/* Floating Preview button */}
-      {hasMessages && previewHtml && !isGenerating && isMobile && activeTab === "chat" && (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={spring}
-          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30"
-        >
-          <motion.button
-            whileTap={{ scale: 0.93 }}
-            transition={spring}
-            onClick={() => setActiveTab("preview")}
-            className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-lg shadow-primary/30"
-          >
-            <Eye className="w-4 h-4" /> Preview
-          </motion.button>
-        </motion.div>
-      )}
+      {/* Floating Preview button removed */}
 
       {/* Bottom input */}
       {hasMessages && (
