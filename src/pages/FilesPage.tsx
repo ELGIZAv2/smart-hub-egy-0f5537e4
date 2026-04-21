@@ -1040,6 +1040,15 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                       {extractChatDisplay(msg.content)}
                     </div>
 
+                    {msg.questions && msg.questionsForType && (
+                      <SmartQuestionFlow
+                        questions={msg.questions}
+                        answered={msg.questionsAnswered}
+                        finalAnswer={msg.questionsAnswer}
+                        onComplete={(ans) => handleQuestionsComplete(i, ans)}
+                      />
+                    )}
+
                     {msg.brief && msg.briefForType && !msg.briefConsumed && (
                       <BriefCard
                         brief={msg.brief}
@@ -1047,6 +1056,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                         onConfirm={(edited) => handleBriefConfirm(i, edited)}
                       />
                     )}
+
                     
                     {/* File thumbnail card */}
                     {msg.htmlContent && (
