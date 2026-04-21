@@ -167,7 +167,7 @@ const ResearchPreviewPage = () => {
         className="flex-1 overflow-y-auto overscroll-contain"
         style={{ scrollBehavior: "smooth" }}
       >
-        <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8 sm:py-14">
+        <div ref={reportRef} className="mx-auto max-w-2xl bg-background px-5 py-10 sm:px-8 sm:py-14">
           {/* Editorial header */}
           <div className="mb-10">
             <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
