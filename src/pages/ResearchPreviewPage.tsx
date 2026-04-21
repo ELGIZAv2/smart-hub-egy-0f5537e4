@@ -155,10 +155,11 @@ const ResearchPreviewPage = () => {
         <h1 className="flex-1 truncate text-sm font-semibold text-foreground">{data.query}</h1>
         <button
           onClick={handleDownload}
-          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-foreground/5 transition"
-          title="Download"
+          disabled={exporting}
+          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-foreground/5 transition disabled:opacity-50"
+          title="Download PDF"
         >
-          <Download className="h-4 w-4 text-foreground" />
+          {exporting ? <Loader2 className="h-4 w-4 text-foreground animate-spin" /> : <Download className="h-4 w-4 text-foreground" />}
         </button>
       </header>
 
