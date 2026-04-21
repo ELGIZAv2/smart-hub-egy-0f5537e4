@@ -108,33 +108,61 @@ const ResearchPreviewPage = () => {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto max-w-3xl px-5 py-8">
-          {topImages.length > 0 && (
-            <div className="-mx-5 mb-8 overflow-x-auto px-5 pb-2 scrollbar-thin">
-              <div className="flex gap-3" style={{ width: "max-content" }}>
-                {topImages.map((img, i) => (
-                  <div key={i} className="h-44 w-64 shrink-0 overflow-hidden rounded-2xl border border-foreground/5 bg-foreground/5">
-                    <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  </div>
-                ))}
-              </div>
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain"
+        style={{ scrollBehavior: "smooth" }}
+      >
+        <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8 sm:py-14">
+          {/* Editorial header */}
+          <div className="mb-10">
+            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              {isRtl ? "تقرير بحث معمّق" : "Deep Research Report"}
+            </p>
+            <h1
+              dir="auto"
+              className="text-[clamp(2rem,6vw,2.75rem)] font-extrabold leading-[1.12] tracking-tight text-foreground"
+              style={{ fontFamily: isRtl ? '"Noto Naskh Arabic", "Cairo", system-ui, sans-serif' : 'Inter, system-ui, sans-serif' }}
+            >
+              {data.query}
+            </h1>
+            <div className="mt-5 flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="h-px w-10 bg-foreground/40" />
+              <span>{new Date().toLocaleDateString(isRtl ? "ar-EG" : "en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
             </div>
+          </div>
+
+          {topImages.length > 0 && (
+            <figure className="-mx-5 mb-10 sm:mx-0">
+              <div className="overflow-x-auto px-5 pb-2 sm:px-0 scrollbar-thin" style={{ scrollSnapType: "x mandatory" }}>
+                <div className="flex gap-3" style={{ width: "max-content" }}>
+                  {topImages.map((img, i) => (
+                    <div
+                      key={i}
+                      className="h-56 w-72 shrink-0 overflow-hidden rounded-xl bg-foreground/5 sm:h-64 sm:w-96"
+                      style={{ scrollSnapAlign: "start" }}
+                    >
+                      <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </figure>
           )}
 
           {reportEmpty ? (
-            <div className="rounded-2xl border border-foreground/10 bg-foreground/5 p-6 text-center text-sm text-muted-foreground">
-              Report is still being prepared. Please wait a moment and try again.
+            <div className="rounded-2xl border border-foreground/10 bg-foreground/5 p-8 text-center text-sm text-muted-foreground">
+              {isRtl ? "التقرير قيد التحضير. حاول مرة أخرى بعد قليل." : "Report is still being prepared. Please wait a moment and try again."}
             </div>
           ) : (
             <article
               dir={isRtl ? "rtl" : "ltr"}
+              lang={isRtl ? "ar" : "en"}
               className={`research-report ${isRtl ? "research-report--rtl" : ""}`}
             >
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  h1: ({ node: _n, ...props }) => <h1 dir="auto" {...props} />,
+                  h1: ({ node: _n, ...props }) => <h2 dir="auto" {...props} />,
                   h2: ({ node: _n, ...props }) => <h2 dir="auto" {...props} />,
                   h3: ({ node: _n, ...props }) => <h3 dir="auto" {...props} />,
                   h4: ({ node: _n, ...props }) => <h4 dir="auto" {...props} />,
@@ -160,15 +188,25 @@ const ResearchPreviewPage = () => {
           )}
 
           {restImages.length > 0 && (
-            <div className="-mx-5 mt-10 overflow-x-auto px-5 pb-2 scrollbar-thin">
-              <h3 className="mb-3 text-sm font-bold text-foreground">More images</h3>
-              <div className="flex gap-3" style={{ width: "max-content" }}>
-                {restImages.map((img, i) => (
-                  <div key={i} className="h-44 w-64 shrink-0 overflow-hidden rounded-2xl border border-foreground/5 bg-foreground/5">
-                    <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  </div>
-                ))}
+            <div className="mt-14 border-t border-foreground/10 pt-8">
+              <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {isRtl ? "صور إضافية" : "More Images"}
+              </p>
+              <div className="-mx-5 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0 scrollbar-thin">
+                <div className="flex gap-3" style={{ width: "max-content" }}>
+                  {restImages.map((img, i) => (
+                    <div key={i} className="h-44 w-64 shrink-0 overflow-hidden rounded-xl bg-foreground/5">
+                      <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
+                </div>
               </div>
+            </div>
+          )}
+
+          {!reportEmpty && (
+            <div className="mt-16 flex justify-center">
+              <div className="h-2 w-2 rotate-45 bg-foreground/40" />
             </div>
           )}
         </div>
