@@ -930,25 +930,20 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
               <AnimatePresence>
                 {showTemplates && slideTemplates.length > 0 && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={spring} className="max-w-xl mx-auto mb-6 overflow-hidden">
-                    <div className="flex items-center justify-between mb-3 px-1">
+                    <div className="flex items-center justify-between mb-4 px-1 gap-2 flex-wrap">
                       <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider">Choose a template</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-medium">{slideCount} slides</span>
-                      </div>
-                    </div>
-                    <div className="px-1 mb-4">
-                      <input
-                        type="range"
-                        min={3}
-                        max={60}
-                        step={1}
-                        value={slideCount}
-                        onChange={(e) => setSlideCount(Number(e.target.value))}
-                        className="w-full h-1.5 rounded-full appearance-none bg-foreground/10 accent-primary cursor-pointer"
-                        aria-label="Number of slides"
-                      />
-                      <div className="flex justify-between text-[10px] text-muted-foreground/60 mt-1">
-                        <span>3</span><span>15</span><span>30</span><span>45</span><span>60</span>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <button
+                          onClick={() => setSlideCount(0)}
+                          className={`px-3 py-1 rounded-full transition-all ${slideCount === 0 ? "bg-primary text-primary-foreground" : "liquid-glass-button text-foreground/70"}`}
+                        >AI decides</button>
+                        {[8, 12, 20].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => setSlideCount(n)}
+                            className={`px-3 py-1 rounded-full transition-all ${slideCount === n ? "bg-primary text-primary-foreground" : "liquid-glass-button text-foreground/70"}`}
+                          >{n}</button>
+                        ))}
                       </div>
                     </div>
                     <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none px-1">
