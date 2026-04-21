@@ -607,11 +607,11 @@ serve(async (req) => {
       failureText = await response.text();
       if (retryCount >= 3) break;
 
-      if (provider === "openrouter" && isModelUnavailable(failStatus, failureText)) {
+      if (isModelUnavailable(failStatus, failureText)) {
         const nextModel = getNextFallbackModel(modelId);
         if (nextModel) {
           modelId = nextModel;
-          body.model = modelId;
+          body.model = normalizeModelForProvider(modelId, provider);
           retryCount++;
           continue;
         }
@@ -625,6 +625,7 @@ serve(async (req) => {
           apiKey = lemonKey.api_key;
           usedKeyId = lemonKey.id;
           provider = "lemondata";
+          body.model = normalizeModelForProvider(modelId, provider);
           retryCount++;
           continue;
         }
