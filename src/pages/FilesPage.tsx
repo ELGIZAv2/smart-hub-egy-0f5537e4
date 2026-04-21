@@ -13,7 +13,15 @@ import { Menu, ArrowUp, Plus, X, Download, Eye, FileText, Undo2, Redo2, Papercli
 
 import type { SlideDeck } from "@/lib/slides/types";
 import SlideDeckPreview from "@/components/files/SlideDeckPreview";
+import BriefCard, { type FileBrief } from "@/components/files/BriefCard";
+import IntakeForm from "@/components/files/IntakeForm";
+import { getBuilder, type FileBuilderType } from "@/lib/builders";
 import { AnimatePresence as AP2 } from "framer-motion";
+
+const SPECIALIZED_BUILDERS: FileBuilderType[] = [
+  "document", "resume", "report", "spreadsheet",
+  "letter", "roadmap", "mindmap", "timeline",
+];
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -21,6 +29,11 @@ interface ChatMsg {
   htmlContent?: string;
   downloadUrl?: string;
   deck?: SlideDeck;
+  /** When set, this assistant message renders a BriefCard awaiting user confirmation. */
+  brief?: FileBrief;
+  briefForType?: FileBuilderType;
+  briefTopic?: string;
+  briefConsumed?: boolean;
   isQuestion?: boolean;
   questionOptions?: string[];
 }
