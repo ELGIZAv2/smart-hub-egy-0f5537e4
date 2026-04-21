@@ -178,9 +178,10 @@ const DeepResearchPage = () => {
 
     const sid = `dr-${Date.now()}`;
     const newSession: ResearchSession = {
-      id: sid, query: input.trim(), steps: [], images: [], report: "", expandedStep: null,
+      id: sid, query: input.trim(), steps: [], images: [], report: "", summary: "", expandedStep: null,
     };
     setSessions((s) => [...s, newSession]);
+    userJustSentRef.current = true;
     const sentInput = input;
     setInput("");
     setIsLoading(true);
