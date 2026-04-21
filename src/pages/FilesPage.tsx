@@ -1064,9 +1064,14 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                         href={msg.downloadUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        download
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
                       >
-                        <Download className="w-4 h-4" /> Download
+                        <Download className="w-4 h-4" />
+                        {msg.mimeType === "image/svg+xml" ? "Download SVG"
+                          : msg.mimeType === "application/pdf" ? "Download PDF"
+                          : msg.mimeType?.includes("spreadsheet") ? "Download XLSX"
+                          : "Download"}
                       </motion.a>
                     )}
                   </motion.div>
