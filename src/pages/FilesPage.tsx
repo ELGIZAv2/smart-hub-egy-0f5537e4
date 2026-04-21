@@ -299,24 +299,18 @@ Do NOT invent information. Only provide verified facts.`;
     });
     if (error || !data?.success) return null;
 
-    if (data?.download_url) {
-      addResearchStep("Preparing summary...");
-      let summary = `Your presentation "${userInput}" is ready with ${data.slide_count || slideCount || 10} professional slides.`;
-      try {
-        const summaryResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: `Write a brief, personalized 2-3 sentence summary. You just created a presentation about "${userInput}" with ${data.slide_count || slideCount || 10} slides. Describe what sections you covered and mention the preview button. Respond in the same language as the topic. Don't use emojis.` }],
-            model: "moonshotai/kimi-k2.5:nitro", mode: "files",
-          }),
-        });
-        if (summaryResp.ok && summaryResp.body) {
-          const s = await readSSEStreamWithStatus(summaryResp.body);
-          if (s.trim()) summary = s.trim();
-        }
-      } catch {}
+    // Premium React deck path
+    if (data?.engine === "react-native" && data?.deck) {
+      const deck = data.deck as SlideDeck;
+      const summary = `Your ${deck.slides.length}-slide presentation "${deck.title || userInput}" is ready. Tap Preview to view it or download as PPTX.`;
+      pushMessage({ role: "assistant", content: summary, deck });
+      if (convId) await saveMsg(convId, "assistant", summary, { htmlContent: JSON.stringify({ __deck: deck }) });
+      setActiveDeck(deck);
+      return true;
+    }
 
+    if (data?.download_url) {
+      const summary = `Your presentation "${userInput}" is ready with ${data.slide_count || slideCount || 10} professional slides.`;
       pushMessage({ role: "assistant", content: summary, downloadUrl: data.download_url });
       if (convId) await saveMsg(convId, "assistant", summary, { downloadUrl: data.download_url });
       return true;
