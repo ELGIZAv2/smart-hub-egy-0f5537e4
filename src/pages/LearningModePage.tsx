@@ -70,9 +70,14 @@ const LearningModePage = () => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
+  // Auto-scroll only after the user just sent a message — let the user scroll freely.
+  const userJustSentRef = useRef(false);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isThinking]);
+    if (userJustSentRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      userJustSentRef.current = false;
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     if (!plusOpen) return;
@@ -87,6 +92,28 @@ const LearningModePage = () => {
     window.addEventListener("pointerdown", handlePointerDown, true);
     return () => window.removeEventListener("pointerdown", handlePointerDown, true);
   }, [plusOpen]);
+
+  const loadConversation = useCallback(async (cid: string) => {
+    setConversationId(cid);
+    const { data: msgs } = await supabase
+      .from("messages")
+      .select("role, content, images")
+      .eq("conversation_id", cid)
+      .order("created_at", { ascending: true });
+    if (!msgs?.length) return;
+    setMessages(msgs.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+      attachedImages: (m.images as string[] | null) || undefined,
+    })));
+  }, []);
+
+  const startNewSession = useCallback(() => {
+    setMessages([]);
+    setConversationId(null);
+    setInput("");
+    setAttachedFiles([]);
+  }, []);
 
   const handleFile = useCallback((files: FileList | null, kind: "image" | "file") => {
     if (!files) return;
@@ -112,6 +139,7 @@ const LearningModePage = () => {
       attachedFiles: attachedFiles.filter(f => f.type !== "image").map(f => ({ name: f.name, type: f.type })),
     };
     setMessages((m) => [...m, userMsg]);
+    userJustSentRef.current = true;
     const sentInput = input;
     setInput("");
     const sentFiles = [...attachedFiles];
