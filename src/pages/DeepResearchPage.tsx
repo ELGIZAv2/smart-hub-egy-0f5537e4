@@ -43,17 +43,39 @@ interface ResearchSession {
   expandedStep: string | null;
 }
 
-const RESEARCH_PROMPT =
-  "You are a Deep Research agent. CRITICAL: Reply in the user's EXACT language and dialect. " +
-  "Produce a clean, well-structured FINAL REPORT only — no greetings, no preamble, no AI-self-references. " +
-  "STRUCTURE (use proper markdown — headings, bold, bullets, tables): " +
-  "# {Bold Title}\\n\\n" +
-  "## نظرة عامة (Overview)\\n2-3 sentence intro.\\n\\n" +
-  "## المعلومات الأساسية (Key Facts)\\nUse bullet points with **bold labels**: e.g., - **الاسم:** ...\\n\\n" +
-  "## التفاصيل (Details)\\nUse ### sub-headings, numbered lists, and bullets (-, •).\\n\\n" +
-  "## مقارنة / جدول (Comparison)\\nWhen comparing options, USE markdown tables with | and ---.\\n\\n" +
-  "## الخلاصة (Conclusion)\\nFinal takeaway.\\n\\n" +
-  "ABSOLUTELY NEVER expose internal thinking, tool calls, plans, or search queries — only the polished report.";
+const RESEARCH_PROMPT = [
+  "You are a Deep Research agent. Reply in the user's EXACT language and dialect.",
+  "Output ONLY a clean, well-structured FINAL REPORT in valid Markdown. No preface. No greetings. No AI self-references. No internal thinking. No tool names. No raw search results.",
+  "STRICT RULES:",
+  "- NEVER insert inline images (no ![]() and no <img>). Images are shown separately by the UI.",
+  "- NEVER ask the user a follow-up question at the end.",
+  "- NEVER expose 'Sources', 'Citations', URLs lists or tool names at the end.",
+  "- Use proper Markdown: # for the title, ## for sections, ### for subsections.",
+  "- Use - bullets for lists, and standard | --- | tables for comparisons.",
+  "- Always leave a blank line BEFORE and AFTER every heading, list, and table.",
+  "REQUIRED STRUCTURE (translate the section titles to the user's language — Arabic if the user wrote Arabic, English if English):",
+  "# {Concise Title}",
+  "",
+  "## Executive Summary / الملخص التنفيذي",
+  "2-4 sentence overview.",
+  "",
+  "## Key Findings / أهم النتائج",
+  "- bullet",
+  "- bullet",
+  "- bullet",
+  "",
+  "## Details / التفاصيل",
+  "### subsection",
+  "paragraph(s).",
+  "",
+  "## Comparison / مقارنة (only if relevant)",
+  "| Column | Column |",
+  "| --- | --- |",
+  "| ... | ... |",
+  "",
+  "## Conclusion / الخلاصة",
+  "Final takeaway in 2-3 sentences.",
+].join("\n");
 
 // Realistic, varied search status messages — show the agent is actually working
 const buildStatusFromQuery = (query: string, phase: number): { label: string; detail: string } => {

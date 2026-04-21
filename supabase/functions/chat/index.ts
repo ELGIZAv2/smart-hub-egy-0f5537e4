@@ -222,16 +222,11 @@ function buildForcedToolCalls({
   const calls: any[] = [];
 
   if (isShopping) {
-    calls.push(createSyntheticToolCall("BROWSE_WEBSITE", {
-      goal: `Search Google and real online stores for "${latestUserText}". Compare the best options, open product pages, collect live prices, seller names, ratings, delivery details, and direct purchase links.`,
-      url: explicitUrl || `https://www.google.com/search?q=${encodeURIComponent(latestUserText)}`,
-    }));
-
+    // Always start with shopping product search (no key required) + web search for reviews.
+    calls.push(createSyntheticToolCall("SHOPPING_SEARCH", { query: latestUserText, num: 10 }));
     if (hasSerper) {
-      calls.push(createSyntheticToolCall("SHOPPING_SEARCH", { query: latestUserText, num: 10 }));
-      calls.push(createSyntheticToolCall("WEB_SEARCH", { query: `${latestUserText} reviews comparison`, include_images: true }));
+      calls.push(createSyntheticToolCall("WEB_SEARCH", { query: `${latestUserText} reviews comparison`, include_images: false }));
     }
-
     return calls;
   }
 
