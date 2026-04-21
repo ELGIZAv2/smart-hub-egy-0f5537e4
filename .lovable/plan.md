@@ -1,174 +1,129 @@
 
-سأصلحها كحزمة واحدة: Deep Research Preview يصبح قارئ تقرير منظم فعلاً، وShopping لن يرد قبل تنفيذ بحث ويب/تسوق حقيقي.
 
-## 1) Deep Research: إعادة بناء التقرير بدل ترقيع الـMarkdown
+## الخطة النهائية: Files & Slides بلغات UI متخصصة + Pexels + 5 قوالب Premium
 
-### الهدف
-منع التقرير من الظهور كنص مكسر أو مختلط، خصوصاً مع العربي وRTL، وجعل العناوين والقوائم والجداول تظهر بترتيب ثابت وواضح.
+### 1) إصلاح Cleanup (الصور فقط، ليس التقرير)
 
-### التنفيذ
-- استبدال منطق `normalizeResearchReport` الحالي بمنظّم أقوى يعمل على مراحل:
-  1. إزالة أي thinking/internal/tool leakage.
-  2. توحيد الأسطر والمسافات.
-  3. اكتشاف العناوين حتى لو النموذج كتبها بدون مسافات صحيحة مثل `##العنوان`.
-  4. تحويل bullets العربية/الغريبة مثل `•` إلى Markdown bullets ثابتة.
-  5. إصلاح القوائم المكسورة بدون دمج عناصر مختلفة في نفس السطر.
-  6. إصلاح الجداول:
-     - التأكد من وجود صف separator مثل `| --- | --- |`.
-     - تنظيف الخلايا الفارغة والزائدة.
-     - منع كسر صف الجدول داخل الفقرة.
-  7. دمج فقرات النص العادية فقط، بدون لمس العناوين أو القوائم أو الجداول.
+تعديل `cleanup_old_research_reports` لتفريغ `images='[]'::jsonb` فقط بدلاً من `DELETE`. التقرير النصي + steps يبقوا للأبد. وفي `ResearchPreviewPage.tsx` تظهر شارة "الصور انتهت صلاحيتها — التقرير محفوظ" عند images فارغة.
 
-## 2) Renderer مخصص لتقرير Deep Research
+---
 
-### المشكلة الحالية
-الصفحة تعتمد على `ReactMarkdown + prose` بشكل عام، وهذا لا يكفي مع:
-- Arabic RTL
-- جداول طويلة
-- mixed Arabic/English/numbers
-- قوائم متداخلة
-- تقارير طويلة جداً
+### 2) Slides — بناء React/TypeScript أصلي + Reveal.js (لا HTML خام)
 
-### التنفيذ
-- إنشاء مكوّن مخصص داخل صفحة المعاينة أو ملف مستقل مثل `ResearchReportRenderer`.
-- استخدام `ReactMarkdown` لكن بمكوّنات مخصصة لكل عنصر:
-  - `h1/h2/h3`: مسافات ثابتة، خطوط واضحة، حدود خفيفة.
-  - `p`: `dir="auto"` مع `unicode-bidi: plaintext`.
-  - `ul/ol/li`: RTL padding مضبوط، bullets لا تدخل داخل النص.
-  - `table`: داخل container أفقي سلس، بعرض `max-content` على الموبايل و`w-full` عندما يناسب.
-  - `th/td`: `dir="auto"`، محاذاة تلقائية، padding ثابت، منع النص من كسر الجدول بشكل قبيح.
-  - `blockquote/code/pre`: تنسيق منفصل لا يخلط اتجاه النص.
-- إضافة كلاس CSS واضح مثل `research-report` في `src/index.css` لقواعد RTL والجداول بدلاً من الاعتماد فقط على Tailwind prose.
+**التحول التقني**: نتخلى عن إرسال HTML خام إلى 2Slides لكل قالب. بدلاً منه:
+- **محرك العرض**: `Reveal.js` (للعرض داخل الموقع) + `PptxGenJS` (للتصدير PPTX حقيقي قابل للتعديل في PowerPoint).
+- **محرك السلايدات داخل التطبيق**: مكونات React مخصصة لكل قالب باستخدام:
+  - `framer-motion` للأنيميشن.
+  - `Recharts` للرسوم البيانية.
+  - `lucide-react` للأيقونات.
+  - `tsParticles` للخلفيات المتحركة.
+  - Google Fonts (Inter, Playfair, Cairo, IBM Plex).
+- كل قالب = مكون React منفصل في `src/lib/slides/templates/` يستقبل `slideData` ويرندر حسب نوع السلايد (cover/section/content/chart/quote/closing).
 
-## 3) منع الصور من تخريب ترتيب التقرير
+**5 قوالب Premium جديدة** (display_order سالب لتظهر أولاً):
+1. **Aurora Keynote** — gradient متحرك + glassmorphism + framer-motion transitions (ستايل Apple Keynote).
+2. **Editorial Noir** — أبيض/أسود فاخر + Playfair Display + خطوط رفيعة (ستايل NYT/Vogue).
+3. **Neo Brutalist** — ألوان جريئة + ظلال صلبة + Inter Bold (ستايل Gumroad/Linear).
+4. **Glass Pitch** — backdrop-blur + tsParticles + Recharts charts (ستايل YC pitch decks).
+5. **Cairo Modern** — RTL أصلي + خط Cairo + ذهبي/كحلي (ستايل عربي راقٍ).
 
-### التنفيذ
-- في Deep Research prompt، أوقف إدراج الصور داخل نص التقرير كـ `![image](url)`.
-- الصور ستظل تظهر في gallery أعلى التقرير ومنتصفه من `images[]`.
-- لو التقرير القديم يحتوي صور Markdown داخل النص، سيتم تنظيفها أو تحويلها لقسم منفصل حتى لا تكسر الفقرات والجداول.
+كل قالب له ملف `<TemplateName>.tsx` + thumbnail SVG + metadata في DB.
 
-## 4) Prompt جديد لتقرير Deep Research
+**دعم 50+ سلايد**: 
+- `generate-slides/index.ts` يقبل `pageCount` (1..60) ويمرره لـ 2Slides API كـ `page: pageCount`.
+- timeout الـedge function يرفع لـ 180s.
+- لو القالب من الجديدة (Premium React)، **لا نستخدم 2Slides أصلاً** — نولد JSON منظم من AI ثم نرندره عبر مكون React → نصدره PPTX عبر PptxGenJS.
 
-### التنفيذ
-تعديل تعليمات Deep Research في:
-- `src/pages/DeepResearchPage.tsx`
-- `supabase/functions/chat/index.ts`
+**تقرير قبل التوليد (Brief)**:
+- edge function جديدة `generate-file-brief` ترجع: ملخص + outline لكل سلايد + اللون/الخط المختار + عدد السلايدات.
+- يظهر داخل الـchat كـ`BriefCard` فيه: **"ابدأ التوليد"** أو **"تعديل"** (textarea لتعديل outline).
+- بعد التعديل، outline المعدل يمرر للـbuilder.
 
-ليكون الإخراج صارم:
+---
 
-```text
-Return ONLY valid Markdown.
-No preface.
-No internal steps.
-No inline images.
-Use this structure:
-# Title
+### 3) Files — Builders متخصصة بلغات UI لكل نوع
 
-## Executive Summary / الملخص التنفيذي
-paragraphs
+**التخلي الكامل عن HTML خام**. كل نوع يصبح **مكون React + مكتبة متخصصة** + تصدير نظيف:
 
-## Key Findings / أهم النتائج
-- bullet
-- bullet
+| النوع | اللغة/المكتبة | الإخراج | بيانات مطلوبة من المستخدم |
+|---|---|---|---|
+| **Document** | React + `@tiptap/react` (rich editor) + Tailwind typography | PDF (via jsPDF + html2canvas) | عنوان، أقسام، نبرة، طول |
+| **Resume** | React مكونات + `react-pdf/renderer` (PDF أصلي vector) | PDF حقيقي vector | اسم، خبرة، تعليم، مهارات، لغات |
+| **Report** | React + `Recharts` + `react-pdf/renderer` | PDF + charts | موضوع، KPIs، مصادر |
+| **Spreadsheet** | `SheetJS (xlsx)` + JSON schema | XLSX حقيقي بصيغ | نوع جدول، أعمدة، صفوف |
+| **Letter** | React + `react-pdf/renderer` | PDF رسمي | مرسل، مستلم، نبرة |
+| **Roadmap** | React + `framer-motion` + SVG vector | PNG/PDF عبر html2canvas | هدف، مراحل، تواريخ |
+| **Mindmap** | `@xyflow/react` (React Flow) interactive | PNG عبر html-to-image + JSON | فكرة مركزية، فروع |
+| **Timeline** | React + `framer-motion` + SVG vector | PNG/PDF | أحداث (تاريخ + عنوان) |
 
-## Details / التفاصيل
-### subsection
-paragraph
+**Pexels Integration** (للصور فقط):
+- edge function جديدة `pexels-search` تستخدم `PEXELS_API_KEY`.
+- عند ما builder يحتاج صورة (cover slide, document hero, report illustration)، يستدعي pexels بكلمة مفتاحية مستخرجة من المحتوى.
+- لا نستخدم unsplash/pixabay لتجنب rate limits، Pexels فقط.
+- الصور المختارة تخزن في `slide-images` bucket لتجنب hotlinking.
 
-## Data Table / جدول البيانات
-| Column | Column |
-| --- | --- |
-| ... | ... |
+**Intake Flow**:
+- مكون جديد `IntakeForm.tsx` يظهر كـsheet بعد اختيار النوع.
+- 3-6 حقول minimal فقط (الإلزامي قليل، Optional يوضح بـ"تخطي = توليد ذكي").
+- زر "تخطي + توليد سريع" متاح دوماً.
+- بعد الإرسال → `BriefCard` (تقرير قبل التوليد) → "ابدأ".
 
-## Conclusion / الخلاصة
-paragraph
-```
+---
 
-- لو لغة المستخدم عربية: كل العناوين عربية.
-- لو إنجليزي: كل العناوين إنجليزي.
-- منع الأسئلة في نهاية التقرير لأن المطلوب تقرير مرتب وليس شات مفتوح.
-- منع مصادر نهائية ظاهرة إذا سياسة المشروع تخفي المصادر، مع السماح بالاستفادة من البحث داخلياً.
+### 4) الملفات والـ Dependencies
 
-## 5) تحسين شكل صفحة المعاينة على الموبايل
+**Dependencies جديدة**:
+- `reveal.js` + `@types/reveal.js`
+- `pptxgenjs`
+- `@react-pdf/renderer`
+- `@tiptap/react` + `@tiptap/starter-kit`
+- `xlsx` (SheetJS)
+- `@xyflow/react`
+- `tsparticles` + `@tsparticles/react`
+- `html-to-image` (لتصدير mindmap/roadmap)
+- (موجود: framer-motion, recharts, lucide-react, html2canvas, jspdf)
 
-### التنفيذ
-- تغيير container التقرير ليكون أكثر راحة على شاشة 428px:
-  - padding ثابت ومريح.
-  - line-height مناسب للعربي.
-  - `overflow-x-auto` للجداول فقط، وليس للصفحة كلها.
-  - `scroll-smooth` و`overscroll-contain` بدون إجبار المستخدم على سكرول تلقائي.
-- إبقاء زر الرجوع والتحميل في header ثابت لكن بدون تغطية أول عنوان.
-- إضافة fallback إذا التقرير فارغ أو مكسور: يظهر “Report is still being prepared” بدلاً من صفحة غير مفهومة.
+**Migrations**:
+- `<new>.sql` — إصلاح cleanup ليفرغ images فقط.
+- `<new>.sql` — إدراج 5 قوالب Premium بـdisplay_order = -5..-1، مع `template_engine='react-native'` (column جديد) + `component_name` لاستهداف المكون.
 
-## 6) Shopping: البحث في الويب قبل أي رد
+**Edge Functions**:
+- `supabase/functions/generate-slides/index.ts` — دعم `pageCount` 60 + branching: قوالب Premium = توليد JSON بدلاً من PPTX من 2Slides.
+- `supabase/functions/generate-file-brief/index.ts` (جديد) — توليد brief لكل نوع.
+- `supabase/functions/pexels-search/index.ts` (جديد) — بحث صور + cache في storage bucket.
 
-### المشكلة الحالية
-الـbackend يعرّف أدوات بحث وتسوق، لكن الرد قد يبدأ من النموذج إذا لم يتم إجبار flow البحث دائماً، أو إذا Hyperbrowser غير متاح.
+**Frontend جديد**:
+- `src/lib/slides/templates/` — 5 مكونات React للقوالب الجديدة.
+- `src/lib/slides/SlideRenderer.tsx` — renderer موحد يختار القالب + يصدر PPTX.
+- `src/lib/slides/pptxExporter.ts` — تحويل React slides إلى PptxGenJS.
+- `src/lib/builders/` — 8 builders متخصصة (document/resume/report/spreadsheet/letter/roadmap/mindmap/timeline).
+- `src/lib/builders/schemas.ts` — JSON schemas لكل نوع (يجبر AI على إخراج منظم).
+- `src/lib/builders/pexelsClient.ts` — wrapper للـedge function.
+- `src/components/files/IntakeForm.tsx` — نماذج ديناميكية حسب النوع.
+- `src/components/files/BriefCard.tsx` — بطاقة معاينة قبل التوليد.
+- `src/components/files/SlidePreview.tsx` — معاينة Reveal.js للسلايدات داخل التطبيق.
+- `src/pages/FilesPage.tsx` — flow جديد Intake → Brief → Generate → Preview.
+- `src/pages/ResearchPreviewPage.tsx` — شارة "صور منتهية".
 
-### التنفيذ
-- تعديل `supabase/functions/chat/index.ts` بحيث Shopping mode يعمل بهذا الترتيب دائماً:
-  1. `SHOPPING_SEARCH` أولاً لجلب المنتجات والأسعار والصور.
-  2. `WEB_SEARCH` ثانياً لجلب مراجعات ومقارنات ومعلومات عامة من الويب.
-  3. بعدها فقط يتم توليد الرد النهائي.
-- إزالة اعتماد إجبار البحث على وجود Hyperbrowser فقط.
-- لو Hyperbrowser موجود، يستخدم كطبقة تحقق إضافية، لكن ليس شرطاً حتى يبدأ البحث.
-- لو Serper موجود، يستخدمه دائماً في Shopping.
-- لو فشل بحث الويب، لا يرد من فراغ: يوضح بشكل white-label أن النتائج الحية غير متاحة مؤقتاً ويعرض المتاح من بحث المنتجات فقط.
+---
 
-## 7) Shopping: منع سؤال المستخدم قبل البحث
+### 5) Secrets المطلوبة
 
-### التنفيذ
-- إزالة قاعدة “اسأل المستخدم عن الدولة والعملة قبل البحث”.
-- بدلاً من ذلك:
-  - استنتاج البلد/العملة من الرسالة أو اللغة.
-  - العربي الافتراضي = مصر/EGP إذا لا توجد ذاكرة محفوظة.
-  - لو المستخدم ذكر السعودية/الإمارات/دولة أخرى يتم احترامها.
-  - لو لم يتضح البلد، يبحث عالمياً ويعرض العملة الأصلية بدون إيقاف التجربة بسؤال.
-- الرد النهائي لا يسأل follow-up، فقط يعطي توصية واضحة.
+- `PEXELS_API_KEY` — **يحتاج إضافة**. سأطلبه عند بدء التنفيذ.
+- `TWOSLIDES_API_KEY` — موجود (للقوالب القديمة فقط).
 
-## 8) Product cards والرد النهائي في Shopping
+---
 
-### التنفيذ
-- الحفاظ على 4 منتجات فقط افتراضياً.
-- لو المستخدم طلب المزيد، تعرض كل النتائج المتاحة.
-- الرد النصي يعتمد على نتائج البحث فعلاً:
-  - Best pick
-  - مقارنة مختصرة
-  - نقاط قوة/ضعف
-  - تنبيه لو السعر أو المتجر مشبوه
-- ملخص المنتج داخل sheet يستمر بلغة رسالة المستخدم، بدون أسئلة.
+### 6) ترتيب التنفيذ
 
-## 9) حفظ المحادثات وعدم كسر السابق
+1. Migration: إصلاح cleanup (images فقط).
+2. Migration: إضافة column `template_engine` + `component_name` + إدراج 5 قوالب Premium.
+3. طلب `PEXELS_API_KEY` من المستخدم.
+4. edge function `pexels-search`.
+5. تحديث `generate-slides` لدعم 60 + branching للقوالب Premium.
+6. edge function `generate-file-brief`.
+7. بناء 5 مكونات React للقوالب الجديدة + Reveal.js renderer + PptxGenJS exporter.
+8. بناء 8 builders للملفات (document/resume/report/spreadsheet/letter/roadmap/mindmap/timeline) — كل واحد بمكتبته المتخصصة.
+9. `IntakeForm` + `BriefCard` + ربط FilesPage بـflow الجديد.
+10. شارة "صور منتهية" في ResearchPreview.
 
-### التنفيذ
-- لا أغير schema حالياً إلا لو ظهر أثناء التنفيذ أن تخزين المنتجات داخل messages مطلوب.
-- سأحافظ على حفظ محادثات Deep Research وShopping كما هو.
-- عند فتح محادثة سابقة من القائمة:
-  - Shopping سيعرض النصوص، ولو المنتجات غير محفوظة كـcards حالياً سيتم على الأقل فتح المحادثة والردود.
-  - Deep Research سيعيد بناء report card من الرسالة المحفوظة ويفتح preview بنفس التنسيق الجديد.
-
-## 10) التحقق بعد التنفيذ
-
-### اختبارات سأجريها
-- تقرير عربي طويل يحتوي:
-  - عناوين
-  - قوائم
-  - جدول
-  - أرقام وإنجليزي داخل عربي
-- تقرير إنجليزي للتأكد أن LTR لم يتكسر.
-- جدول عريض على موبايل للتأكد أن السكرول أفقي داخل الجدول فقط.
-- Shopping query بالعربي مثل: “عايز أفضل موبايل في حدود ١٥ ألف جنيه”
-  - يجب أن يبدأ ببحث منتجات + بحث ويب قبل الرد.
-  - يعرض 4 منتجات فقط.
-  - لا يسأل المستخدم عن البلد أو العملة.
-- Shopping query “هات المزيد”
-  - يعرض نتائج أكثر.
-
-## الملفات المتوقع تعديلها
-
-- `src/lib/normalizeResearchReport.ts`
-- `src/pages/ResearchPreviewPage.tsx`
-- `src/pages/DeepResearchPage.tsx`
-- `src/pages/ShoppingModePage.tsx`
-- `supabase/functions/chat/index.ts`
-- `src/index.css`
