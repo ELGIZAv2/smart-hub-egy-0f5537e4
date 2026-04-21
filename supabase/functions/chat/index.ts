@@ -182,6 +182,15 @@ function getNextFallbackModel(currentModel: string): string | null {
   return OPENROUTER_FALLBACK_MODELS.find((candidate) => candidate !== currentModel) ?? null;
 }
 
+function normalizeModelForProvider(model: string, provider: "openrouter" | "lemondata"): string {
+  // LemonData expects bare model IDs (e.g. "gemini-2.5-flash-lite"), not "google/gemini-2.5-flash-lite"
+  if (provider === "lemondata") {
+    const slash = model.indexOf("/");
+    return slash === -1 ? model : model.slice(slash + 1);
+  }
+  return model;
+}
+
 // Detect if the task requires a more powerful model
 function detectComplexTask(text: string, hasImages: boolean, isDeepResearch: boolean, isShopping: boolean, mode?: string): boolean {
   if (hasImages) return true;
@@ -539,7 +548,7 @@ serve(async (req) => {
       : messages;
 
     const body: any = {
-      model: modelId,
+      model: normalizeModelForProvider(modelId, provider),
       messages: isCasualMessage 
         ? [{ role: "system", content: `You are Megsy, a fast and friendly AI assistant. Reply briefly and naturally. Match the user's language.${userContext}` }, ...trimmedMessages]
         : [{ role: "system", content: systemPrompt }, ...trimmedMessages],
@@ -598,11 +607,11 @@ serve(async (req) => {
       failureText = await response.text();
       if (retryCount >= 3) break;
 
-      if (provider === "openrouter" && isModelUnavailable(failStatus, failureText)) {
+      if (isModelUnavailable(failStatus, failureText)) {
         const nextModel = getNextFallbackModel(modelId);
         if (nextModel) {
           modelId = nextModel;
-          body.model = modelId;
+          body.model = normalizeModelForProvider(modelId, provider);
           retryCount++;
           continue;
         }
@@ -616,6 +625,7 @@ serve(async (req) => {
           apiKey = lemonKey.api_key;
           usedKeyId = lemonKey.id;
           provider = "lemondata";
+          body.model = normalizeModelForProvider(modelId, provider);
           retryCount++;
           continue;
         }
@@ -1576,7 +1586,7 @@ async function handleToolCalls(
     ];
 
     const secondBody: any = {
-      model: modelId,
+      model: apiUrl === LEMONDATA_URL ? normalizeModelForProvider(modelId, "lemondata") : modelId,
       messages: searchMessages,
       stream: true,
       max_tokens: isDeepResearch ? 8192 : (isShopping ? 2048 : 2048),
