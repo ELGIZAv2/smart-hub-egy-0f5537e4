@@ -274,6 +274,26 @@ const DeepResearchPage = () => {
         });
         setIsLoading(false);
         abortRef.current = null;
+
+        // Generate a short AI summary for the report card (one short sentence in the user's language).
+        let summaryText = "";
+        try {
+          await streamChat({
+            messages: [
+              { role: "assistant", content: "Write ONE single concise sentence (max 22 words) summarizing the report below. Reply in the user's exact language. No prefix, no headings, no quotes." },
+              { role: "user", content: reportBuf.slice(0, 2400) },
+            ] as any,
+            model: "google/gemini-2.5-flash-lite-preview-09-2025",
+            chatMode: "chat",
+            user_id: userId ?? undefined,
+            onDelta: (d) => { summaryText += d; },
+            onDone: () => {},
+            onError: () => {},
+          });
+        } catch { /* non-blocking */ }
+        const cleanSummary = summaryText.replace(/[#*`>]/g, "").trim() || reportBuf.slice(0, 180).replace(/[#*`>|]/g, "").trim();
+        updateLastSession((s) => ({ ...s, summary: cleanSummary }));
+
         if (userId && reportBuf) {
           const cid = await saveConversation({
             conversationId, userId, mode: "research",
