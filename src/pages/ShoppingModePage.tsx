@@ -69,9 +69,14 @@ const ShoppingModePage = () => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
+  // Auto-scroll only when the user just sent a message — never auto-jump while reading.
+  const userJustSentRef = useRef(false);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isLoading]);
+    if (userJustSentRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      userJustSentRef.current = false;
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     if (!plusOpen) return;
@@ -86,6 +91,28 @@ const ShoppingModePage = () => {
     window.addEventListener("pointerdown", handlePointerDown, true);
     return () => window.removeEventListener("pointerdown", handlePointerDown, true);
   }, [plusOpen]);
+
+  const loadConversation = useCallback(async (cid: string) => {
+    setConversationId(cid);
+    const { data: msgs } = await supabase
+      .from("messages")
+      .select("role, content, images")
+      .eq("conversation_id", cid)
+      .order("created_at", { ascending: true });
+    if (!msgs?.length) return;
+    setMessages(msgs.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+      attachedImages: (m.images as string[] | null) || undefined,
+    })));
+  }, []);
+
+  const startNewSession = useCallback(() => {
+    setMessages([]);
+    setConversationId(null);
+    setInput("");
+    setAttachedFiles([]);
+  }, []);
 
   const hasResults = messages.length > 0;
 
@@ -112,6 +139,7 @@ const ShoppingModePage = () => {
       attachedImages: attachedFiles.filter(f => f.type === "image").map(f => f.data),
     };
     setMessages((m) => [...m, userMsg]);
+    userJustSentRef.current = true;
     const sentInput = input;
     setInput("");
     setAttachedFiles([]);
@@ -268,8 +296,19 @@ const ShoppingModePage = () => {
   );
 
   return (
-    <AppLayout>
-      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={() => navigate("/")} currentMode="shopping" />
+    <AppLayout
+      onSelectConversation={loadConversation}
+      onNewChat={startNewSession}
+      activeConversationId={conversationId}
+    >
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={startNewSession}
+        onSelectConversation={loadConversation}
+        activeConversationId={conversationId}
+        currentMode="shopping"
+      />
 
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "file")} />
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFile(e.target.files, "image")} />
