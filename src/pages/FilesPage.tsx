@@ -165,7 +165,7 @@ const FilesPage = () => {
   const [undoStack, setUndoStack] = useState<ChatMsg[][]>([]);
   const [redoStack, setRedoStack] = useState<ChatMsg[][]>([]);
   const [activeDeck, setActiveDeck] = useState<SlideDeck | null>(null);
-  const [intakeOpen, setIntakeOpen] = useState(false);
+  // (intake state removed — replaced by in-chat SmartQuestionFlow)
   const [pendingBuilder, setPendingBuilder] = useState<{ type: FileBuilderType; topic: string; extras: Record<string, string> } | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState<"outer" | "inner" | null>(null);
   const [agentMode, setAgentMode] = useState<AgentMode>("work");
