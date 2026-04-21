@@ -174,7 +174,8 @@ function normalizeRequestedModel(rawModel: string | null): string | null {
 }
 
 function isModelUnavailable(status: number, errorText: string): boolean {
-  return status === 400 && /not.*available|invalid.*model|unsupported/i.test(errorText);
+  if (status !== 400 && status !== 404) return false;
+  return /not.*available|invalid.*model|unsupported|model[_\s-]?not[_\s-]?found|not\s+found|no\s+such\s+model|deprecated/i.test(errorText);
 }
 
 function getNextFallbackModel(currentModel: string): string | null {
