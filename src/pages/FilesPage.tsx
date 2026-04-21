@@ -14,8 +14,9 @@ import { Menu, ArrowUp, Plus, X, Download, Eye, FileText, Undo2, Redo2, Papercli
 import type { SlideDeck } from "@/lib/slides/types";
 import SlideDeckPreview from "@/components/files/SlideDeckPreview";
 import BriefCard, { type FileBrief } from "@/components/files/BriefCard";
-import IntakeForm from "@/components/files/IntakeForm";
+import SmartQuestionFlow, { type SmartQuestion } from "@/components/files/SmartQuestionFlow";
 import { getBuilder, type FileBuilderType } from "@/lib/builders";
+import { detectLanguage } from "@/lib/detectLanguage";
 
 
 const SPECIALIZED_BUILDERS: FileBuilderType[] = [
