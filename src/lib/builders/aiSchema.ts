@@ -10,7 +10,7 @@ export async function generateBuilderSchema<T extends AnyBuilderSchema>(
   topic: string,
   context: { brief?: unknown; extraText?: string; userLanguage?: string } = {}
 ): Promise<T | null> {
-  try {
+  const tryOnce = async (): Promise<T | null> => {
     const { data, error } = await supabase.functions.invoke("generate-builder-schema", {
       body: {
         fileType,
@@ -20,15 +20,20 @@ export async function generateBuilderSchema<T extends AnyBuilderSchema>(
         extra: context.extraText ? { text: context.extraText.slice(0, 4000) } : undefined,
       },
     });
-    if (error) {
-      console.warn("[builder-schema] invoke error:", error);
-      return null;
-    }
+    if (error) { console.warn("[builder-schema] invoke error:", error); return null; }
     if (!data?.success || !data?.schema) {
       console.warn("[builder-schema] no schema returned:", data);
       return null;
     }
     return data.schema as T;
+  };
+
+  try {
+    const first = await tryOnce();
+    if (first) return first;
+    // One automatic retry — Gemini occasionally returns empty JSON on first call.
+    await new Promise(r => setTimeout(r, 600));
+    return await tryOnce();
   } catch (e) {
     console.warn("[builder-schema] exception:", e);
     return null;

@@ -25,6 +25,7 @@ import ScientificPaper from "./templates/ScientificPaper";
 import PitchYC from "./templates/PitchYC";
 import ArabesqueGold from "./templates/ArabesqueGold";
 import type { SlideDeck, Slide, SlidePalette } from "./types";
+import { paletteForTemplate } from "./templatePalettes";
 
 const TEMPLATE_MAP: Record<string, React.ComponentType<{ slide: Slide; palette: SlidePalette; index: number; total: number }>> = {
   AuroraKeynote, EditorialNoir, NeoBrutalist, GlassPitch, CairoModern,
@@ -84,6 +85,8 @@ export function SlideCanvas({ deck, index }: { deck: SlideDeck; index: number })
   const componentName = TEMPLATE_BY_ID[deck.templateId] || "AuroraKeynote";
   const Template = TEMPLATE_MAP[componentName];
   const slide = deck.slides[index];
+  // Always override the AI's palette with the template's signature palette.
+  const palette = paletteForTemplate(deck.templateId, deck.palette);
   if (!slide || !Template) return null;
 
   return (
@@ -98,7 +101,7 @@ export function SlideCanvas({ deck, index }: { deck: SlideDeck; index: number })
           transformOrigin: "center center",
         }}
       >
-        <Template slide={slide} palette={deck.palette} index={index} total={deck.slides.length} />
+        <Template slide={slide} palette={palette} index={index} total={deck.slides.length} />
       </div>
     </div>
   );

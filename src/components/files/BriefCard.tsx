@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import { motion } from "framer-motion";
 
 export interface FileBrief {
@@ -28,7 +28,7 @@ interface Props {
 
 const spring = { type: "spring" as const, damping: 22, stiffness: 320 };
 
-const BriefCard = ({ brief, fileType, onConfirm, onCancel }: Props) => {
+const BriefCard = forwardRef<HTMLDivElement, Props>(({ brief, fileType, onConfirm, onCancel }, ref) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<FileBrief>(brief);
 
@@ -45,6 +45,7 @@ const BriefCard = ({ brief, fileType, onConfirm, onCancel }: Props) => {
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, y: 12, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={spring}
@@ -119,6 +120,8 @@ const BriefCard = ({ brief, fileType, onConfirm, onCancel }: Props) => {
       )}
     </motion.div>
   );
-};
+});
+
+BriefCard.displayName = "BriefCard";
 
 export default BriefCard;
