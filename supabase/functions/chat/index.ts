@@ -552,7 +552,8 @@ serve(async (req) => {
       body.tool_choice = "auto";
     }
 
-    const shouldForceComputerFlow = !!HB_API_KEY && !isFilesMode && !mentionsIntegrations && !wantsImageTool && !wantsVideoTool && !wantsVoiceTool && (isShopping || isDeepResearch);
+    // Shopping forces a search flow without requiring Hyperbrowser. Deep research still needs HB for browser steps.
+    const shouldForceComputerFlow = !isFilesMode && !mentionsIntegrations && !wantsImageTool && !wantsVideoTool && !wantsVoiceTool && (isShopping || (!!HB_API_KEY && isDeepResearch));
     const forcedToolCalls = shouldForceComputerFlow
       ? buildForcedToolCalls({
           latestUserText,
