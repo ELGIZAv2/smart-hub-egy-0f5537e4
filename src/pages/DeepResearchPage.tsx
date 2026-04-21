@@ -335,8 +335,15 @@ const DeepResearchPage = () => {
   };
 
   const openPreview = (s: ResearchSession) => {
-    // Report data is loaded from the backend in the preview page; pass id only.
-    navigate(`/research/preview/${s.id}`);
+    navigate(`/research/preview/${s.id}`, {
+      state: {
+        reportData: {
+          query: s.query,
+          report: s.report,
+          images: s.images,
+        },
+      },
+    });
   };
 
   const toggleStep = (sIdx: number, stepId: string) => {
