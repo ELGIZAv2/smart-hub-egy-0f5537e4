@@ -57,6 +57,8 @@ interface SavedFile {
   title: string;
   created_at: string;
   mode: string;
+  preview_html?: string;
+  preview_deck?: SlideDeck;
 }
 
 interface SlideTemplate {
@@ -194,8 +196,47 @@ const FilesPage = () => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("conversations").select("id, title, created_at, mode").eq("user_id", user.id).eq("mode", "files").order("created_at", { ascending: false }).limit(20);
-      if (data) setSavedFiles(data as SavedFile[]);
+      const { data: convs } = await supabase
+        .from("conversations")
+        .select("id, title, created_at, mode")
+        .eq("user_id", user.id)
+        .eq("mode", "files")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (!convs) return;
+
+      // For the first 6, fetch the latest assistant message and pull a preview.
+      const enriched: SavedFile[] = await Promise.all(convs.map(async (c) => {
+        const base: SavedFile = c as SavedFile;
+        try {
+          const { data: msgs } = await supabase
+            .from("messages")
+            .select("role, content, images")
+            .eq("conversation_id", c.id)
+            .eq("role", "assistant")
+            .order("created_at", { ascending: false })
+            .limit(1);
+          const msg = msgs?.[0];
+          if (msg?.images?.[0]) {
+            try {
+              const meta = JSON.parse(msg.images[0]);
+              if (meta?.htmlContent && typeof meta.htmlContent === "string") {
+                if (meta.htmlContent.startsWith("{")) {
+                  // It's a serialized deck
+                  try {
+                    const inner = JSON.parse(meta.htmlContent);
+                    if (inner?.__deck) base.preview_deck = inner.__deck as SlideDeck;
+                  } catch { /* */ }
+                } else {
+                  base.preview_html = meta.htmlContent;
+                }
+              }
+            } catch { /* */ }
+          }
+        } catch { /* */ }
+        return base;
+      }));
+      setSavedFiles(enriched);
     })();
   }, []);
 
