@@ -181,8 +181,12 @@ const FilesPage = () => {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("slide_templates").select("*").eq("is_active", true).order("display_order");
-      if (data && data.length > 0) setSlideTemplates(data);
+      const { data } = await supabase.from("slide_templates").select("*").eq("is_active", true);
+      if (data && data.length > 0) {
+        // Random order so users discover different templates each visit.
+        const shuffled = [...data].sort(() => Math.random() - 0.5);
+        setSlideTemplates(shuffled);
+      }
     })();
   }, []);
 
@@ -299,7 +303,7 @@ Do NOT invent information. Only provide verified facts.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: `Research this topic deeply and provide comprehensive information: ${topic}` }
           ],
-          model: "moonshotai/kimi-k2.5:nitro",
+          model: "z-ai/glm-4.5-air:free",
           mode: "files",
           searchEnabled: true,
         }),
@@ -407,7 +411,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
       body: JSON.stringify({
         messages: [{ role: "system", content: systemPrompt }, userMessage],
-        model: "moonshotai/kimi-k2.5:nitro",
+        model: "z-ai/glm-4.5-air:free",
         mode: "files",
       }),
     });
@@ -440,7 +444,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
             { role: "system", content: `You MUST generate a complete HTML file. Output ONLY HTML. Do not chat. Generate a ${agentType} about the user's topic. Respond in the user's language. After HTML, add ---SUMMARY--- with a brief description.` },
             userMessage
           ],
-          model: "moonshotai/kimi-k2.5:nitro",
+          model: "z-ai/glm-4.5-air:free",
           mode: "files",
         }),
       });
