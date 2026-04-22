@@ -66,59 +66,54 @@ function providers(): AIProvider[] {
   ];
 }
 
+/* ============================================================
+ * SINGLE-PROVIDER AI HELPER
+ * Files page uses ONLY OpenRouter `z-ai/glm-4.5-air:free`.
+ * ========================================================== */
+const FILES_MODEL = "z-ai/glm-4.5-air:free";
+
 async function callAIWithFallback(
   messages: Array<{ role: string; content: string }>,
   opts: { model?: string; jsonMode?: boolean } = {},
 ): Promise<string> {
-  const model = opts.model ?? "gemini-2.5-flash";
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) throw new Error("OPENROUTER_API_KEY missing");
+
   const wantJson = !!opts.jsonMode;
-  let lastErr = "no provider configured";
+  const finalMessages = wantJson
+    ? [
+        ...messages.slice(0, 1),
+        { role: "system", content: "Return raw JSON only. No markdown fences. No prose." },
+        ...messages.slice(1),
+      ]
+    : messages;
 
-  for (const p of providers()) {
-    if (!p.key) continue;
-    try {
-      const finalMessages = wantJson && !p.supportsJsonMode
-        ? [
-            ...messages.slice(0, 1),
-            { role: "system", content: "Return raw JSON only. No markdown fences. No prose." },
-            ...messages.slice(1),
-          ]
-        : messages;
+  const body: Record<string, unknown> = {
+    model: opts.model ?? FILES_MODEL,
+    messages: finalMessages,
+  };
+  if (wantJson) body.response_format = { type: "json_object" };
 
-      const body: Record<string, unknown> = {
-        model: `${p.modelPrefix}${model}`,
-        messages: finalMessages,
-      };
-      if (wantJson && p.supportsJsonMode) body.response_format = { type: "json_object" };
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://megsyai.com",
+      "X-Title": "Megsy Files",
+    },
+    body: JSON.stringify(body),
+  });
 
-      const r = await fetch(p.url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (r.ok) {
-        const d = await r.json();
-        const content = d?.choices?.[0]?.message?.content;
-        if (content) {
-          console.log(`[ai] ✓ ${p.name} (${model})`);
-          return content;
-        }
-        lastErr = `${p.name}: empty content`;
-        continue;
-      }
-
-      const txt = await r.text().catch(() => "");
-      console.warn(`[ai] ✗ ${p.name} ${r.status}: ${txt.slice(0, 200)}`);
-      lastErr = `${p.name}: ${r.status}`;
-      // Continue to next provider regardless of error type
-    } catch (e) {
-      console.warn(`[ai] ✗ ${p.name} threw:`, e);
-      lastErr = `${p.name}: ${String(e).slice(0, 80)}`;
-    }
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.warn(`[ai] openrouter ${r.status}: ${txt.slice(0, 200)}`);
+    throw new Error(`AI provider failed: ${r.status}`);
   }
-
-  throw new Error(`All AI providers failed: ${lastErr}`);
+  const d = await r.json();
+  const content = d?.choices?.[0]?.message?.content;
+  if (!content) throw new Error("AI provider returned empty content");
+  return content;
 }
 
 function safeParseJson<T = unknown>(raw: string): T | null {
