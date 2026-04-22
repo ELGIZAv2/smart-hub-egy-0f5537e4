@@ -991,47 +991,26 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
               <AnimatePresence>
                 {showTemplates && slideTemplates.length > 0 && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={spring} className="max-w-xl mx-auto mb-6 overflow-hidden">
-                    <div className="flex items-center justify-between mb-4 px-1 gap-2 flex-wrap">
-                      <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider">Choose a template</p>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <button
-                          onClick={() => setSlideCount(0)}
-                          className={`px-3 py-1 rounded-full transition-all ${slideCount === 0 ? "bg-primary text-primary-foreground" : "liquid-glass-button text-foreground/70"}`}
-                        >AI decides</button>
-                        {[8, 12, 20].map(n => (
-                          <button
-                            key={n}
-                            onClick={() => setSlideCount(n)}
-                            className={`px-3 py-1 rounded-full transition-all ${slideCount === n ? "bg-primary text-primary-foreground" : "liquid-glass-button text-foreground/70"}`}
-                          >{n}</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none px-1">
+                    <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider mb-3 px-1">Choose a template</p>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
                       {slideTemplates.map(tmpl => {
                         const selected = selectedTemplate?.id === tmpl.id;
                         return (
                           <motion.button
                             key={tmpl.id}
                             whileTap={{ scale: 0.95 }}
-                            whileHover={{ scale: 1.02 }}
+                            whileHover={{ scale: 1.03 }}
                             transition={spring}
                             onClick={() => setSelectedTemplate(selected ? null : tmpl)}
-                            className={`shrink-0 w-40 rounded-2xl overflow-hidden transition-all text-left ${
-                              selected ? "ring-2 ring-primary shadow-lg shadow-primary/20 scale-105" : "liquid-glass-subtle"
+                            className={`shrink-0 w-28 aspect-[16/10] rounded-xl overflow-hidden transition-all relative ${
+                              selected ? "ring-2 ring-primary shadow-lg shadow-primary/20" : "ring-1 ring-border/30"
                             }`}
                           >
-                            <div className="aspect-[16/10] bg-secondary/50 flex items-center justify-center relative">
-                              {tmpl.image_url ? (
-                                <img src={tmpl.image_url} alt={tmpl.name || "Template"} className="w-full h-full object-cover" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground/60 font-mono px-2 text-center">{tmpl.name || tmpl.template_id.slice(-8)}</span>
-                              )}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
-                            </div>
-                            {tmpl.name && (
-                              <div className="px-2.5 py-1.5">
-                                <p className="text-[11px] font-semibold text-foreground truncate">{tmpl.name}</p>
+                            {tmpl.image_url ? (
+                              <img src={tmpl.image_url} alt={tmpl.name || "Template"} className="w-full h-full object-cover" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-primary/20 via-purple-500/15 to-pink-500/20 flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-foreground/80 px-2 text-center uppercase tracking-wider">{tmpl.name || tmpl.template_id.slice(-8)}</span>
                               </div>
                             )}
                           </motion.button>
@@ -1046,7 +1025,7 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
             {/* Recent files */}
             <div className="flex-1 flex flex-col justify-start pt-6 max-w-xl w-full px-4">
               {savedFiles.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40 font-medium">Recent</p>
                   {savedFiles.slice(0, 6).map((f, i) => (
                     <motion.button
@@ -1055,17 +1034,33 @@ Respond in the SAME LANGUAGE as the user's message.`}`;
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ ...spring, delay: i * 0.04 }}
                       whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.97 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => loadConversation(f.id)}
-                      className="w-full flex items-center gap-3 p-3.5 rounded-2xl liquid-glass-button text-left"
+                      className="w-full rounded-2xl liquid-glass-button text-left overflow-hidden"
                     >
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/20 flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4 text-primary" />
+                      <div className="relative w-full aspect-[16/9] bg-secondary/30 overflow-hidden">
+                        {f.preview_html ? (
+                          <iframe
+                            srcDoc={f.preview_html}
+                            className="pointer-events-none border-0"
+                            sandbox=""
+                            title="preview"
+                            style={{ width: "200%", height: "200%", transform: "scale(0.5)", transformOrigin: "top left" }}
+                          />
+                        ) : f.preview_deck ? (
+                          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-purple-500/15 to-pink-500/20 flex items-center justify-center">
+                            <span className="text-xs font-bold text-foreground/70 uppercase tracking-widest">{f.preview_deck.slides?.length ?? 0} Slides</span>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center">
+                            <FileText className="w-8 h-8 text-primary/40" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{f.title}</p>
+                      <div className="px-4 py-3">
+                        <p className="text-sm font-semibold text-foreground truncate">{f.title}</p>
                       </div>
-                      <span className="text-muted-foreground/30 shrink-0 text-xs">→</span>
                     </motion.button>
                   ))}
                 </div>
