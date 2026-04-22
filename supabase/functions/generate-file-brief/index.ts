@@ -5,6 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const FILES_MODEL = "z-ai/glm-4.5-air:free";
+
 const BRIEF_SYSTEM_BY_TYPE: Record<string, string> = {
   slides: `You generate a brief for a slide presentation. Return ONLY a JSON object with: {"summary": "2-3 sentences describing the deck", "outline": ["Slide 1 title", "Slide 2 title", ...], "tone": "professional|playful|academic", "language": "ar|en|...", "estimated_minutes": number}. Match outline length to requested page count. No markdown, no fences.`,
   document: `You generate a brief for a long-form document. Return ONLY JSON: {"summary": "2-3 sentences", "outline": ["Section 1", "Section 2", ...], "tone": "...", "language": "...", "estimated_words": number}.`,
@@ -17,42 +19,30 @@ const BRIEF_SYSTEM_BY_TYPE: Record<string, string> = {
   timeline: `You generate a brief for a timeline. Return ONLY JSON: {"summary": "1-2 sentences", "events": [{"date": "YYYY-MM-DD", "title": "..."}], "orientation": "vertical|horizontal", "language": "..."}.`,
 };
 
-/* Multi-provider helper */
-type AIProvider = { name: string; key: string | undefined; url: string; modelPrefix: string; supportsJsonMode: boolean };
-function providers(): AIProvider[] {
-  return [
-    { name: "lovable",    key: Deno.env.get("LOVABLE_API_KEY"),    url: "https://ai.gateway.lovable.dev/v1/chat/completions", modelPrefix: "google/", supportsJsonMode: true },
-    { name: "openrouter", key: Deno.env.get("OPENROUTER_API_KEY"), url: "https://openrouter.ai/api/v1/chat/completions",       modelPrefix: "google/", supportsJsonMode: true },
-    { name: "lemondata",  key: Deno.env.get("DEAPI_API_KEY"),      url: "https://api.lemondata.ai/v1/chat/completions",        modelPrefix: "",        supportsJsonMode: false },
-  ];
-}
-async function callAIWithFallback(messages: Array<{ role: string; content: string }>, opts: { model?: string; jsonMode?: boolean } = {}): Promise<string> {
-  const model = opts.model ?? "gemini-2.5-flash-lite";
-  let lastErr = "no provider";
-  for (const p of providers()) {
-    if (!p.key) continue;
-    try {
-      const finalMessages = opts.jsonMode && !p.supportsJsonMode
-        ? [...messages.slice(0, 1), { role: "system", content: "Return raw JSON only." }, ...messages.slice(1)]
-        : messages;
-      const body: Record<string, unknown> = { model: `${p.modelPrefix}${model}`, messages: finalMessages };
-      if (opts.jsonMode && p.supportsJsonMode) body.response_format = { type: "json_object" };
-      const r = await fetch(p.url, { method: "POST", headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (r.ok) {
-        const d = await r.json();
-        const c = d?.choices?.[0]?.message?.content;
-        if (c) { console.log(`[ai] ✓ ${p.name}`); return c; }
-      }
-      const txt = await r.text().catch(() => "");
-      console.warn(`[ai] ✗ ${p.name} ${r.status}: ${txt.slice(0, 160)}`);
-      lastErr = `${p.name}:${r.status}`;
-    } catch (e) {
-      console.warn(`[ai] ✗ ${p.name} threw:`, e);
-      lastErr = `${p.name}:exc`;
-    }
+async function callOpenRouter(messages: Array<{ role: string; content: string }>): Promise<string> {
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) throw new Error("OPENROUTER_API_KEY missing");
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://megsyai.com",
+      "X-Title": "Megsy Files",
+    },
+    body: JSON.stringify({ model: FILES_MODEL, messages }),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.warn(`[openrouter] ${r.status}: ${txt.slice(0, 200)}`);
+    throw new Error(`AI failed: ${r.status}`);
   }
-  throw new Error(`All AI providers failed: ${lastErr}`);
+  const d = await r.json();
+  const c = d?.choices?.[0]?.message?.content;
+  if (!c) throw new Error("Empty AI response");
+  return c;
 }
+
 function safeParseJson<T = unknown>(raw: string): T | null {
   try { return JSON.parse(raw) as T; } catch { /* */ }
   const m = raw.match(/\{[\s\S]*\}/);
@@ -80,12 +70,12 @@ serve(async (req) => {
 
     let raw = "";
     try {
-      raw = await callAIWithFallback(
-        [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-        { model: "gemini-2.5-flash-lite", jsonMode: true },
-      );
+      raw = await callOpenRouter([
+        { role: "system", content: sys + "\nReturn raw JSON only. No markdown fences." },
+        { role: "user", content: userMsg },
+      ]);
     } catch (e) {
-      console.error("[file-brief] all providers failed:", e);
+      console.error("[file-brief] AI failed:", e);
       return new Response(JSON.stringify({ success: false, error: "Brief generation failed" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
