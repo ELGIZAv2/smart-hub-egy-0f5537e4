@@ -9,12 +9,13 @@ const corsHeaders = {
 const BASE_URL = "https://2slides.com";
 
 const REACT_TEMPLATES = new Set([
-  "premium-glass-pitch", "premium-sketch-hand", "premium-cinema-3d",
+  "premium-megsy", "premium-glass-pitch", "premium-sketch-hand", "premium-cinema-3d",
   "premium-terminal-dev", "premium-magazine-fold", "premium-paper-origami",
   "premium-minimal-swiss", "premium-gradient-wave", "premium-glitch-art",
 ]);
 
 const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg: string }> = {
+  "premium-megsy":         { primary: "#3b82f6", accent: "#ec4899", bg: "#08070d", fg: "#f8fafc" },
   "premium-glass-pitch":   { primary: "#3b82f6", accent: "#a855f7", bg: "#070b1f", fg: "#f8fafc" },
   "premium-sketch-hand":   { primary: "#1f2937", accent: "#ef4444", bg: "#fdf6e3", fg: "#1f2937" },
   "premium-cinema-3d":     { primary: "#06b6d4", accent: "#f43f5e", bg: "#000814", fg: "#ffffff" },
