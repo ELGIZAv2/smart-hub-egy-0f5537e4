@@ -5,6 +5,7 @@ import type { SlidePalette } from "./types";
  * the AI returns the same default colours.
  */
 export const TEMPLATE_PALETTES: Record<string, SlidePalette> = {
+  "premium-megsy":         { primary: "#3b82f6", accent: "#ec4899", bg: "#08070d", fg: "#f8fafc" },
   "premium-glass-pitch":   { primary: "#3b82f6", accent: "#a855f7", bg: "#070b1f", fg: "#f8fafc" },
   "premium-sketch-hand":   { primary: "#1f2937", accent: "#ef4444", bg: "#fdf6e3", fg: "#1f2937" },
   "premium-cinema-3d":     { primary: "#06b6d4", accent: "#f43f5e", bg: "#000814", fg: "#ffffff" },
