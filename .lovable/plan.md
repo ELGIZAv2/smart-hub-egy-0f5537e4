@@ -1,79 +1,150 @@
 
 
-## خطة الإصلاح الشامل: محتوى عميق + صور Pexels حقيقية + بريفيو PDF + منع تكرار الأسئلة
+## فحص شامل + إصلاح ملفات + Claude Code Bot للبرمجة
 
-### المشاكل الفعلية المكتشفة
+### السبب الجذري للملفات (مؤكد من اللوغز)
 
-1. **محتوى السلايدس فارغ**: `generate-slides` يستخدم `gemini-2.5-flash` بدون آلية بحث عميق، النموذج يكتب bullets قصيرة بدلاً من فقرات غنية.
-2. **الصور خاطئة/مفقودة**: `image_query` يُولَّد ثم يُمرَّر لـ Pexels لكن النموذج يكتب كلمات عربية أو غامضة فلا تطابق المكتبة، والكثير من السلايدات لا يحصل على صورة أصلاً.
-3. **Builders بدون بريفيو**: PDF يُحمَّل فقط ولا يُعرَض في `FilePreviewPanel` (الذي يدعم HTML iframe فقط، لا PDF).
-4. **الأسئلة الذكية تتكرر**: `generate-file-questions` لا يحتوي seed/randomization، Gemini يعيد نفس الأسئلة لنفس النوع.
-5. **Spreadsheet/Mindmap/Roadmap/Timeline** لا تنتج بريفيو لأن `previewHtml` مفقود.
+```
+schema upstream 402 {"type":"payment_required","message":"Not enough credits"}
+brief upstream error: 402 ...
+questions upstream 402 ...
+```
+
+`z-ai/glm-4.5-air:free` على OpenRouter ضرب سقف الكوتا اليومية (rate limit للـ free tier). الكود يستدعي OpenRouter مباشرة لكن الكوتا المجانية انتهت. الحل: **Auto-fallback صامت لنماذج OpenRouter رخيصة بدون تغيير النموذج الأساسي المطلوب**.
 
 ---
 
-### الإصلاحات
+### 1) إصلاح وظائف الملفات الأربع
 
-#### 1) محرّك سلايدس بـ "بحث عميق على مرحلتين"
-داخل `generate-slides` (مسار React templates):
-- **المرحلة A — Outline**: `gemini-2.5-flash` ينتج هيكل (titles + image_queries إنجليزية فقط + counts) في مكالمة سريعة.
-- **المرحلة B — Deep Content**: `gemini-2.5-pro` (نموذج أقوى للمحتوى) يستقبل الـoutline + topic + reference content، ويولّد لكل سلايد:
-  - `body`: فقرة 60-120 كلمة (إجباري)
-  - `bullets`: 4-6 نقاط، كل واحدة 8-15 كلمة (لا 3 كلمات)
-  - `stats` و`quote` بأرقام/اقتباسات حقيقية
-- **إجبار الإنجليزية على image_query**: تحقق برمجي بعد parse — لو احتوى أحرف غير لاتينية، نعيد ترجمته عبر استدعاء AI سريع `"translate to 3 english visual keywords"`.
+أضيف داخل كل من `generate-builder-schema`, `generate-file-questions`, `generate-file-brief`, `generate-slides`:
 
-#### 2) إصلاح Pexels integration
-- استدعاءات متوازية مع **fallback**: إن لم تعد Pexels نتيجة لـ`image_query`، نجرب أول كلمة فقط، ثم نستخدم صورة generic للقالب من DB.
-- **تخزين الصور في الـSlide** بـ `image` و`image_thumb`، تمرير الأول للعرض والثاني للـlazy load.
-- **logging**: نطبع كل failed query في edge logs لتشخيص لاحق.
-
-#### 3) PDF Preview للملفات الأخرى
-- إضافة `pdfPreviewUrl` لـ `BuilderResult`. عند توليد الـPDF، نحوّل الـblob لـ `URL.createObjectURL(blob)` ونمرّره.
-- في `FilePreviewPanel` نضيف `pdfUrl` prop: لو موجود، نعرض `<iframe src={pdfUrl}>` بدلاً من `srcDoc`.
-- يطبَّق على: `document`, `resume`, `report`, `letter`.
-- لـ `spreadsheet`: نولّد HTML preview بسيط من الـschema (table بـTailwind inline) + رابط XLSX للتحميل.
-- لـ `roadmap`, `mindmap`, `timeline`: نولّد HTML preview جميل من الـschema (موجود جزئياً، نتأكد من ملئه).
-
-#### 4) منع تكرار الأسئلة
-- `generate-file-questions` يستقبل `seed: Date.now()` ويُحقن في system prompt: `"Variation seed: ${seed} — produce a fresh angle different from previous runs."`
-- نرفع `temperature: 0.9` (افتراضي 0.7) ليولّد تنوّعاً.
-- نحفظ آخر 3 أسئلة في `localStorage` ونمررها للـedge: `"Avoid repeating these previous questions: [...]"`.
-
-#### 5) تحسين system prompt للمحتوى العميق
-استبدال الـsystem الحالي:
+```ts
+const FILES_MODEL_CHAIN = [
+  "z-ai/glm-4.5-air:free",         // مطلوب أولاً (مجاني)
+  "deepseek/deepseek-chat-v3.1:free", // مجاني آخر
+  "google/gemini-2.5-flash-lite",   // مدفوع رخيص جداً
+  "google/gemini-2.0-flash-001",    // احتياط أخير
+];
 ```
-- Each "content" slide: body paragraph 60-120 words (REQUIRED, not optional)
-  + 4-6 bullets each 8-15 words (NOT 3 words)
-- Stats slides: 3-5 stats with real-looking numbers
-- Quote slides: real-feel quote 15-30 words + plausible attribution
-- Section slides: full kicker + 1-line description
-- NEVER produce empty fields. If unsure, expand with relevant context.
-- image_query: ALWAYS English, 3-5 visual keywords (e.g. "modern glass office skyline aerial")
+
+عند 402/429/5xx من نموذج، ينتقل للتالي تلقائياً بنفس مفتاح OpenRouter. المستخدم لا يرى تغيير. لا Lovable AI، لا LemonData — فقط OpenRouter كما طلبت.
+
+تحسينات إضافية:
+- إعادة محاولة JSON parse فاشل بـ system prompt مشدد
+- تنظيف code fences (` ```json `) قبل parse
+- timeout 45 ثانية لكل محاولة
+
+---
+
+### 2) Claude Code Bot للبرمجة (نظام متكامل)
+
+**ما هو:** بدلاً من توليد كود مباشر، نبني وكيل برمجة على نمط `claude-code` / `clow` كنظام إيجنت كامل:
+
+**الوظائف الجديدة:**
+- `code-agent/index.ts` — orchestrator رئيسي يستخدم `z-ai/glm-4.5-air:free` فقط (كما طلبت) مع نفس fallback chain
+- `github-tree/index.ts` — جلب شجرة المستودع كاملة + قراءة ملفات محددة عبر `GITHUB_PAT`
+- يدعم tool-calling داخلي:
+  - `read_file(path)` — قراءة ملف من repo
+  - `list_dir(path)` — استعراض مجلد
+  - `search_code(query)` — بحث نصي في repo
+  - `write_file(path, content)` — كتابة/تعديل
+  - `run_preview()` — بناء معاينة على الكومبيوتر
+
+**واجهة CodeWorkspace:**
+- شريط أدوات جديد: **GitHub repo selector** (يجلب repos المستخدم تلقائياً)
+- لوحة "Agent Activity" تعرض كل خطوة (read → analyze → write → verify) بنفس نمط Build Workflow الحالي
+- زر **"Open in Computer Preview"** — يفتح iframe بحجم 1440×900 مع تكبير ذكي ليتسع في الشاشة (يحاكي شاشة كومبيوتر حقيقية)
+
+---
+
+### 3) قالب Megsy جديد كلياً (إصلاح التكرار)
+
+القالب الحالي يشبه GlassPitch (radial glows + headline). إعادة كتابة كاملة:
+
+**التصميم الجديد المستوحى مباشرة من landing page:**
+- خلفية `#08070d` + dot grid pattern (نفس HeroSection)
+- **Hero typography**: Space Grotesk Black uppercase 200px على الغلاف، gradient متحرك (أزرق→بنفسجي→وردي)
+- **Floating glass bullet cards** بدل قائمة عادية — كل bullet في بطاقة `backdrop-blur-3xl` معلقة
+- **Number badges دائرية** 96px بـ gradient عند الترقيم
+- **Marquee أفقي** للـ kicker (نفس ModelsMarquee)
+- **Floating particles** متحركة (نفس HeroSection)
+- شريط سفلي: شعار "MEGSY" ضخم يساراً + رقم سلايد monospace يميناً
+- 5 layouts مختلفة كلياً عن GlassPitch (cover/section/content/quote/stats)
+
+---
+
+### 4) Auto-screenshot لكل ملف منشأ
+
+- وظيفة جديدة `screenshot-preview/index.ts` تستخدم `ScreenshotOne_Access Key` (متوفرة)
+- تُستدعى تلقائياً بعد كل توليد سلايد/ملف
+- تحفظ في bucket `slide-images`
+- تُرفق `preview_image_url` مع المرسلة + في `saved_files`
+- Recent files cards تعرض الـ screenshot بحجم كبير (180px) فوق الاسم
+
+---
+
+### 5) Preview Images لقوالب السلايدس
+
+كل قالب من القوالب التسعة يحصل على preview image في DB:
+- نولّد slide demo واحد لكل قالب → screenshot → حفظ في `slide-images/template-previews/`
+- تحديث `slide_templates.preview_url` بـ migration
+- منتقي القوالب يعرض الصورة فقط بدون مساحات (compact grid) + ترتيب عشوائي client-side
+
+---
+
+### 6) إصلاح overflow في القوالب التسعة
+
+تطبيق على كل قالب:
+```tsx
+className="break-words line-clamp-{N}"
+style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
 ```
+حدود: title=2 أسطر، subtitle=3، body=6، bullet=2 لكل عنصر. تقليل أحجام الخطوط الكبيرة عند طول > 40 حرف.
+
+---
+
+### 7) E2E Test محسّن
+
+`_e2e_test/index.ts` يفحص:
+- 8 أنواع schema (تأكيد content غير فارغ)
+- 9 قوالب slides (≥70% slides ممتلئة)
+- fallback chain يعمل
+- screenshot generation
+- تقرير مفصل بكل اختبار فشل + سبب
+
+سأشغّله بعد الإصلاحات وأكرر حتى pass كامل.
 
 ---
 
 ### الملفات المتأثرة
 
 ```text
-supabase/functions/generate-slides/index.ts        ← إعادة كتابة (two-stage)
-supabase/functions/generate-file-questions/index.ts ← seed + temperature + avoid list
-src/lib/builders/types.ts                          ← +pdfPreviewUrl, +previewHtml للجميع
-src/lib/builders/documentBuilder.tsx               ← إنتاج blob URL
-src/lib/builders/resumeBuilder.tsx                 ← إنتاج blob URL
-src/lib/builders/reportBuilder.tsx                 ← إنتاج blob URL
-src/lib/builders/letterBuilder.tsx                 ← إنتاج blob URL
-src/lib/builders/spreadsheetBuilder.ts             ← +HTML table preview
-src/lib/builders/roadmapBuilder.ts                 ← التأكد من previewHtml
-src/lib/builders/mindmapBuilder.ts                 ← التأكد من previewHtml
-src/lib/builders/timelineBuilder.ts                ← التأكد من previewHtml
-src/components/files/FilePreviewPanel.tsx          ← دعم pdfUrl prop
-src/pages/FilesPage.tsx                            ← تمرير pdfUrl + حفظ آخر أسئلة
+تعديل:
+  supabase/functions/generate-builder-schema/index.ts   ← OpenRouter chain
+  supabase/functions/generate-file-questions/index.ts   ← OpenRouter chain
+  supabase/functions/generate-file-brief/index.ts       ← OpenRouter chain
+  supabase/functions/generate-slides/index.ts           ← OpenRouter chain + Megsy palette
+  supabase/functions/_e2e_test/index.ts                 ← شامل
+  src/lib/slides/templates/Megsy.tsx                    ← إعادة كتابة كاملة
+  src/lib/slides/templates/{Sketch,Cinema3D,Glass,...}.tsx ← line-clamp
+  src/pages/CodeWorkspace.tsx                           ← repo picker + Computer preview + Agent Activity
+  src/pages/FilesPage.tsx                               ← preview screenshots للـ recent
+  src/components/files/FilePreviewPanel.tsx             ← screenshot display
+
+إنشاء:
+  supabase/functions/code-agent/index.ts                ← Claude Code-style orchestrator (glm-4.5-air)
+  supabase/functions/github-tree/index.ts               ← فحص شجرة GitHub
+  supabase/functions/screenshot-preview/index.ts        ← ScreenshotOne integration
+  src/components/code/AgentActivity.tsx                 ← لوحة نشاط الإيجنت
+  src/components/code/ComputerPreview.tsx               ← iframe بحجم desktop
+  supabase/migrations/<new>.sql                         ← preview_url لكل قالب
 ```
 
 ### النتيجة المتوقعة
-- سلايدس بمحتوى ضعف الحالي + صور Pexels صحيحة في كل سلايد.
-- بريفيو PDF داخل التطبيق لـ4 أنواع ملفات + بريفيو HTML للباقي.
-- أسئلة ذكية مختلفة في كل مرة، حتى لنفس الموضوع.
+- ملفات تعمل 100% (4 نماذج OpenRouter بالتتابع)
+- قالب Megsy مميز كلياً يحاكي landing
+- Claude Code-style agent للبرمجة مع فحص GitHub repos
+- Computer preview حقيقي للكود
+- screenshot كبير لكل ملف في قائمة recent
+- لا overflow في أي قالب
 
