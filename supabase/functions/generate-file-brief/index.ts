@@ -5,7 +5,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const FILES_MODEL = "z-ai/glm-4.5-air:free";
+const FILES_MODEL_CHAIN = [
+  "z-ai/glm-4.5-air:free",
+  "deepseek/deepseek-chat-v3.1:free",
+  "google/gemini-2.5-flash-lite",
+  "google/gemini-2.0-flash-001",
+];
 
 const BRIEF_SYSTEM_BY_TYPE: Record<string, string> = {
   slides: `You generate a brief for a slide presentation. Return ONLY a JSON object with: {"summary": "2-3 sentences describing the deck", "outline": ["Slide 1 title", "Slide 2 title", ...], "tone": "professional|playful|academic", "language": "ar|en|...", "estimated_minutes": number}. Match outline length to requested page count. No markdown, no fences.`,
@@ -22,25 +27,40 @@ const BRIEF_SYSTEM_BY_TYPE: Record<string, string> = {
 async function callOpenRouter(messages: Array<{ role: string; content: string }>): Promise<string> {
   const key = Deno.env.get("OPENROUTER_API_KEY");
   if (!key) throw new Error("OPENROUTER_API_KEY missing");
-  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://megsyai.com",
-      "X-Title": "Megsy Files",
-    },
-    body: JSON.stringify({ model: FILES_MODEL, messages }),
-  });
-  if (!r.ok) {
-    const txt = await r.text().catch(() => "");
-    console.warn(`[openrouter] ${r.status}: ${txt.slice(0, 200)}`);
-    throw new Error(`AI failed: ${r.status}`);
+
+  let lastErr: unknown = null;
+  for (const model of FILES_MODEL_CHAIN) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 45_000);
+      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://megsyai.com",
+          "X-Title": "Megsy Files",
+        },
+        body: JSON.stringify({ model, messages, response_format: { type: "json_object" } }),
+        signal: ctrl.signal,
+      }).finally(() => clearTimeout(t));
+
+      if (!r.ok) {
+        const txt = await r.text().catch(() => "");
+        console.warn(`[openrouter:${model}] ${r.status}: ${txt.slice(0, 160)}`);
+        lastErr = new Error(`${r.status}`);
+        continue;
+      }
+      const d = await r.json();
+      const c = d?.choices?.[0]?.message?.content;
+      if (!c) { lastErr = new Error("empty"); continue; }
+      return c;
+    } catch (e) {
+      console.warn(`[openrouter:${model}] error`, e);
+      lastErr = e;
+    }
   }
-  const d = await r.json();
-  const c = d?.choices?.[0]?.message?.content;
-  if (!c) throw new Error("Empty AI response");
-  return c;
+  throw lastErr instanceof Error ? lastErr : new Error("All providers failed");
 }
 
 function safeParseJson<T = unknown>(raw: string): T | null {
