@@ -28,45 +28,6 @@ const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg
 };
 
 /* ============================================================
- * MULTI-PROVIDER AI HELPER
- * Tries Lovable AI → OpenRouter → LemonData in order.
- * On 402/429/404/5xx or "model not found", falls through.
- * ========================================================== */
-type AIProvider = {
-  name: string;
-  key: string | undefined;
-  url: string;
-  modelPrefix: string;
-  supportsJsonMode: boolean;
-};
-
-function providers(): AIProvider[] {
-  return [
-    {
-      name: "lovable",
-      key: Deno.env.get("LOVABLE_API_KEY"),
-      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      modelPrefix: "google/",
-      supportsJsonMode: true,
-    },
-    {
-      name: "openrouter",
-      key: Deno.env.get("OPENROUTER_API_KEY"),
-      url: "https://openrouter.ai/api/v1/chat/completions",
-      modelPrefix: "google/",
-      supportsJsonMode: true,
-    },
-    {
-      name: "lemondata",
-      key: Deno.env.get("DEAPI_API_KEY"),
-      url: "https://api.lemondata.ai/v1/chat/completions",
-      modelPrefix: "",
-      supportsJsonMode: false,
-    },
-  ];
-}
-
-/* ============================================================
  * SINGLE-PROVIDER AI HELPER
  * Files page uses ONLY OpenRouter `z-ai/glm-4.5-air:free`.
  * ========================================================== */
