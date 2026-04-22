@@ -207,7 +207,7 @@ Rules:
 
   const raw = await callAIWithFallback(
     [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-    { model: "gemini-2.5-flash", jsonMode: true },
+    { jsonMode: true },
   );
 
   let outline = safeParseJson<{ title?: string; slides?: unknown[]; language?: string; subtitle?: string }>(raw)
@@ -263,7 +263,7 @@ ${content ? `Reference material:\n${content.slice(0, 8000)}` : ""}`;
   try {
     const raw = await callAIWithFallback(
       [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      { model: "gemini-2.5-flash", jsonMode: true },
+      { jsonMode: true },
     );
     const parsed = safeParseJson<{ slides?: RawSlide[] }>(raw);
     if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
@@ -304,7 +304,7 @@ async function fillEmptySlides(slides: RawSlide[], topic: string, language: stri
   try {
     const raw = await callAIWithFallback(
       [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      { model: "gemini-2.5-flash", jsonMode: true },
+      { jsonMode: true },
     );
     const parsed = safeParseJson<{ slides?: { i: number; body?: string; bullets?: string[] }[] }>(raw);
     if (parsed?.slides) {
@@ -339,7 +339,7 @@ async function ensureEnglishQueries(slides: RawSlide[]): Promise<void> {
   try {
     const raw = await callAIWithFallback(
       [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      { model: "gemini-2.5-flash-lite", jsonMode: true },
+      { jsonMode: true },
     );
     const parsed = safeParseJson<{ translations?: { i: number; q: string }[] }>(raw);
     parsed?.translations?.forEach(t => {
