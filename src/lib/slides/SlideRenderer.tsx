@@ -8,15 +8,17 @@ import PaperOrigami from "./templates/PaperOrigami";
 import MinimalSwiss from "./templates/MinimalSwiss";
 import GradientWave from "./templates/GradientWave";
 import GlitchArt from "./templates/GlitchArt";
+import Megsy from "./templates/Megsy";
 import type { SlideDeck, Slide, SlidePalette } from "./types";
 import { paletteForTemplate } from "./templatePalettes";
 
 const TEMPLATE_MAP: Record<string, React.ComponentType<{ slide: Slide; palette: SlidePalette; index: number; total: number }>> = {
   GlassPitch, SketchHand, Cinema3D, TerminalDev, MagazineFold,
-  PaperOrigami, MinimalSwiss, GradientWave, GlitchArt,
+  PaperOrigami, MinimalSwiss, GradientWave, GlitchArt, Megsy,
 };
 
 const TEMPLATE_BY_ID: Record<string, string> = {
+  "premium-megsy": "Megsy",
   "premium-glass-pitch": "GlassPitch",
   "premium-sketch-hand": "SketchHand",
   "premium-cinema-3d": "Cinema3D",

@@ -9,12 +9,13 @@ const corsHeaders = {
 const BASE_URL = "https://2slides.com";
 
 const REACT_TEMPLATES = new Set([
-  "premium-glass-pitch", "premium-sketch-hand", "premium-cinema-3d",
+  "premium-megsy", "premium-glass-pitch", "premium-sketch-hand", "premium-cinema-3d",
   "premium-terminal-dev", "premium-magazine-fold", "premium-paper-origami",
   "premium-minimal-swiss", "premium-gradient-wave", "premium-glitch-art",
 ]);
 
 const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg: string }> = {
+  "premium-megsy":         { primary: "#3b82f6", accent: "#ec4899", bg: "#08070d", fg: "#f8fafc" },
   "premium-glass-pitch":   { primary: "#3b82f6", accent: "#a855f7", bg: "#070b1f", fg: "#f8fafc" },
   "premium-sketch-hand":   { primary: "#1f2937", accent: "#ef4444", bg: "#fdf6e3", fg: "#1f2937" },
   "premium-cinema-3d":     { primary: "#06b6d4", accent: "#f43f5e", bg: "#000814", fg: "#ffffff" },
@@ -27,97 +28,53 @@ const PALETTES: Record<string, { primary: string; accent: string; bg: string; fg
 };
 
 /* ============================================================
- * MULTI-PROVIDER AI HELPER
- * Tries Lovable AI → OpenRouter → LemonData in order.
- * On 402/429/404/5xx or "model not found", falls through.
+ * SINGLE-PROVIDER AI HELPER
+ * Files page uses ONLY OpenRouter `z-ai/glm-4.5-air:free`.
  * ========================================================== */
-type AIProvider = {
-  name: string;
-  key: string | undefined;
-  url: string;
-  modelPrefix: string;
-  supportsJsonMode: boolean;
-};
-
-function providers(): AIProvider[] {
-  return [
-    {
-      name: "lovable",
-      key: Deno.env.get("LOVABLE_API_KEY"),
-      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      modelPrefix: "google/",
-      supportsJsonMode: true,
-    },
-    {
-      name: "openrouter",
-      key: Deno.env.get("OPENROUTER_API_KEY"),
-      url: "https://openrouter.ai/api/v1/chat/completions",
-      modelPrefix: "google/",
-      supportsJsonMode: true,
-    },
-    {
-      name: "lemondata",
-      key: Deno.env.get("DEAPI_API_KEY"),
-      url: "https://api.lemondata.ai/v1/chat/completions",
-      modelPrefix: "",
-      supportsJsonMode: false,
-    },
-  ];
-}
+const FILES_MODEL = "z-ai/glm-4.5-air:free";
 
 async function callAIWithFallback(
   messages: Array<{ role: string; content: string }>,
   opts: { model?: string; jsonMode?: boolean } = {},
 ): Promise<string> {
-  const model = opts.model ?? "gemini-2.5-flash";
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) throw new Error("OPENROUTER_API_KEY missing");
+
   const wantJson = !!opts.jsonMode;
-  let lastErr = "no provider configured";
+  const finalMessages = wantJson
+    ? [
+        ...messages.slice(0, 1),
+        { role: "system", content: "Return raw JSON only. No markdown fences. No prose." },
+        ...messages.slice(1),
+      ]
+    : messages;
 
-  for (const p of providers()) {
-    if (!p.key) continue;
-    try {
-      const finalMessages = wantJson && !p.supportsJsonMode
-        ? [
-            ...messages.slice(0, 1),
-            { role: "system", content: "Return raw JSON only. No markdown fences. No prose." },
-            ...messages.slice(1),
-          ]
-        : messages;
+  const body: Record<string, unknown> = {
+    model: opts.model ?? FILES_MODEL,
+    messages: finalMessages,
+  };
+  if (wantJson) body.response_format = { type: "json_object" };
 
-      const body: Record<string, unknown> = {
-        model: `${p.modelPrefix}${model}`,
-        messages: finalMessages,
-      };
-      if (wantJson && p.supportsJsonMode) body.response_format = { type: "json_object" };
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://megsyai.com",
+      "X-Title": "Megsy Files",
+    },
+    body: JSON.stringify(body),
+  });
 
-      const r = await fetch(p.url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (r.ok) {
-        const d = await r.json();
-        const content = d?.choices?.[0]?.message?.content;
-        if (content) {
-          console.log(`[ai] ✓ ${p.name} (${model})`);
-          return content;
-        }
-        lastErr = `${p.name}: empty content`;
-        continue;
-      }
-
-      const txt = await r.text().catch(() => "");
-      console.warn(`[ai] ✗ ${p.name} ${r.status}: ${txt.slice(0, 200)}`);
-      lastErr = `${p.name}: ${r.status}`;
-      // Continue to next provider regardless of error type
-    } catch (e) {
-      console.warn(`[ai] ✗ ${p.name} threw:`, e);
-      lastErr = `${p.name}: ${String(e).slice(0, 80)}`;
-    }
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.warn(`[ai] openrouter ${r.status}: ${txt.slice(0, 200)}`);
+    throw new Error(`AI provider failed: ${r.status}`);
   }
-
-  throw new Error(`All AI providers failed: ${lastErr}`);
+  const d = await r.json();
+  const content = d?.choices?.[0]?.message?.content;
+  if (!content) throw new Error("AI provider returned empty content");
+  return content;
 }
 
 function safeParseJson<T = unknown>(raw: string): T | null {
@@ -250,7 +207,7 @@ Rules:
 
   const raw = await callAIWithFallback(
     [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-    { model: "gemini-2.5-flash", jsonMode: true },
+    { jsonMode: true },
   );
 
   let outline = safeParseJson<{ title?: string; slides?: unknown[]; language?: string; subtitle?: string }>(raw)
@@ -306,7 +263,7 @@ ${content ? `Reference material:\n${content.slice(0, 8000)}` : ""}`;
   try {
     const raw = await callAIWithFallback(
       [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      { model: "gemini-2.5-flash", jsonMode: true },
+      { jsonMode: true },
     );
     const parsed = safeParseJson<{ slides?: RawSlide[] }>(raw);
     if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
@@ -347,7 +304,7 @@ async function fillEmptySlides(slides: RawSlide[], topic: string, language: stri
   try {
     const raw = await callAIWithFallback(
       [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      { model: "gemini-2.5-flash", jsonMode: true },
+      { jsonMode: true },
     );
     const parsed = safeParseJson<{ slides?: { i: number; body?: string; bullets?: string[] }[] }>(raw);
     if (parsed?.slides) {
@@ -382,7 +339,7 @@ async function ensureEnglishQueries(slides: RawSlide[]): Promise<void> {
   try {
     const raw = await callAIWithFallback(
       [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-      { model: "gemini-2.5-flash-lite", jsonMode: true },
+      { jsonMode: true },
     );
     const parsed = safeParseJson<{ translations?: { i: number; q: string }[] }>(raw);
     parsed?.translations?.forEach(t => {
