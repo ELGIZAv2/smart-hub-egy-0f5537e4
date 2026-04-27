@@ -387,12 +387,12 @@ const PricingPage = () => {
                   </div>
                 )}
 
-                {/* Bubbles */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {/* Bubbles (small & subtle, clipped to card) */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
                   {BUBBLES.map((_, b) => {
-                    const size = 10 + ((b * 7) % 22);
-                    const left = (b * 37) % 90;
-                    const delay = (b * 0.7) % 5;
+                    const size = 3 + ((b * 2) % 5); // 3px - 7px tiny bubbles
+                    const left = (b * 13) % 95;
+                    const delay = (b * 0.4) % 6;
                     return (
                       <span
                         key={b}
@@ -404,7 +404,7 @@ const PricingPage = () => {
                           bottom: `-${size}px`,
                           background: p.bubbleColor,
                           animationDelay: `${delay}s`,
-                          animationDuration: `${4.5 + (b % 3)}s`,
+                          animationDuration: `${5 + (b % 4)}s`,
                         }}
                       />
                     );
