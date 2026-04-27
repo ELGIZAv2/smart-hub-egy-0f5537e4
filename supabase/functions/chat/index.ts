@@ -37,7 +37,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 let cachedKey: { id: string; api_key: string } | null = null;
 let cachedKeyExpiry = 0;
 
-async function getLemonDataKey(sb: ReturnType<typeof createClient>, excludeId?: string): Promise<{ id: string; api_key: string } | null> {
+async function getLemonDataKey(sb: any, excludeId?: string): Promise<{ id: string; api_key: string } | null> {
   if (cachedKey && Date.now() < cachedKeyExpiry && cachedKey.id !== excludeId) return cachedKey;
   const { data } = await sb.from("lemondata_keys").select("id, api_key").eq("is_active", true).eq("is_blocked", false).limit(50);
   if (!data || data.length === 0) { cachedKey = null; return null; }
@@ -49,18 +49,18 @@ async function getLemonDataKey(sb: ReturnType<typeof createClient>, excludeId?: 
   return pick;
 }
 
-function blockLemonKey(sb: ReturnType<typeof createClient>, keyId: string, reason: string) {
+function blockLemonKey(sb: any, keyId: string, reason: string) {
   if (cachedKey?.id === keyId) cachedKey = null;
   sb.from("lemondata_keys").update({ is_blocked: true, block_reason: reason, last_error_at: new Date().toISOString() }).eq("id", keyId).then(() => {});
 }
 
-function markKeyUsed(sb: ReturnType<typeof createClient>, keyId: string) {
+function markKeyUsed(sb: any, keyId: string) {
   sb.from("lemondata_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyId).then(() => {});
 }
 
 const serperKeyCache: { id: string; api_key: string; expiry: number } = { id: "", api_key: "", expiry: 0 };
 
-async function getSerperKey(sb: ReturnType<typeof createClient>): Promise<string | null> {
+async function getSerperKey(sb: any): Promise<string | null> {
   if (serperKeyCache.api_key && Date.now() < serperKeyCache.expiry) return serperKeyCache.api_key;
   const { data } = await sb.from("api_keys").select("id, api_key").eq("service", "serper").eq("is_active", true).limit(10);
   if (!data || data.length === 0) return Deno.env.get("SERPER_API_KEY") || null;
@@ -74,7 +74,7 @@ async function getSerperKey(sb: ReturnType<typeof createClient>): Promise<string
 // Hyperbrowser key cache
 const hbKeyCache: { id: string; api_key: string; expiry: number } = { id: "", api_key: "", expiry: 0 };
 
-async function getHyperbrowserKey(sb: ReturnType<typeof createClient>): Promise<string | null> {
+async function getHyperbrowserKey(sb: any): Promise<string | null> {
   if (hbKeyCache.api_key && Date.now() < hbKeyCache.expiry) return hbKeyCache.api_key;
   const { data } = await sb.from("api_keys").select("id, api_key").eq("service", "hyperbrowser").eq("is_active", true).eq("is_blocked", false).limit(10);
   if (!data || data.length === 0) return null;
@@ -1018,7 +1018,7 @@ async function handleToolCalls(
   isDeepResearch: boolean,
   isShopping: boolean,
   searchTools: any[],
-  sb: ReturnType<typeof createClient>,
+  sb: any,
   depth: number = 0,
   HB_API_KEY: string | null = null,
 ) {

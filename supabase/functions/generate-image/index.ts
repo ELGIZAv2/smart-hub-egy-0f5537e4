@@ -61,7 +61,7 @@ let cachedLemonKey: { id: string; api_key: string } | null = null;
 let cachedLemonKeyExpiry = 0;
 const LEMON_CACHE_TTL = 5 * 60 * 1000;
 
-async function getLemonKey(sb: ReturnType<typeof createClient>, excludeId?: string): Promise<{ id: string; api_key: string } | null> {
+async function getLemonKey(sb: any, excludeId?: string): Promise<{ id: string; api_key: string } | null> {
   if (cachedLemonKey && Date.now() < cachedLemonKeyExpiry && cachedLemonKey.id !== excludeId) {
     return cachedLemonKey;
   }
@@ -79,7 +79,7 @@ async function getLemonKey(sb: ReturnType<typeof createClient>, excludeId?: stri
   return pick;
 }
 
-function blockLemonKey(sb: ReturnType<typeof createClient>, keyId: string, reason: string) {
+function blockLemonKey(sb: any, keyId: string, reason: string) {
   if (cachedLemonKey?.id === keyId) { cachedLemonKey = null; }
   sb.from("lemondata_keys").update({
     is_blocked: true, block_reason: reason, last_error_at: new Date().toISOString(),
@@ -90,7 +90,7 @@ function blockLemonKey(sb: ReturnType<typeof createClient>, keyId: string, reaso
   });
 }
 
-function markKeyUsed(sb: ReturnType<typeof createClient>, keyId: string) {
+function markKeyUsed(sb: any, keyId: string) {
   sb.from("lemondata_keys").select("usage_count").eq("id", keyId).single().then(({ data }) => {
     sb.from("lemondata_keys").update({
       last_used_at: new Date().toISOString(),
@@ -100,7 +100,7 @@ function markKeyUsed(sb: ReturnType<typeof createClient>, keyId: string) {
 }
 
 // ── deAPI key rotation (for free models) ──
-async function getDeapiKey(sb: ReturnType<typeof createClient>): Promise<{ key: string; id: string } | null> {
+async function getDeapiKey(sb: any): Promise<{ key: string; id: string } | null> {
   const { data } = await sb.from("deapi_keys").select("id, api_key").eq("is_active", true).order("usage_count", { ascending: true }).limit(5);
   if (!data || data.length === 0) return null;
   const pick = data[Math.floor(Math.random() * data.length)];
@@ -108,7 +108,7 @@ async function getDeapiKey(sb: ReturnType<typeof createClient>): Promise<{ key: 
   return { key: pick.api_key, id: pick.id };
 }
 
-async function callDeapi(sb: ReturnType<typeof createClient>, deapiEndpoint: string, body: Record<string, unknown>, maxRetries = 3): Promise<any> {
+async function callDeapi(sb: any, deapiEndpoint: string, body: Record<string, unknown>, maxRetries = 3): Promise<any> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const keyData = await getDeapiKey(sb);
     if (!keyData) throw new Error("No active deAPI keys available");
@@ -149,7 +149,7 @@ async function pollDeapiResult(apiKey: string, requestId: string): Promise<any> 
 
 // ── LemonData image generation with retry ──
 async function callLemonImage(
-  sb: ReturnType<typeof createClient>,
+  sb: any,
   modelName: string,
   prompt: string,
   size: string,
