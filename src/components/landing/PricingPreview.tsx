@@ -172,15 +172,16 @@ const PricingPreview = () => {
 
               <div className="mt-9">
                 {plan.highlight ?
-              <FancyButton onClick={() => navigate("/auth")} className="w-full py-3 text-base">
-                    Get Started
+              <FancyButton onClick={() => handleSubscribe(plan.tier)} className="w-full py-3 text-base">
+                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
                   </FancyButton> :
 
               <button
-                onClick={() => navigate("/auth")}
-                className="w-full rounded-xl border border-white/15 py-3 text-base font-medium text-white/70 transition-all hover:border-white/30 hover:text-white">
+                onClick={() => handleSubscribe(plan.tier)}
+                disabled={loadingTier === plan.tier}
+                className="w-full rounded-xl border border-white/15 py-3 text-base font-medium text-white/70 transition-all hover:border-white/30 hover:text-white disabled:opacity-50">
                 
-                    Get Started
+                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
                   </button>
               }
               </div>
