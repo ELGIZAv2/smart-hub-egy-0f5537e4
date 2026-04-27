@@ -84,14 +84,14 @@ function blockLemonKey(sb: any, keyId: string, reason: string) {
   sb.from("lemondata_keys").update({
     is_blocked: true, block_reason: reason, last_error_at: new Date().toISOString(),
   }).eq("id", keyId).then(() => {
-    sb.from("lemondata_keys").select("error_count").eq("id", keyId).single().then(({ data }) => {
+    sb.from("lemondata_keys").select("error_count").eq("id", keyId).single().then(({ data }: any) => {
       if (data) sb.from("lemondata_keys").update({ error_count: (data.error_count || 0) + 1 }).eq("id", keyId);
     });
   });
 }
 
 function markKeyUsed(sb: any, keyId: string) {
-  sb.from("lemondata_keys").select("usage_count").eq("id", keyId).single().then(({ data }) => {
+  sb.from("lemondata_keys").select("usage_count").eq("id", keyId).single().then(({ data }: any) => {
     sb.from("lemondata_keys").update({
       last_used_at: new Date().toISOString(),
       usage_count: ((data?.usage_count) || 0) + 1,
