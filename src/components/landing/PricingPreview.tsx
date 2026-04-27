@@ -1,11 +1,21 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Check, Building2, Zap, Shield, Server, Users, Star, Headphones, Lock, BarChart3 } from "lucide-react";
+import { Check, Building2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import FancyButton from "@/components/FancyButton";
+
+const PRODUCT_IDS: Record<string, string> = {
+  starter: "57ebadf5-ae24-4814-a80c-d39c288b68aa",
+  pro: "6776d8ca-2027-4893-b419-07ed28796f45",
+  elite: "af5a7adb-2713-4fb2-bd07-aad91ec0dd9f",
+};
 
 const plans = [
 {
   name: "Starter",
+  tier: "starter",
   price: "9",
   period: "/mo",
   yearlyNote: "or $89/yr — 880 MC",
@@ -28,6 +38,7 @@ const plans = [
 },
 {
   name: "Pro",
+  tier: "pro",
   price: "29",
   period: "/mo",
   yearlyNote: "or $249/yr — 2,480 MC",
@@ -50,6 +61,7 @@ const plans = [
 },
 {
   name: "Elite",
+  tier: "elite",
   price: "49",
   period: "/mo",
   yearlyNote: "or $499/yr — 4,980 MC",
@@ -74,6 +86,35 @@ const plans = [
 
 const PricingPreview = () => {
   const navigate = useNavigate();
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+  const handleSubscribe = async (tier: string) => {
+    const product_id = PRODUCT_IDS[tier];
+    if (!product_id) {
+      navigate("/pricing");
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/auth?redirect=/pricing");
+      return;
+    }
+    setLoadingTier(tier);
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-checkout", {
+        body: { product_id, plan: tier },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data?.error || "Checkout failed");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to open checkout");
+      setLoadingTier(null);
+    }
+  };
 
   return (
     <section id="pricing" className="relative overflow-hidden py-16 md:py-40">
@@ -131,15 +172,16 @@ const PricingPreview = () => {
 
               <div className="mt-9">
                 {plan.highlight ?
-              <FancyButton onClick={() => navigate("/auth")} className="w-full py-3 text-base">
-                    Get Started
+              <FancyButton onClick={() => handleSubscribe(plan.tier)} className="w-full py-3 text-base">
+                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
                   </FancyButton> :
 
               <button
-                onClick={() => navigate("/auth")}
-                className="w-full rounded-xl border border-white/15 py-3 text-base font-medium text-white/70 transition-all hover:border-white/30 hover:text-white">
+                onClick={() => handleSubscribe(plan.tier)}
+                disabled={loadingTier === plan.tier}
+                className="w-full rounded-xl border border-white/15 py-3 text-base font-medium text-white/70 transition-all hover:border-white/30 hover:text-white disabled:opacity-50">
                 
-                    Get Started
+                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
                   </button>
               }
               </div>
