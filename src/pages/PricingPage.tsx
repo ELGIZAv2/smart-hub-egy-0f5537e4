@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Building2 } from "lucide-react";
+import { ArrowLeft, Check, Building2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import FancyButton from "@/components/FancyButton";
 
 const plans = [
   {
     name: "Starter",
-    monthlyPrice: 9,
-    yearlyPrice: 89,
+    monthlyPrice: 10,
+    yearlyPrice: 99,
     monthlyCredits: "80",
     yearlyCredits: "880",
     tier: "starter" as const,
@@ -194,6 +196,54 @@ const tierStyles: Record<string, { gradient: string; check: string; border: stri
 const PricingPage = () => {
   const navigate = useNavigate();
   const [isYearly, setIsYearly] = useState(false);
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+  const handleSubscribe = async (tier: string) => {
+    if (tier === "business") {
+      navigate("/enterprise");
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/auth?redirect=/pricing");
+      return;
+    }
+    setLoadingTier(tier);
+    try {
+      const productMap: Record<string, { monthly?: string; yearly?: string }> = {
+        starter: {
+          monthly: import.meta.env.VITE_POLAR_STARTER_MONTHLY,
+          yearly: import.meta.env.VITE_POLAR_STARTER_YEARLY,
+        },
+        pro: {
+          monthly: import.meta.env.VITE_POLAR_PRO_MONTHLY,
+          yearly: import.meta.env.VITE_POLAR_PRO_YEARLY,
+        },
+        elite: {
+          monthly: import.meta.env.VITE_POLAR_ELITE_MONTHLY,
+          yearly: import.meta.env.VITE_POLAR_ELITE_YEARLY,
+        },
+      };
+      const product_id = isYearly ? productMap[tier]?.yearly : productMap[tier]?.monthly;
+      if (!product_id) {
+        toast.error("هذا المنتج غير مفعّل في Polar بعد. أنشئه من لوحة Polar وأضف الـ Product ID.");
+        setLoadingTier(null);
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke("polar-checkout", {
+        body: { product_id, plan: tier },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data?.error || "Checkout failed");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "حدث خطأ أثناء فتح صفحة الدفع");
+      setLoadingTier(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -273,17 +323,18 @@ const PricingPage = () => {
 
                 {isFeatured ? (
                   <FancyButton
-                    onClick={() => navigate("/auth")}
+                    onClick={() => handleSubscribe(plan.tier)}
                     className="w-full py-3 text-sm"
                   >
-                    Get Started
+                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
                   </FancyButton>
                 ) : (
                   <button
-                    onClick={() => plan.tier === "business" ? navigate("/enterprise") : navigate("/auth")}
-                    className="w-full py-3 rounded-xl font-medium text-sm transition-all border border-border bg-secondary/50 hover:bg-secondary text-foreground"
+                    onClick={() => handleSubscribe(plan.tier)}
+                    disabled={loadingTier === plan.tier}
+                    className="w-full py-3 rounded-xl font-medium text-sm transition-all border border-border bg-secondary/50 hover:bg-secondary text-foreground disabled:opacity-50"
                   >
-                    {plan.tier === "business" ? "Contact Sales" : "Get Started"}
+                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (plan.tier === "business" ? "Contact Sales" : "Get Started")}
                   </button>
                 )}
 
