@@ -54,8 +54,8 @@ const PLANS: PlanCardConfig[] = [
     bg: "#D1FAE5",
     text: "#1A1A1A",
     subText: "rgba(26,26,26,0.65)",
-    monthlyPrice: 9,
-    yearlyPrice: 89,
+    monthlyPrice: 10,
+    yearlyPrice: 99,
     monthlyCredits: "80 MC / month",
     yearlyCredits: "880 MC / year",
     features: [
