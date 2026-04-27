@@ -11,7 +11,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 let cachedHBKey: { id: string; api_key: string } | null = null;
 let cachedHBKeyExpiry = 0;
 
-async function getHyperbrowserKey(sb: ReturnType<typeof createClient>, excludeId?: string): Promise<{ id: string; api_key: string } | null> {
+async function getHyperbrowserKey(sb: any, excludeId?: string): Promise<{ id: string; api_key: string } | null> {
   if (cachedHBKey && Date.now() < cachedHBKeyExpiry && cachedHBKey.id !== excludeId) return cachedHBKey;
   const { data } = await sb.from("api_keys").select("id, api_key").eq("service", "hyperbrowser").eq("is_active", true).eq("is_blocked", false).limit(20);
   if (!data || data.length === 0) {
@@ -41,12 +41,12 @@ async function getHyperbrowserKey(sb: ReturnType<typeof createClient>, excludeId
   return pick;
 }
 
-function blockHBKey(sb: ReturnType<typeof createClient>, keyId: string, reason: string) {
+function blockHBKey(sb: any, keyId: string, reason: string) {
   if (cachedHBKey?.id === keyId) cachedHBKey = null;
   sb.from("api_keys").update({ is_blocked: true, block_reason: reason, last_error_at: new Date().toISOString() }).eq("id", keyId).then(() => {});
 }
 
-function markHBKeyUsed(sb: ReturnType<typeof createClient>, keyId: string) {
+function markHBKeyUsed(sb: any, keyId: string) {
   sb.from("api_keys").update({ last_used_at: new Date().toISOString(), usage_count: 1 }).eq("id", keyId).then(() => {});
 }
 
