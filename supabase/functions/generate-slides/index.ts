@@ -187,7 +187,7 @@ async function generateOutline(opts: {
   topic: string;
   content: string;
   pageCount: number;
-}) {
+}): Promise<{ title?: string; slides: RawSlide[]; language?: string; subtitle?: string }> {
   const { topic, content, pageCount } = opts;
 
   const lengthRule = pageCount > 0
@@ -226,7 +226,7 @@ Rules:
     { jsonMode: true },
   );
 
-  let outline = safeParseJson<{ title?: string; slides?: unknown[]; language?: string; subtitle?: string }>(raw)
+  const outline = safeParseJson<{ title?: string; slides?: RawSlide[]; language?: string; subtitle?: string }>(raw)
     ?? { title: topic, slides: [] };
   if (!Array.isArray(outline.slides) || outline.slides.length === 0) {
     outline.slides = [{ type: "cover", title: topic }, { type: "closing", title: "Thank You" }];
