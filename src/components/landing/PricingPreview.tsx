@@ -1,7 +1,16 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Check, Building2, Zap, Shield, Server, Users, Star, Headphones, Lock, BarChart3 } from "lucide-react";
+import { Check, Building2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import FancyButton from "@/components/FancyButton";
+
+const PRODUCT_IDS: Record<string, string> = {
+  starter: "57ebadf5-ae24-4814-a80c-d39c288b68aa",
+  pro: "6776d8ca-2027-4893-b419-07ed28796f45",
+  elite: "af5a7adb-2713-4fb2-bd07-aad91ec0dd9f",
+};
 
 const plans = [
 {
