@@ -168,63 +168,27 @@ const ENTERPRISE_FEATURES: string[] = [
   "Custom Contract, Invoicing & Billing",
 ];
 
-const PaymentBrand = ({ name, children }: { name: string; children: React.ReactNode }) => (
-  <div
-    title={name}
-    aria-label={name}
-    className="h-9 w-14 rounded-md border border-neutral-200 bg-white shadow-sm flex items-center justify-center"
-  >
-    {children}
-  </div>
-);
+const PAYMENT_METHODS: { name: string; src: string }[] = [
+  { name: "Visa",             src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/visa.svg" },
+  { name: "Mastercard",       src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/mastercard.svg" },
+  { name: "American Express", src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/amex.svg" },
+  { name: "Discover",         src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/discover.svg" },
+  { name: "Apple Pay",        src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/applepay.svg" },
+  { name: "UnionPay",         src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/unionpay.svg" },
+];
 
 const PaymentIcons = () => (
   <div className="flex flex-wrap items-center justify-center gap-3">
-    {/* Visa */}
-    <PaymentBrand name="Visa">
-      <svg viewBox="0 0 48 16" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
-        <text x="0" y="14" fontFamily="Arial Black, sans-serif" fontSize="16" fontWeight="900" fill="#1A1F71" fontStyle="italic">VISA</text>
-      </svg>
-    </PaymentBrand>
-    {/* Mastercard */}
-    <PaymentBrand name="Mastercard">
-      <svg viewBox="0 0 40 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="15" cy="12" r="9" fill="#EB001B" />
-        <circle cx="25" cy="12" r="9" fill="#F79E1B" />
-        <path d="M20 5.5a8.96 8.96 0 0 1 0 13 8.96 8.96 0 0 1 0-13z" fill="#FF5F00" />
-      </svg>
-    </PaymentBrand>
-    {/* Amex */}
-    <PaymentBrand name="American Express">
-      <svg viewBox="0 0 60 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
-        <rect width="60" height="24" rx="3" fill="#2E77BC" />
-        <text x="30" y="15" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="8" fontWeight="900" fill="#FFFFFF">AMEX</text>
-      </svg>
-    </PaymentBrand>
-    {/* Discover */}
-    <PaymentBrand name="Discover">
-      <svg viewBox="0 0 80 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
-        <text x="0" y="16" fontFamily="Arial Black, sans-serif" fontSize="11" fontWeight="900" fill="#231F20">DISC</text>
-        <circle cx="50" cy="12" r="6" fill="#FF6000" />
-        <text x="58" y="16" fontFamily="Arial Black, sans-serif" fontSize="11" fontWeight="900" fill="#231F20">VER</text>
-      </svg>
-    </PaymentBrand>
-    {/* Apple Pay */}
-    <PaymentBrand name="Apple Pay">
-      <svg viewBox="0 0 50 20" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8.5 5.2c-.5.6-1.3 1.1-2.1 1-.1-.8.3-1.7.8-2.2.5-.6 1.4-1 2.1-1.1.1.9-.3 1.7-.8 2.3zm.8.9c-1.2-.1-2.2.7-2.7.7-.6 0-1.4-.6-2.4-.6-1.2 0-2.4.7-3 1.8-1.3 2.2-.3 5.5 1 7.3.6.9 1.3 1.8 2.3 1.8.9 0 1.3-.6 2.4-.6s1.4.6 2.4.6c1 0 1.6-.9 2.2-1.8.7-1 1-2 1-2-.1 0-2-.8-2-3 0-1.9 1.5-2.8 1.6-2.8-.9-1.3-2.3-1.4-2.8-1.4z" fill="#000"/>
-        <text x="14" y="14" fontFamily="Arial, sans-serif" fontSize="9" fontWeight="700" fill="#000">Pay</text>
-      </svg>
-    </PaymentBrand>
-    {/* UnionPay */}
-    <PaymentBrand name="UnionPay">
-      <svg viewBox="0 0 60 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0" y="2" width="20" height="20" rx="2" fill="#E21836" />
-        <rect x="20" y="2" width="20" height="20" rx="0" fill="#00447C" />
-        <rect x="40" y="2" width="20" height="20" rx="2" fill="#007B5E" />
-        <text x="30" y="15" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="6" fontWeight="900" fill="#FFFFFF">UnionPay</text>
-      </svg>
-    </PaymentBrand>
+    {PAYMENT_METHODS.map((p) => (
+      <img
+        key={p.name}
+        src={p.src}
+        alt={p.name}
+        title={p.name}
+        loading="lazy"
+        className="h-9 w-auto rounded-md shadow-sm"
+      />
+    ))}
   </div>
 );
 
