@@ -169,25 +169,29 @@ const ENTERPRISE_FEATURES: string[] = [
 ];
 
 const PAYMENT_METHODS: { name: string; src: string }[] = [
-  { name: "Visa",             src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/visa.svg" },
-  { name: "Mastercard",       src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/mastercard.svg" },
-  { name: "American Express", src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/amex.svg" },
-  { name: "Discover",         src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/discover.svg" },
-  { name: "Apple Pay",        src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/applepay.svg" },
-  { name: "UnionPay",         src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/unionpay.svg" },
+  { name: "Visa",             src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/visa.svg" },
+  { name: "Mastercard",       src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/mastercard.svg" },
+  { name: "American Express", src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/amex.svg" },
+  { name: "Discover",         src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/discover.svg" },
+  { name: "Apple Pay",        src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/apple-pay.svg" },
+  { name: "UnionPay",         src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/unionpay.svg" },
 ];
 
 const PaymentIcons = () => (
   <div className="flex flex-wrap items-center justify-center gap-3">
     {PAYMENT_METHODS.map((p) => (
-      <img
+      <div
         key={p.name}
-        src={p.src}
-        alt={p.name}
         title={p.name}
-        loading="lazy"
-        className="h-9 w-auto rounded-md shadow-sm"
-      />
+        className="h-10 w-16 rounded-lg border border-neutral-200 bg-white shadow-sm flex items-center justify-center px-2"
+      >
+        <img
+          src={p.src}
+          alt={p.name}
+          loading="lazy"
+          className="max-h-6 max-w-full object-contain"
+        />
+      </div>
     ))}
   </div>
 );
