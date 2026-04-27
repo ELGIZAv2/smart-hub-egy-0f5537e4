@@ -324,7 +324,6 @@ const PricingPage = () => {
                 {isFeatured ? (
                   <FancyButton
                     onClick={() => handleSubscribe(plan.tier)}
-                    disabled={loadingTier === plan.tier}
                     className="w-full py-3 text-sm"
                   >
                     {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
