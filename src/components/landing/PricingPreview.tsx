@@ -7,9 +7,10 @@ import { supabase } from "@/integrations/supabase/client";
 import FancyButton from "@/components/FancyButton";
 
 const PRODUCT_IDS: Record<string, string> = {
-  starter: "57ebadf5-ae24-4814-a80c-d39c288b68aa",
-  pro: "6776d8ca-2027-4893-b419-07ed28796f45",
-  elite: "af5a7adb-2713-4fb2-bd07-aad91ec0dd9f",
+  starter: "c3483e63-7dbd-4214-bec2-894926f5590a",
+  pro: "8da537b0-7192-46cd-b38a-bbe341febdf7",
+  elite: "d212d1e6-4958-4329-a1f4-5b460886fc9d",
+  business: "1fb17ce3-5bb4-473e-8c67-e50a8ce927dd",
 };
 
 const plans = [

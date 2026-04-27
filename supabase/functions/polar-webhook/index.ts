@@ -45,12 +45,18 @@ Deno.serve(async (req) => {
 
   // Map product_id -> { plan, credits, interval }
   const PRODUCT_MAP: Record<string, { plan: string; credits: number }> = {
-    "57ebadf5-ae24-4814-a80c-d39c288b68aa": { plan: "starter", credits: 80 },       // Starter monthly
-    "eea9ef87-f733-448a-9554-d37d88dec986": { plan: "starter", credits: 880 },      // Starter yearly
-    "6776d8ca-2027-4893-b419-07ed28796f45": { plan: "pro", credits: 280 },          // Pro monthly
-    "bd50728b-1c57-40c3-ad6a-4962cbf38849": { plan: "pro", credits: 2480 },         // Pro yearly
-    "af5a7adb-2713-4fb2-bd07-aad91ec0dd9f": { plan: "elite", credits: 480 },        // Elite monthly
-    "f2889c5d-b180-4041-a908-5f3ef568b56d": { plan: "elite", credits: 4980 },       // Elite yearly
+    // Starter
+    "c3483e63-7dbd-4214-bec2-894926f5590a": { plan: "starter",  credits: 80 },
+    "729d9b3d-1acc-4d58-8a39-49ab63330674": { plan: "starter",  credits: 880 },
+    // Pro
+    "8da537b0-7192-46cd-b38a-bbe341febdf7": { plan: "pro",      credits: 280 },
+    "bcbd0c61-a5bd-4934-872a-7413324a330c": { plan: "pro",      credits: 2480 },
+    // Elite
+    "d212d1e6-4958-4329-a1f4-5b460886fc9d": { plan: "elite",    credits: 480 },
+    "0b8f0aa3-57a7-4dd5-9ab3-ce68cebec7f6": { plan: "elite",    credits: 4980 },
+    // Business
+    "1fb17ce3-5bb4-473e-8c67-e50a8ce927dd": { plan: "business", credits: 1480 },
+    "39752b51-d4cd-4a03-9718-bb2b95f71084": { plan: "business", credits: 12980 },
   };
 
   const extractProductId = (d: any): string | null =>
