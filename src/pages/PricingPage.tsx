@@ -151,21 +151,21 @@ const PLANS: PlanCardConfig[] = [
 const BUBBLES = Array.from({ length: 14 });
 
 const ENTERPRISE_FEATURES: string[] = [
-  "Custom MC Allocation — رصيد مخصص حسب الاحتياج",
-  "All Models with Priority Speed — أقصى سرعة وصول لكافة النماذج",
-  "Dedicated Infrastructure — بنية تحتية مستقلة لضمان الاستقرار",
-  "SLA Guarantees — ضمانات مستوى الخدمة والتشغيل",
-  "Custom API Access & Integrations — ربط برمجي مخصص وتكامل مع أنظمتك",
+  "Custom MC Allocation",
+  "All Models with Priority Speed",
+  "Dedicated Infrastructure",
+  "SLA Guarantees",
+  "Custom API Access & Integrations",
   "Enterprise Security (SOC2-ready, GDPR & Advanced Encryption)",
-  "Data Privacy & Compliance — التزام كامل بخصوصية بيانات الشركات",
-  "Early Access to New AI Models — أولوية تجربة أحدث النماذج قبل صدورها",
-  "Advanced Analytics & Reporting — تحليلات متقدمة لاستهلاك الفريق",
-  "Dedicated Account Manager — مدير حساب مخصص لمتابعة احتياجاتك",
-  "24/7 Priority Support — دعم فني ذو أولوية على مدار الساعة",
-  "Priority Onboarding & Training — تجهيز الفريق وتدريبه بشكل عاجل",
-  "Monthly Business Reviews — تقييم دوري لنمو وتطور استخدامك",
-  "Volume Discounts — خصومات حصرية للكميات الكبيرة",
-  "Custom Contract, Invoicing & Billing — عقود وفواتير مخصصة تناسب نظامك المالي",
+  "Data Privacy & Compliance",
+  "Early Access to New AI Models",
+  "Advanced Analytics & Reporting",
+  "Dedicated Account Manager",
+  "24/7 Priority Support",
+  "Priority Onboarding & Training",
+  "Monthly Business Reviews",
+  "Volume Discounts",
+  "Custom Contract, Invoicing & Billing",
 ];
 
 const PaymentBrand = ({ name, children }: { name: string; children: React.ReactNode }) => (
