@@ -27,6 +27,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const CustomizationPage = lazy(() => import("./pages/CustomizationPage"));
 const ProfileSettingsPage = lazy(() => import("./pages/ProfileSettingsPage"));
 const BillingPage = lazy(() => import("./pages/BillingPage"));
+const BillingSuccessPage = lazy(() => import("./pages/BillingSuccessPage"));
 const ReferralsPage = lazy(() => import("./pages/ReferralsPage"));
 const LanguagePage = lazy(() => import("./pages/LanguagePage"));
 const IntegrationsPage = lazy(() => import("./pages/IntegrationsPage"));
@@ -281,6 +282,7 @@ const App = () => {
                   <Route path="/settings/ai-personalization" element={<ProtectedRoute><AIPersonalizationPage /></ProtectedRoute>} />
                   <Route path="/settings/profile" element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} />
                   <Route path="/settings/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+                  <Route path="/billing/success" element={<BillingSuccessPage />} />
                   <Route path="/settings/referrals" element={<ProtectedRoute><ReferralsPage /></ProtectedRoute>} />
                   <Route path="/settings/language" element={<ProtectedRoute><LanguagePage /></ProtectedRoute>} />
                   <Route path="/settings/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
