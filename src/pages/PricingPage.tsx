@@ -4,9 +4,6 @@ import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import FancyButton from "@/components/FancyButton";
-import LandingNavbar from "@/components/landing/LandingNavbar";
-import LandingFooter from "@/components/landing/LandingFooter";
 
 type PlanTier = "starter" | "pro" | "elite" | "business";
 
@@ -32,28 +29,35 @@ const PRODUCT_MAP: Record<PlanTier, { monthly: string; yearly: string }> = {
 interface PlanCardConfig {
   tier: PlanTier;
   name: string;
+  label: string;
+  bg: string;
+  text: string;
+  subText: string;
   monthlyPrice: number;
   yearlyPrice: number;
   monthlyCredits: string;
   yearlyCredits: string;
-  description: string;
   features: string[];
-  highlight?: boolean;
-  cardBorder: string;
-  cardBg: string;
-  checkColor: string;
-  nameColor: string;
+  ctaBg: string;
+  ctaText: string;
+  ctaHover: string;
+  bubbleColor: string;
+  topBadge?: boolean;
+  glow?: string;
 }
 
 const PLANS: PlanCardConfig[] = [
   {
     tier: "starter",
     name: "Starter",
+    label: "BEST FOR BEGINNERS",
+    bg: "#D1FAE5",
+    text: "#1A1A1A",
+    subText: "rgba(26,26,26,0.65)",
     monthlyPrice: 9,
     yearlyPrice: 89,
     monthlyCredits: "80 MC / month",
     yearlyCredits: "880 MC / year",
-    description: "Great for getting started with AI creation",
     features: [
       "All chat models",
       "50 images / month",
@@ -62,19 +66,22 @@ const PLANS: PlanCardConfig[] = [
       "Deploy & publish",
       "Standard support",
     ],
-    cardBorder: "border-emerald-500/[0.12]",
-    cardBg: "bg-gradient-to-b from-emerald-500/[0.06] to-transparent",
-    checkColor: "text-emerald-400",
-    nameColor: "text-emerald-400",
+    ctaBg: "#000000",
+    ctaText: "#FFFFFF",
+    ctaHover: "#1f1f1f",
+    bubbleColor: "rgba(255,255,255,0.7)",
   },
   {
     tier: "pro",
     name: "Pro",
+    label: "PROFESSIONAL CHOICE",
+    bg: "#2563EB",
+    text: "#FFFFFF",
+    subText: "rgba(255,255,255,0.75)",
     monthlyPrice: 29,
     yearlyPrice: 249,
     monthlyCredits: "280 MC / month",
     yearlyCredits: "2,480 MC / year",
-    description: "For creators who need more power",
     features: [
       "All AI models",
       "200 images / month",
@@ -83,19 +90,22 @@ const PLANS: PlanCardConfig[] = [
       "API access",
       "Priority support",
     ],
-    cardBorder: "border-violet-500/[0.12]",
-    cardBg: "bg-gradient-to-b from-violet-500/[0.06] to-transparent",
-    checkColor: "text-violet-400",
-    nameColor: "text-violet-400",
+    ctaBg: "#FFFFFF",
+    ctaText: "#2563EB",
+    ctaHover: "#f3f4f6",
+    bubbleColor: "rgba(255,255,255,0.35)",
   },
   {
     tier: "elite",
     name: "Elite",
+    label: "MOST POPULAR",
+    bg: "#7C3AED",
+    text: "#FFFFFF",
+    subText: "rgba(255,255,255,0.78)",
     monthlyPrice: 49,
     yearlyPrice: 499,
     monthlyCredits: "480 MC / month",
     yearlyCredits: "4,980 MC / year",
-    description: "Maximum power for serious professionals",
     features: [
       "All models (priority speed)",
       "500 images / month",
@@ -104,20 +114,24 @@ const PLANS: PlanCardConfig[] = [
       "API + webhooks",
       "Dedicated support",
     ],
-    highlight: true,
-    cardBorder: "border-purple-500/30",
-    cardBg: "bg-gradient-to-b from-purple-500/[0.12] to-purple-900/[0.06]",
-    checkColor: "text-purple-400",
-    nameColor: "text-purple-400",
+    ctaBg: "#FFD700",
+    ctaText: "#000000",
+    ctaHover: "#ffdf33",
+    bubbleColor: "rgba(255,215,0,0.35)",
+    topBadge: true,
+    glow: "0 0 60px rgba(124,58,237,0.55), 0 20px 50px -10px rgba(124,58,237,0.6)",
   },
   {
     tier: "business",
     name: "Business",
+    label: "BEST VALUE",
+    bg: "#D97706",
+    text: "#FFFFFF",
+    subText: "rgba(255,255,255,0.78)",
     monthlyPrice: 149,
     yearlyPrice: 1299,
     monthlyCredits: "1,480 MC / month",
     yearlyCredits: "12,980 MC / year",
-    description: "Dedicated infra, SLA & account manager",
     features: [
       "All models with priority speed",
       "2,000 images / month",
@@ -127,28 +141,29 @@ const PLANS: PlanCardConfig[] = [
       "SLA guarantees",
       "Dedicated account manager",
     ],
-    cardBorder: "border-rose-500/20",
-    cardBg: "bg-gradient-to-br from-rose-950/30 via-transparent to-pink-950/20",
-    checkColor: "text-rose-400",
-    nameColor: "text-rose-400",
+    ctaBg: "#FFFFFF",
+    ctaText: "#D97706",
+    ctaHover: "#FFF7ED",
+    bubbleColor: "rgba(255,215,0,0.45)",
   },
 ];
 
-const TINY_BUBBLES = Array.from({ length: 10 });
+const BUBBLES = Array.from({ length: 7 });
 
-const PaymentBrandIcons = () => {
-  const base = "h-7 sm:h-8 w-auto opacity-80 hover:opacity-100 transition-opacity";
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-5">
-      <img alt="Visa" className={base} src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" />
-      <img alt="Mastercard" className={base} src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" />
-      <img alt="American Express" className={base} src="https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg" />
-      <img alt="Discover" className={base} src="https://upload.wikimedia.org/wikipedia/commons/5/57/Discover_Card_logo.svg" />
-      <img alt="Apple Pay" className={base} src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg" />
-      <img alt="UnionPay" className={base} src="https://upload.wikimedia.org/wikipedia/commons/1/1b/UnionPay_logo.svg" />
-    </div>
-  );
-};
+const PaymentIcons = () => (
+  <div className="flex flex-wrap items-center justify-center gap-5 opacity-70">
+    {[
+      "Visa", "Mastercard", "Amex", "Discover", "Apple Pay", "UnionPay"
+    ].map((name) => (
+      <div
+        key={name}
+        className="px-3 py-1.5 rounded-md border border-neutral-300 bg-white text-[11px] font-semibold tracking-wide text-neutral-700"
+      >
+        {name}
+      </div>
+    ))}
+  </div>
+);
 
 const PricingPage = () => {
   const navigate = useNavigate();
@@ -180,294 +195,352 @@ const PricingPage = () => {
   };
 
   return (
-    <div data-theme="dark" className="min-h-screen overflow-x-hidden bg-background text-foreground">
-      <LandingNavbar />
-
-      {/* Tiny bubbles styling — small but eye-catching */}
+    <div className="min-h-screen bg-white text-neutral-900">
+      {/* Bubble + utility CSS scoped to page */}
       <style>{`
-        @keyframes tiny-bubble-rise {
-          0%   { transform: translateY(0) scale(0.6); opacity: 0; }
-          15%  { opacity: 0.9; }
-          85%  { opacity: 0.5; }
-          100% { transform: translateY(-140px) scale(1); opacity: 0; }
+        @keyframes pricing-bubble-rise {
+          0%   { transform: translateY(0) scale(0.8); opacity: 0; }
+          10%  { opacity: 0.9; }
+          80%  { opacity: 0.6; }
+          100% { transform: translateY(-180px) scale(1.1); opacity: 0; }
         }
-        .tiny-bubble {
+        .pricing-bubble {
           position: absolute;
           border-radius: 9999px;
           pointer-events: none;
           will-change: transform, opacity;
-          animation: tiny-bubble-rise 4.5s ease-in-out infinite;
-          filter: blur(0.3px);
+          animation: pricing-bubble-rise 5s ease-in-out infinite;
+        }
+        @keyframes gold-pulse {
+          0%, 100% { box-shadow: 0 0 24px rgba(255,215,0,0.55), 0 0 60px rgba(255,215,0,0.25); }
+          50%      { box-shadow: 0 0 38px rgba(255,215,0,0.85), 0 0 90px rgba(255,215,0,0.45); }
         }
       `}</style>
 
-      <section className="relative overflow-hidden pt-28 md:pt-36 pb-10">
-        <div className="mx-auto max-w-6xl px-6 text-center">
+      {/* Top bar */}
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 max-w-7xl mx-auto">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-neutral-500 hover:text-neutral-900 transition-colors"
+          aria-label="Back"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-base font-bold tracking-tight">Pricing</h1>
+      </div>
+
+      {/* Hero */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-8 sm:pt-14 pb-10 sm:pb-14 text-center">
+        <motion.h2
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
+          className="font-black tracking-tight leading-[1.02] text-neutral-900"
+          style={{ fontSize: "clamp(2.25rem, 6vw, 4.75rem)", letterSpacing: "-0.03em" }}
+        >
+          One AI Platform.
+          <br />
+          <span className="bg-gradient-to-r from-purple-600 via-fuchsia-500 to-amber-500 bg-clip-text text-transparent">
+            Infinite Possibilities.
+          </span>
+        </motion.h2>
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="mx-auto mt-5 max-w-2xl font-medium text-neutral-600"
+          style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.125rem)" }}
+        >
+          Simple, transparent pricing. No hidden fees. Pay only for real usage across the entire AI ecosystem.
+        </motion.p>
+
+        {/* Toggle */}
+        <div className="mt-8 inline-flex items-center gap-1 p-1 rounded-full bg-[#F1F5F9]">
           <button
-            onClick={() => navigate(-1)}
-            className="mb-6 inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm"
+            onClick={() => setIsYearly(false)}
+            className={`px-5 sm:px-7 py-2.5 rounded-full text-sm transition-all ${
+              !isYearly
+                ? "bg-[#D1FAE5] text-black font-semibold shadow-sm"
+                : "text-neutral-500 hover:text-neutral-800 font-medium"
+            }`}
           >
-            <ArrowLeft className="w-4 h-4" /> Back
+            Monthly
           </button>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 60 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9 }}
-            className="font-display text-[10vw] font-black uppercase tracking-tighter leading-[0.85] text-white md:text-[8vw]"
+          <button
+            onClick={() => setIsYearly(true)}
+            className={`inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 rounded-full text-sm transition-all ${
+              isYearly
+                ? "bg-[#D1FAE5] text-black font-semibold shadow-sm"
+                : "text-neutral-500 hover:text-neutral-800 font-medium"
+            }`}
           >
-            ONE AI{" "}
-            <span className="bg-gradient-to-r from-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
-              PLATFORM
-            </span>
-          </motion.h1>
-          <p className="mx-auto mt-4 max-w-xl text-xl text-white/40">
-            Simple, transparent pricing. No hidden fees. Pay only for real usage across the entire AI ecosystem.
-          </p>
-
-          {/* Toggle */}
-          <div className="mt-8 inline-flex items-center gap-1 p-1 rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-sm">
-            <button
-              onClick={() => setIsYearly(false)}
-              className={`px-5 sm:px-7 py-2.5 rounded-full text-sm transition-all ${
-                !isYearly
-                  ? "bg-white text-black font-semibold shadow-sm"
-                  : "text-white/50 hover:text-white font-medium"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setIsYearly(true)}
-              className={`inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 rounded-full text-sm transition-all ${
-                isYearly
-                  ? "bg-white text-black font-semibold shadow-sm"
-                  : "text-white/50 hover:text-white font-medium"
-              }`}
-            >
-              Yearly
-              <span className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                isYearly ? "bg-emerald-500/20 text-emerald-700" : "bg-emerald-500/15 text-emerald-300"
-              }`}>
-                20% off
+            Yearly
+            {isYearly && (
+              <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border border-black/80 text-black bg-white whitespace-nowrap">
+                20% off on yearly
               </span>
-            </button>
-          </div>
+            )}
+          </button>
         </div>
       </section>
 
-      {/* Plans grid — first 3 */}
-      <section className="mx-auto max-w-6xl px-6 pb-10">
-        <div className="grid gap-6 md:grid-cols-3 pt-8">
-          {PLANS.slice(0, 3).map((plan, i) => {
-            const price = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
-            const credits = isYearly ? plan.yearlyCredits : plan.monthlyCredits;
+      {/* Plans grid */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 items-stretch">
+          {PLANS.map((p, i) => {
+            const price = isYearly ? p.yearlyPrice : p.monthlyPrice;
+            const credits = isYearly ? p.yearlyCredits : p.monthlyCredits;
+            const isElite = p.tier === "elite";
+
             return (
               <motion.div
-                key={plan.tier}
-                initial={{ opacity: 0, y: 80 }}
+                key={p.tier}
+                initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.7, delay: i * 0.12 }}
-                className={`relative rounded-2xl border p-6 transition-all duration-300 hover:scale-[1.02] md:rounded-3xl md:p-9 ${plan.cardBorder} ${plan.cardBg} ${
-                  plan.highlight ? "shadow-xl shadow-purple-500/10 ring-1 ring-purple-500/20 md:mt-8" : ""
+                transition={{ duration: 0.55, delay: i * 0.07 }}
+                className={`relative rounded-[24px] overflow-hidden flex flex-col ${
+                  isElite ? "lg:-translate-y-3 z-10" : ""
                 }`}
+                style={{
+                  background: p.bg,
+                  color: p.text,
+                  boxShadow: p.glow ?? "0 12px 40px -12px rgba(0,0,0,0.12)",
+                  minHeight: 540,
+                }}
               >
-                {plan.highlight && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 rounded-full bg-purple-500 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg shadow-purple-500/40 whitespace-nowrap">
-                    Most Popular
+                {/* MOST POPULAR badge above Elite */}
+                {p.topBadge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+                    <span
+                      className="px-4 py-1 text-[11px] font-extrabold tracking-[0.2em] rounded-full text-black"
+                      style={{
+                        background: "#FFD700",
+                        animation: "gold-pulse 2.4s ease-in-out infinite",
+                      }}
+                    >
+                      MOST POPULAR
+                    </span>
                   </div>
                 )}
 
-                {/* Tiny bubbles inside the card */}
-                <div className="absolute inset-0 overflow-hidden rounded-2xl md:rounded-3xl pointer-events-none">
-                  {TINY_BUBBLES.map((_, b) => {
-                    const size = 3 + ((b * 2) % 5);
-                    const left = (b * 31) % 92;
-                    const delay = (b * 0.55) % 4.5;
+                {/* Bubbles */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  {BUBBLES.map((_, b) => {
+                    const size = 10 + ((b * 7) % 22);
+                    const left = (b * 37) % 90;
+                    const delay = (b * 0.7) % 5;
                     return (
                       <span
                         key={b}
-                        className="tiny-bubble"
+                        className="pricing-bubble"
                         style={{
                           width: size,
                           height: size,
                           left: `${left}%`,
                           bottom: `-${size}px`,
-                          background: plan.highlight
-                            ? "rgba(192,132,252,0.7)"
-                            : plan.tier === "starter"
-                            ? "rgba(52,211,153,0.6)"
-                            : "rgba(167,139,250,0.6)",
+                          background: p.bubbleColor,
                           animationDelay: `${delay}s`,
-                          animationDuration: `${4 + (b % 3)}s`,
+                          animationDuration: `${4.5 + (b % 3)}s`,
                         }}
                       />
                     );
                   })}
                 </div>
 
-                <div className="relative z-10">
-                  <h3 className={`text-lg font-bold ${plan.nameColor}`}>{plan.name}</h3>
-                  <div className="mt-2 flex items-baseline gap-1 md:mt-3">
-                    <span className="text-4xl font-black text-white md:text-5xl">${price}</span>
-                    <span className="text-base text-white/40">/{isYearly ? "yr" : "mo"}</span>
-                  </div>
-                  <p className="mt-1.5 text-xs text-white/30">{credits}</p>
-                  <p className="mt-3 text-sm leading-relaxed text-white/40">{plan.description}</p>
+                {/* Content */}
+                <div className="relative z-10 p-7 sm:p-8 flex flex-col flex-1">
+                  {/* Label (glass frame) */}
+                  {!p.topBadge && (
+                    <span
+                      className="self-start inline-block text-[10px] sm:text-[11px] font-bold tracking-[0.18em] px-3 py-1 rounded-full mb-5 backdrop-blur-md"
+                      style={{
+                        background: p.tier === "starter" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.18)",
+                        border: p.tier === "starter" ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(255,255,255,0.35)",
+                        color: p.text,
+                      }}
+                    >
+                      {p.label}
+                    </span>
+                  )}
+                  {p.topBadge && <div className="h-6" />}
 
-                  <ul className="mt-8 space-y-3">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-center gap-3 text-base text-white/60">
-                        <Check size={16} className={`shrink-0 ${plan.checkColor}`} />
-                        {f}
+                  <h3
+                    className="font-black"
+                    style={{ fontSize: "clamp(1.5rem, 2.5vw, 1.875rem)" }}
+                  >
+                    {p.name}
+                  </h3>
+
+                  <div className="mt-3 flex items-baseline gap-1.5">
+                    <span
+                      className="font-black leading-none"
+                      style={{ fontSize: "clamp(2.5rem, 5vw, 3.5rem)" }}
+                    >
+                      ${price}
+                    </span>
+                    <span className="text-sm font-medium" style={{ color: p.subText }}>
+                      /{isYearly ? "year" : "month"}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 text-sm font-semibold" style={{ color: p.subText }}>
+                    {credits}
+                  </p>
+
+                  {/* CTA */}
+                  <button
+                    onClick={() => handleSubscribe(p.tier)}
+                    disabled={loadingTier === p.tier}
+                    className="mt-6 w-full py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all active:scale-[0.98] disabled:opacity-60"
+                    style={{
+                      background: p.ctaBg,
+                      color: p.ctaText,
+                      boxShadow: isElite
+                        ? "0 0 30px rgba(255,215,0,0.5), 0 8px 20px rgba(0,0,0,0.15)"
+                        : "0 6px 18px rgba(0,0,0,0.12)",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = p.ctaHover)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = p.ctaBg)}
+                  >
+                    {loadingTier === p.tier ? (
+                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    ) : (
+                      "Get Started"
+                    )}
+                  </button>
+
+                  {/* Features */}
+                  <ul className="mt-6 space-y-2.5 flex-1">
+                    {p.features.map((f) => (
+                      <li
+                        key={f}
+                        className="flex items-start gap-2.5 text-sm"
+                        style={{ color: p.subText }}
+                      >
+                        <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: p.text }} />
+                        <span>{f}</span>
                       </li>
                     ))}
                   </ul>
-
-                  <div className="mt-9">
-                    {plan.highlight ? (
-                      <FancyButton onClick={() => handleSubscribe(plan.tier)} className="w-full py-3 text-base">
-                        {loadingTier === plan.tier ? (
-                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                        ) : (
-                          "Get Started"
-                        )}
-                      </FancyButton>
-                    ) : (
-                      <button
-                        onClick={() => handleSubscribe(plan.tier)}
-                        disabled={loadingTier === plan.tier}
-                        className="w-full rounded-xl border border-white/15 py-3 text-base font-medium text-white/70 transition-all hover:border-white/30 hover:text-white disabled:opacity-50"
-                      >
-                        {loadingTier === plan.tier ? (
-                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                        ) : (
-                          "Get Started"
-                        )}
-                      </button>
-                    )}
-                  </div>
                 </div>
               </motion.div>
             );
           })}
         </div>
 
-        {/* Business + Enterprise */}
-        <div className="grid gap-6 md:grid-cols-2 mt-8">
-          {/* Business */}
-          <motion.div
-            initial={{ opacity: 0, y: 80 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="relative overflow-hidden rounded-2xl border border-rose-500/20 p-6 md:rounded-3xl md:p-9 bg-gradient-to-br from-rose-950/30 via-transparent to-pink-950/20"
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(244,63,94,0.06),transparent_50%)] rounded-2xl md:rounded-3xl" />
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              {TINY_BUBBLES.map((_, b) => {
-                const size = 3 + ((b * 2) % 5);
-                const left = (b * 31) % 92;
-                const delay = (b * 0.55) % 4.5;
-                return (
-                  <span
-                    key={b}
-                    className="tiny-bubble"
-                    style={{
-                      width: size,
-                      height: size,
-                      left: `${left}%`,
-                      bottom: `-${size}px`,
-                      background: "rgba(251,113,133,0.55)",
-                      animationDelay: `${delay}s`,
-                      animationDuration: `${4 + (b % 3)}s`,
-                    }}
-                  />
-                );
-              })}
-            </div>
-            <div className="relative z-10">
-              <h3 className="text-lg font-bold text-rose-400">Business</h3>
-              <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-4xl font-black text-white md:text-5xl">
-                  ${isYearly ? PLANS[3].yearlyPrice : PLANS[3].monthlyPrice}
-                </span>
-                <span className="text-base text-white/40">/{isYearly ? "yr" : "mo"}</span>
-              </div>
-              <p className="mt-1.5 text-xs text-white/30">
-                {isYearly ? PLANS[3].yearlyCredits : PLANS[3].monthlyCredits}
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-white/40">
-                Dedicated infrastructure, SLA guarantees, and a dedicated account manager.
-              </p>
-              <button
-                onClick={() => handleSubscribe("business")}
-                disabled={loadingTier === "business"}
-                className="mt-6 w-full rounded-xl border border-rose-500/20 bg-rose-500/10 px-8 py-3 text-base font-medium text-rose-300 transition-all hover:bg-rose-500/20 hover:border-rose-500/30 disabled:opacity-50"
+        {/* Enterprise — full width matte black */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="mt-12 relative rounded-[28px] overflow-hidden p-8 sm:p-12"
+          style={{
+            background: "#0F0F0F",
+            boxShadow: "0 30px 60px -20px rgba(0,0,0,0.4)",
+          }}
+        >
+          <div
+            className="absolute inset-0 opacity-60 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse at top right, rgba(255,215,0,0.12), transparent 55%), radial-gradient(ellipse at bottom left, rgba(255,215,0,0.08), transparent 60%)",
+            }}
+          />
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+            <div className="max-w-xl">
+              <span className="inline-block text-[11px] font-bold tracking-[0.2em] px-3 py-1 rounded-full bg-white/5 border border-[#FFD700]/30 text-[#FFD700] mb-4">
+                ENTERPRISE
+              </span>
+              <h3
+                className="font-black text-white leading-tight"
+                style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)" }}
               >
-                {loadingTier === "business" ? (
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                ) : (
-                  "Get Started"
-                )}
-              </button>
-            </div>
-          </motion.div>
-
-          {/* Enterprise */}
-          <motion.div
-            initial={{ opacity: 0, y: 80 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.5 }}
-            className="relative rounded-2xl border border-cyan-500/20 p-6 md:rounded-3xl md:p-9 bg-gradient-to-br from-cyan-950/30 via-transparent to-indigo-950/20"
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(6,182,212,0.06),transparent_50%)] rounded-2xl md:rounded-3xl" />
-            <div className="relative z-10">
-              <h3 className="text-lg font-bold text-cyan-400">Enterprise</h3>
-              <p className="mt-3 text-sm leading-relaxed text-white/40 max-w-lg">
-                Custom plans for large teams — dedicated infrastructure, advanced security, SLA, and everything your organization needs.
+                Built for organizations <span className="text-[#FFD700]">at scale</span>.
+              </h3>
+              <p className="mt-4 text-white/65 text-base leading-relaxed">
+                Custom MC allocation, dedicated infrastructure, advanced security (SOC2, GDPR), SLA guarantees, and a dedicated account manager.
               </p>
-              <button
-                onClick={() => navigate("/enterprise")}
-                className="mt-6 w-full rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-8 py-3 text-base font-medium text-white transition-all hover:opacity-90 shadow-lg shadow-cyan-500/20"
-              >
-                Contact Sales
-              </button>
             </div>
-          </motion.div>
-        </div>
+            <button
+              onClick={() => navigate("/enterprise")}
+              className="shrink-0 px-8 py-4 rounded-2xl font-bold text-sm sm:text-base text-black transition-transform active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, #FFD700 0%, #FFA500 60%, #FFD700 100%)",
+                boxShadow: "0 10px 30px rgba(255,215,0,0.35)",
+              }}
+            >
+              Contact Sales
+            </button>
+          </div>
+        </motion.div>
       </section>
 
       {/* Final CTA */}
-      <section className="mx-auto max-w-4xl px-6 py-20 text-center">
+      <section className="max-w-4xl mx-auto px-6 pb-20 text-center">
         <motion.h3
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="font-display text-[8vw] md:text-[5vw] font-black uppercase tracking-tighter leading-[0.9] text-white"
+          className="font-black tracking-tight text-neutral-900"
+          style={{ fontSize: "clamp(2rem, 5vw, 3.75rem)", letterSpacing: "-0.025em" }}
         >
-          READY TO OWN <span className="bg-gradient-to-r from-purple-400 to-fuchsia-400 bg-clip-text text-transparent">THE FUTURE?</span>
+          Ready to Own the Future?
         </motion.h3>
-        <div className="mt-8 inline-block">
-          <FancyButton onClick={() => navigate("/auth")} className="px-10 py-4 text-lg">
-            Start Your Empire Now
-          </FancyButton>
-        </div>
+        <motion.button
+          initial={{ opacity: 0, scale: 0.92 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
+          onClick={() => navigate("/auth")}
+          className="mt-8 inline-block px-10 py-4 sm:px-12 sm:py-5 rounded-2xl text-black font-extrabold text-base sm:text-lg"
+          style={{
+            background: "linear-gradient(135deg, #FFD700 0%, #FFC400 50%, #FFD700 100%)",
+            animation: "gold-pulse 2.4s ease-in-out infinite",
+          }}
+        >
+          Start Your Empire Now
+        </motion.button>
       </section>
 
-      {/* Payment brand icons */}
-      <section className="mx-auto max-w-5xl px-6 pb-14">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-6 md:p-8">
-          <p className="text-center text-xs uppercase tracking-[0.2em] text-white/40 mb-5">
-            Secure payments
-          </p>
-          <PaymentBrandIcons />
+      {/* Footer */}
+      <footer className="border-t border-neutral-200 bg-white">
+        <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col items-center gap-6">
+          <PaymentIcons />
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-neutral-500">
+            <a
+              href="https://terms.megsyai.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-neutral-900 transition-colors"
+            >
+              Terms of Service
+            </a>
+            <span>|</span>
+            <a
+              href="https://privacy.megsyai.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-neutral-900 transition-colors"
+            >
+              Privacy Policy
+            </a>
+            <span>|</span>
+            <a
+              href="/cookies"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/cookies");
+              }}
+              className="hover:text-neutral-900 transition-colors"
+            >
+              Cookie Policy
+            </a>
+          </div>
+          <p className="text-xs text-neutral-400">© 2026 Megsy AI. All Rights Reserved.</p>
         </div>
-      </section>
-
-      <LandingFooter />
+      </footer>
     </div>
   );
 };
