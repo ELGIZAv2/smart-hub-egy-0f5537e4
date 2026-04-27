@@ -511,31 +511,48 @@ const PricingPage = () => {
                 "radial-gradient(ellipse at top right, rgba(255,215,0,0.12), transparent 55%), radial-gradient(ellipse at bottom left, rgba(255,215,0,0.08), transparent 60%)",
             }}
           />
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-            <div className="max-w-xl">
-              <span className="inline-block text-[11px] font-bold tracking-[0.2em] px-3 py-1 rounded-full bg-white/5 border border-[#FFD700]/30 text-[#FFD700] mb-4">
-                ENTERPRISE
-              </span>
-              <h3
-                className="font-black text-white leading-tight"
-                style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)" }}
+          <div className="relative z-10 flex flex-col gap-8">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
+              <div className="max-w-xl">
+                <span className="inline-block text-[11px] font-bold tracking-[0.2em] px-3 py-1 rounded-full bg-white/5 border border-[#FFD700]/30 text-[#FFD700] mb-4">
+                  ENTERPRISE
+                </span>
+                <h3
+                  className="font-black text-white leading-tight"
+                  style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)" }}
+                >
+                  Built for organizations <span className="text-[#FFD700]">at scale</span>.
+                </h3>
+                <p className="mt-4 text-white/65 text-base leading-relaxed">
+                  Custom MC allocation, dedicated infrastructure, advanced security (SOC2, GDPR), SLA guarantees, and a dedicated account manager.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate("/enterprise")}
+                className="shrink-0 px-8 py-4 rounded-2xl font-bold text-sm sm:text-base text-black transition-transform active:scale-[0.98]"
+                style={{
+                  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 60%, #FFD700 100%)",
+                  boxShadow: "0 10px 30px rgba(255,215,0,0.35)",
+                }}
               >
-                Built for organizations <span className="text-[#FFD700]">at scale</span>.
-              </h3>
-              <p className="mt-4 text-white/65 text-base leading-relaxed">
-                Custom MC allocation, dedicated infrastructure, advanced security (SOC2, GDPR), SLA guarantees, and a dedicated account manager.
-              </p>
+                Contact Sales
+              </button>
             </div>
-            <button
-              onClick={() => navigate("/enterprise")}
-              className="shrink-0 px-8 py-4 rounded-2xl font-bold text-sm sm:text-base text-black transition-transform active:scale-[0.98]"
-              style={{
-                background: "linear-gradient(135deg, #FFD700 0%, #FFA500 60%, #FFD700 100%)",
-                boxShadow: "0 10px 30px rgba(255,215,0,0.35)",
-              }}
-            >
-              Contact Sales
-            </button>
+
+            {/* Enterprise full feature list */}
+            <div>
+              <h4 className="text-white font-bold text-sm tracking-[0.18em] uppercase mb-5">
+                Enterprise Plan Features
+              </h4>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                {ENTERPRISE_FEATURES.map((f) => (
+                  <li key={f} className="flex items-start gap-3 text-white/80 text-sm leading-relaxed">
+                    <Check className="w-4 h-4 mt-0.5 shrink-0 text-[#FFD700]" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </motion.div>
       </section>
