@@ -15,6 +15,7 @@ const PRODUCT_IDS: Record<string, string> = {
 const plans = [
 {
   name: "Starter",
+  tier: "starter",
   price: "9",
   period: "/mo",
   yearlyNote: "or $89/yr — 880 MC",
@@ -37,6 +38,7 @@ const plans = [
 },
 {
   name: "Pro",
+  tier: "pro",
   price: "29",
   period: "/mo",
   yearlyNote: "or $249/yr — 2,480 MC",
@@ -59,6 +61,7 @@ const plans = [
 },
 {
   name: "Elite",
+  tier: "elite",
   price: "49",
   period: "/mo",
   yearlyNote: "or $499/yr — 4,980 MC",
@@ -83,6 +86,35 @@ const plans = [
 
 const PricingPreview = () => {
   const navigate = useNavigate();
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+  const handleSubscribe = async (tier: string) => {
+    const product_id = PRODUCT_IDS[tier];
+    if (!product_id) {
+      navigate("/pricing");
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/auth?redirect=/pricing");
+      return;
+    }
+    setLoadingTier(tier);
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-checkout", {
+        body: { product_id, plan: tier },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data?.error || "Checkout failed");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to open checkout");
+      setLoadingTier(null);
+    }
+  };
 
   return (
     <section id="pricing" className="relative overflow-hidden py-16 md:py-40">
