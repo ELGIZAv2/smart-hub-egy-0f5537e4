@@ -40,6 +40,27 @@ Deno.serve(async (req) => {
     data.metadata?.user_id ||
     data.customer?.external_id ||
     data.subscription?.customer?.external_id ||
+    data.subscription?.metadata?.user_id ||
+    null;
+
+  // Map product_id -> { plan, credits, interval }
+  const PRODUCT_MAP: Record<string, { plan: string; credits: number }> = {
+    "57ebadf5-ae24-4814-a80c-d39c288b68aa": { plan: "starter", credits: 1000 },     // Starter monthly
+    "eea9ef87-f733-448a-9554-d37d88dec986": { plan: "starter", credits: 12000 },    // Starter yearly
+    "6776d8ca-2027-4893-b419-07ed28796f45": { plan: "pro", credits: 3500 },         // Pro monthly
+    "bd50728b-1c57-40c3-ad6a-4962cbf38849": { plan: "pro", credits: 42000 },        // Pro yearly
+    "af5a7adb-2713-4fb2-bd07-aad91ec0dd9f": { plan: "elite", credits: 6500 },       // Elite monthly
+    "f2889c5d-b180-4041-a908-5f3ef568b56d": { plan: "elite", credits: 78000 },      // Elite yearly
+  };
+
+  const extractProductId = (d: any): string | null =>
+    d.product_id ||
+    d.product?.id ||
+    d.products?.[0]?.id ||
+    d.subscription?.product_id ||
+    d.subscription?.product?.id ||
+    d.items?.[0]?.product_id ||
+    d.items?.[0]?.product?.id ||
     null;
 
   // Log event
@@ -80,15 +101,53 @@ Deno.serve(async (req) => {
         break;
 
       case "order.paid":
-        if (userId) {
-          // Add credits or extend subscription on successful payment
+      case "order.created": {
+        if (!userId) break;
+
+        const productId = extractProductId(data);
+        const mapping = productId ? PRODUCT_MAP[productId] : null;
+
+        // Idempotency: skip if this order already credited
+        const orderId = data.id || data.order_id;
+        if (orderId) {
+          const { data: existing } = await supabase
+            .from("payment_events")
+            .select("id")
+            .eq("event_type", "order.credits.added")
+            .eq("polar_event_id", orderId)
+            .maybeSingle();
+          if (existing) break;
+        }
+
+        if (mapping) {
+          // Add credits via RPC
+          const { error: credErr } = await supabase.rpc("add_credits", {
+            p_user_id: userId,
+            p_amount: mapping.credits,
+            p_description: `Subscription: ${mapping.plan} (Polar order ${orderId || "n/a"})`,
+          });
+          if (credErr) console.error("add_credits failed:", credErr);
+
+          // Update plan
+          await supabase.from("profiles").update({ plan: mapping.plan }).eq("id", userId);
+
+          // Log idempotency marker
+          await supabase.from("payment_events").insert({
+            user_id: userId,
+            event_type: "order.credits.added",
+            polar_event_id: orderId || null,
+            payload: { product_id: productId, plan: mapping.plan, credits: mapping.credits },
+          });
+        } else {
+          console.warn("order.paid: no PRODUCT_MAP entry for product_id:", productId);
           await supabase.from("payment_events").insert({
             user_id: userId,
             event_type: "order.paid.processed",
-            payload: { amount: data.amount, currency: data.currency },
+            payload: { amount: data.amount, currency: data.currency, product_id: productId, unmapped: true },
           });
         }
         break;
+      }
     }
   } catch (e: any) {
     console.error("Webhook processing error:", e);
