@@ -362,7 +362,7 @@ const PricingPage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.55, delay: i * 0.07 }}
-                className={`relative rounded-[24px] overflow-hidden flex flex-col ${
+                className={`relative rounded-[24px] flex flex-col ${
                   isElite ? "lg:-translate-y-3 z-10" : ""
                 }`}
                 style={{
