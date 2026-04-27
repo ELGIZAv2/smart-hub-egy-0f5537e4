@@ -212,16 +212,16 @@ const PricingPage = () => {
     try {
       const productMap: Record<string, { monthly?: string; yearly?: string }> = {
         starter: {
-          monthly: import.meta.env.VITE_POLAR_STARTER_MONTHLY,
-          yearly: import.meta.env.VITE_POLAR_STARTER_YEARLY,
+          monthly: "57ebadf5-ae24-4814-a80c-d39c288b68aa",
+          yearly: "eea9ef87-f733-448a-9554-d37d88dec986",
         },
         pro: {
-          monthly: import.meta.env.VITE_POLAR_PRO_MONTHLY,
-          yearly: import.meta.env.VITE_POLAR_PRO_YEARLY,
+          monthly: "6776d8ca-2027-4893-b419-07ed28796f45",
+          yearly: "bd50728b-1c57-40c3-ad6a-4962cbf38849",
         },
         elite: {
-          monthly: import.meta.env.VITE_POLAR_ELITE_MONTHLY,
-          yearly: import.meta.env.VITE_POLAR_ELITE_YEARLY,
+          monthly: "af5a7adb-2713-4fb2-bd07-aad91ec0dd9f",
+          yearly: "f2889c5d-b180-4041-a908-5f3ef568b56d",
         },
       };
       const product_id = isYearly ? productMap[tier]?.yearly : productMap[tier]?.monthly;
