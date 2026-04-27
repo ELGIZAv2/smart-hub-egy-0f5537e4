@@ -155,18 +155,18 @@ interface BotSession {
 }
 
 // ---- Helpers ----
-async function loadSession(sb: ReturnType<typeof createClient>, chatId: number): Promise<BotSession | null> {
+async function loadSession(sb: any, chatId: number): Promise<BotSession | null> {
   const { data } = await sb.from("memories").select("value").eq("key", `tg_${chatId}`).maybeSingle();
   if (!data) return null;
   try { return JSON.parse(data.value); } catch { return null; }
 }
 
-async function saveSession(sb: ReturnType<typeof createClient>, chatId: number, session: BotSession) {
+async function saveSession(sb: any, chatId: number, session: BotSession) {
   await sb.from("memories").delete().eq("key", `tg_${chatId}`);
   await sb.from("memories").insert({ key: `tg_${chatId}`, value: JSON.stringify(session) });
 }
 
-async function clearSession(sb: ReturnType<typeof createClient>, chatId: number) {
+async function clearSession(sb: any, chatId: number) {
   await sb.from("memories").delete().eq("key", `tg_${chatId}`);
 }
 
@@ -193,29 +193,29 @@ async function send(token: string, chatId: number, msgId: number | undefined, te
   });
 }
 
-async function getExistingMedia(sb: ReturnType<typeof createClient>, models: string[]) {
+async function getExistingMedia(sb: any, models: string[]) {
   const { data } = await sb.from("model_media").select("model_id").in("model_id", models);
   return new Set((data || []).map((r: { model_id: string }) => r.model_id));
 }
 
-async function getModelConfig(sb: ReturnType<typeof createClient>, modelId: string): Promise<Record<string, string>> {
+async function getModelConfig(sb: any, modelId: string): Promise<Record<string, string>> {
   const { data } = await sb.from("memories").select("value").eq("key", `model_config_${modelId}`).maybeSingle();
   if (!data) return {};
   try { return JSON.parse(data.value); } catch { return {}; }
 }
 
-async function setModelConfig(sb: ReturnType<typeof createClient>, modelId: string, config: Record<string, string>) {
+async function setModelConfig(sb: any, modelId: string, config: Record<string, string>) {
   await sb.from("memories").delete().eq("key", `model_config_${modelId}`);
   await sb.from("memories").insert({ key: `model_config_${modelId}`, value: JSON.stringify(config) });
 }
 
-async function loadAddedModels(sb: ReturnType<typeof createClient>): Promise<Record<string, unknown>[]> {
+async function loadAddedModels(sb: any): Promise<Record<string, unknown>[]> {
   const { data } = await sb.from("memories").select("value").eq("key", "models_added").maybeSingle();
   if (!data) return [];
   try { return JSON.parse(data.value); } catch { return []; }
 }
 
-async function getDynamicCategories(sb: ReturnType<typeof createClient>) {
+async function getDynamicCategories(sb: any) {
   const added = await loadAddedModels(sb);
   return buildCategories(added);
 }
@@ -312,14 +312,14 @@ const DEFAULT_PAGE_VIDEOS = {
   defaultResolution: "1080p",
 };
 
-async function getPageSettings(sb: ReturnType<typeof createClient>, page: "images" | "videos") {
+async function getPageSettings(sb: any, page: "images" | "videos") {
   const defaults = page === "images" ? DEFAULT_PAGE_IMAGES : DEFAULT_PAGE_VIDEOS;
   const { data } = await sb.from("memories").select("value").eq("key", `page_settings_${page}`).maybeSingle();
   if (!data) return { ...defaults };
   try { return { ...defaults, ...JSON.parse(data.value) }; } catch { return { ...defaults }; }
 }
 
-async function savePageSettings(sb: ReturnType<typeof createClient>, page: "images" | "videos", settings: Record<string, unknown>) {
+async function savePageSettings(sb: any, page: "images" | "videos", settings: Record<string, unknown>) {
   await sb.from("memories").delete().eq("key", `page_settings_${page}`);
   await sb.from("memories").insert({ key: `page_settings_${page}`, value: JSON.stringify(settings) });
 }
@@ -3957,7 +3957,7 @@ serve(async (req) => {
 });
 
 // ---- دوال مساعدة ----
-async function showUsersPage(sb: ReturnType<typeof createClient>, token: string, chatId: number, msgId: number | undefined, page: number) {
+async function showUsersPage(sb: any, token: string, chatId: number, msgId: number | undefined, page: number) {
   const from = page * USERS_PER_PAGE;
   const { data: users, count } = await sb.from("profiles")
     .select("id, display_name, credits, plan, created_at", { count: "exact" })
@@ -3987,7 +3987,7 @@ async function showUsersPage(sb: ReturnType<typeof createClient>, token: string,
   await send(token, chatId, msgId, `👥 *المستخدمين* (${total} إجمالي)\n\nاختر مستخدم:`, rows);
 }
 
-async function applyMcChange(sb: ReturnType<typeof createClient>, token: string, chatId: number, msgId: number | undefined, userId: string, change: number) {
+async function applyMcChange(sb: any, token: string, chatId: number, msgId: number | undefined, userId: string, change: number) {
   const { data: profile } = await sb.from("profiles").select("credits, display_name").eq("id", userId).single();
   if (!profile) { await send(token, chatId, msgId, "❌ المستخدم غير موجود", [[{ text: "🔙 رجوع", callback_data: "users_menu" }]]); return; }
 
@@ -4012,7 +4012,7 @@ async function applyMcChange(sb: ReturnType<typeof createClient>, token: string,
 }
 
 // ---- Showcase save helper ----
-async function saveShowcaseItem(sb: ReturnType<typeof createClient>, token: string, chatId: number, session: BotSession, duration: string | null) {
+async function saveShowcaseItem(sb: any, token: string, chatId: number, session: BotSession, duration: string | null) {
   // Get max display_order
   const { data: maxOrder } = await sb.from("showcase_items")
     .select("display_order")

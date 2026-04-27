@@ -40,7 +40,7 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
 };
 
 // ── deAPI key rotation ──
-async function getDeapiKey(sb: ReturnType<typeof createClient>): Promise<{ key: string; id: string } | null> {
+async function getDeapiKey(sb: any): Promise<{ key: string; id: string } | null> {
   const { data } = await sb
     .from("deapi_keys")
     .select("id, api_key, usage_count")
@@ -53,7 +53,7 @@ async function getDeapiKey(sb: ReturnType<typeof createClient>): Promise<{ key: 
   return { key: pick.api_key, id: pick.id };
 }
 
-async function markKeyInactive(sb: ReturnType<typeof createClient>, keyId: string) {
+async function markKeyInactive(sb: any, keyId: string) {
   await sb.from("deapi_keys").update({ is_active: false }).eq("id", keyId);
 }
 
@@ -72,7 +72,7 @@ async function pollDeapiResult(apiKey: string, requestId: string, maxAttempts = 
 }
 
 async function callDeapiVideo(
-  sb: ReturnType<typeof createClient>,
+  sb: any,
   deapiEndpoint: string,
   body: Record<string, unknown>,
   maxRetries = 3,
