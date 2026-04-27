@@ -215,10 +215,11 @@ const PricingPreview = () => {
                 1,480 MC / month, dedicated infrastructure, SLA guarantees, and a dedicated account manager.
               </p>
               <button
-                onClick={() => navigate("/auth")}
-                className="mt-6 w-full rounded-xl border border-rose-500/20 bg-rose-500/10 px-8 py-3 text-base font-medium text-rose-300 transition-all hover:bg-rose-500/20 hover:border-rose-500/30">
+                onClick={() => handleSubscribe("business")}
+                disabled={loadingTier === "business"}
+                className="mt-6 w-full rounded-xl border border-rose-500/20 bg-rose-500/10 px-8 py-3 text-base font-medium text-rose-300 transition-all hover:bg-rose-500/20 hover:border-rose-500/30 disabled:opacity-50">
                 
-                Get Started
+                {loadingTier === "business" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
               </button>
             </div>
           </motion.div>
