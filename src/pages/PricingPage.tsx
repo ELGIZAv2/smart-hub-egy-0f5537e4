@@ -1,208 +1,177 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Building2, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import FancyButton from "@/components/FancyButton";
 
-const plans = [
-  {
-    name: "Starter",
-    monthlyPrice: 10,
-    yearlyPrice: 99,
-    monthlyCredits: "80",
-    yearlyCredits: "880",
-    tier: "starter" as const,
-    color: "emerald",
-    features: [
-      "80 MC / month",
-      "All chat models",
-      "50 images / month",
-      "5 videos / month",
-      "10 code builds / month",
-      "Deploy & publish",
-      "GitHub sync",
-      "File analysis",
-      "Standard support",
-    ],
-    yearlyFeatures: [
-      "880 MC / year",
-      "All chat models",
-      "50 images / month",
-      "5 videos / month",
-      "10 code builds / month",
-      "Deploy & publish",
-      "GitHub sync",
-      "File analysis",
-      "Standard support",
-    ],
-  },
-  {
-    name: "Pro",
-    monthlyPrice: 29,
-    yearlyPrice: 249,
-    monthlyCredits: "280",
-    yearlyCredits: "2,480",
-    tier: "pro" as const,
-    color: "violet",
-    features: [
-      "280 MC / month",
-      "All AI models",
-      "200 images / month",
-      "20 videos / month",
-      "40 code builds / month",
-      "Deploy & publish",
-      "GitHub sync + version control",
-      "File analysis",
-      "API access",
-      "Priority support",
-    ],
-    yearlyFeatures: [
-      "2,480 MC / year",
-      "All AI models",
-      "200 images / month",
-      "20 videos / month",
-      "40 code builds / month",
-      "Deploy & publish",
-      "GitHub sync + version control",
-      "File analysis",
-      "API access",
-      "Priority support",
-    ],
-  },
-  {
-    name: "Elite",
-    monthlyPrice: 49,
-    yearlyPrice: 499,
-    monthlyCredits: "480",
-    yearlyCredits: "4,980",
-    tier: "elite" as const,
-    color: "purple",
-    badge: "MOST POPULAR",
-    featured: true,
-    features: [
-      "480 MC / month",
-      "All models (priority speed)",
-      "500 images / month",
-      "50 videos / month",
-      "80 code builds / month",
-      "Deploy & publish",
-      "GitHub sync + version control",
-      "File analysis",
-      "API access + webhooks",
-      "Social publishing",
-      "Dedicated support",
-    ],
-    yearlyFeatures: [
-      "4,980 MC / year",
-      "All models (priority speed)",
-      "500 images / month",
-      "50 videos / month",
-      "80 code builds / month",
-      "Deploy & publish",
-      "GitHub sync + version control",
-      "File analysis",
-      "API access + webhooks",
-      "Social publishing",
-      "Dedicated support",
-    ],
-  },
-  {
-    name: "Business",
-    monthlyPrice: 149,
-    yearlyPrice: 1299,
-    monthlyCredits: "1,480",
-    yearlyCredits: "12,980",
-    tier: "business" as const,
-    color: "rose",
-    badge: "BUSINESS",
-    features: [
-      "1,480 MC / month",
-      "All models with priority speed",
-      "2,000 images / month",
-      "200 videos / month",
-      "300 code builds / month",
-      "Dedicated infrastructure",
-      "SLA guarantees",
-      "Custom API integrations",
-      "Dedicated account manager",
-      "Data privacy & compliance",
-      "Advanced analytics",
-      "Volume discounts",
-    ],
-    yearlyFeatures: [
-      "12,980 MC / year",
-      "All models with priority speed",
-      "2,000 images / month",
-      "200 videos / month",
-      "300 code builds / month",
-      "Dedicated infrastructure",
-      "SLA guarantees",
-      "Custom API integrations",
-      "Dedicated account manager",
-      "Data privacy & compliance",
-      "Advanced analytics",
-      "Volume discounts",
-    ],
-  },
-];
+type PlanTier = "starter" | "pro" | "elite" | "business";
 
-const enterpriseFeatures = [
-  "Custom MC Allocation",
-  "All Models with Priority Speed",
-  "Dedicated Infrastructure",
-  "SLA Guarantees",
-  "Custom API Access & Integrations",
-  "Enterprise Security (SOC2, GDPR)",
-  "Data Privacy & Compliance",
-  "Early Access to New AI Models",
-  "Advanced Analytics & Reporting",
-  "Dedicated Account Manager",
-  "24/7 Priority Support",
-  "Priority Onboarding & Training",
-  "Monthly Business Reviews",
-  "Volume Discounts",
-  "Custom Contract & Invoicing",
-];
-
-const tierStyles: Record<string, { gradient: string; check: string; border: string; glow: string }> = {
+const PRODUCT_MAP: Record<PlanTier, { monthly: string; yearly: string }> = {
   starter: {
-    gradient: "from-emerald-500/10 via-emerald-900/5 to-transparent",
-    check: "text-emerald-400",
-    border: "border-emerald-500/15 hover:border-emerald-500/30",
-    glow: "rgba(16,185,129,0.06)",
+    monthly: "c3483e63-7dbd-4214-bec2-894926f5590a",
+    yearly: "729d9b3d-1acc-4d58-8a39-49ab63330674",
   },
   pro: {
-    gradient: "from-violet-500/10 via-violet-900/5 to-transparent",
-    check: "text-violet-400",
-    border: "border-violet-500/15 hover:border-violet-500/30",
-    glow: "rgba(139,92,246,0.06)",
+    monthly: "8da537b0-7192-46cd-b38a-bbe341febdf7",
+    yearly: "bcbd0c61-a5bd-4934-872a-7413324a330c",
   },
   elite: {
-    gradient: "from-purple-500/15 via-purple-900/8 to-transparent",
-    check: "text-purple-300",
-    border: "border-purple-500/30 hover:border-purple-500/50",
-    glow: "rgba(168,85,247,0.1)",
+    monthly: "d212d1e6-4958-4329-a1f4-5b460886fc9d",
+    yearly: "0b8f0aa3-57a7-4dd5-9ab3-ce68cebec7f6",
   },
   business: {
-    gradient: "from-rose-500/10 via-rose-900/5 to-transparent",
-    check: "text-rose-400",
-    border: "border-rose-500/15 hover:border-rose-500/30",
-    glow: "rgba(244,63,94,0.06)",
+    monthly: "1fb17ce3-5bb4-473e-8c67-e50a8ce927dd",
+    yearly: "39752b51-d4cd-4a03-9718-bb2b95f71084",
   },
 };
+
+interface PlanCardConfig {
+  tier: PlanTier;
+  name: string;
+  label: string;
+  bg: string;
+  text: string;
+  subText: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  monthlyCredits: string;
+  yearlyCredits: string;
+  features: string[];
+  ctaBg: string;
+  ctaText: string;
+  ctaHover: string;
+  bubbleColor: string;
+  topBadge?: boolean;
+  glow?: string;
+}
+
+const PLANS: PlanCardConfig[] = [
+  {
+    tier: "starter",
+    name: "Starter",
+    label: "BEST FOR BEGINNERS",
+    bg: "#D1FAE5",
+    text: "#1A1A1A",
+    subText: "rgba(26,26,26,0.65)",
+    monthlyPrice: 9,
+    yearlyPrice: 89,
+    monthlyCredits: "80 MC / month",
+    yearlyCredits: "880 MC / year",
+    features: [
+      "All chat models",
+      "50 images / month",
+      "5 videos / month",
+      "10 code builds / month",
+      "Deploy & publish",
+      "Standard support",
+    ],
+    ctaBg: "#000000",
+    ctaText: "#FFFFFF",
+    ctaHover: "#1f1f1f",
+    bubbleColor: "rgba(255,255,255,0.7)",
+  },
+  {
+    tier: "pro",
+    name: "Pro",
+    label: "PROFESSIONAL CHOICE",
+    bg: "#2563EB",
+    text: "#FFFFFF",
+    subText: "rgba(255,255,255,0.75)",
+    monthlyPrice: 29,
+    yearlyPrice: 249,
+    monthlyCredits: "280 MC / month",
+    yearlyCredits: "2,480 MC / year",
+    features: [
+      "All AI models",
+      "200 images / month",
+      "20 videos / month",
+      "40 code builds / month",
+      "API access",
+      "Priority support",
+    ],
+    ctaBg: "#FFFFFF",
+    ctaText: "#2563EB",
+    ctaHover: "#f3f4f6",
+    bubbleColor: "rgba(255,255,255,0.35)",
+  },
+  {
+    tier: "elite",
+    name: "Elite",
+    label: "MOST POPULAR",
+    bg: "#7C3AED",
+    text: "#FFFFFF",
+    subText: "rgba(255,255,255,0.78)",
+    monthlyPrice: 49,
+    yearlyPrice: 499,
+    monthlyCredits: "480 MC / month",
+    yearlyCredits: "4,980 MC / year",
+    features: [
+      "All models (priority speed)",
+      "500 images / month",
+      "50 videos / month",
+      "80 code builds / month",
+      "API + webhooks",
+      "Dedicated support",
+    ],
+    ctaBg: "#FFD700",
+    ctaText: "#000000",
+    ctaHover: "#ffdf33",
+    bubbleColor: "rgba(255,215,0,0.35)",
+    topBadge: true,
+    glow: "0 0 60px rgba(124,58,237,0.55), 0 20px 50px -10px rgba(124,58,237,0.6)",
+  },
+  {
+    tier: "business",
+    name: "Business",
+    label: "BEST VALUE",
+    bg: "#D97706",
+    text: "#FFFFFF",
+    subText: "rgba(255,255,255,0.78)",
+    monthlyPrice: 149,
+    yearlyPrice: 1299,
+    monthlyCredits: "1,480 MC / month",
+    yearlyCredits: "12,980 MC / year",
+    features: [
+      "All models with priority speed",
+      "2,000 images / month",
+      "200 videos / month",
+      "300 code builds / month",
+      "Dedicated infrastructure",
+      "SLA guarantees",
+      "Dedicated account manager",
+    ],
+    ctaBg: "#FFFFFF",
+    ctaText: "#D97706",
+    ctaHover: "#FFF7ED",
+    bubbleColor: "rgba(255,215,0,0.45)",
+  },
+];
+
+const BUBBLES = Array.from({ length: 7 });
+
+const PaymentIcons = () => (
+  <div className="flex flex-wrap items-center justify-center gap-5 opacity-70">
+    {[
+      "Visa", "Mastercard", "Amex", "Discover", "Apple Pay", "UnionPay"
+    ].map((name) => (
+      <div
+        key={name}
+        className="px-3 py-1.5 rounded-md border border-neutral-300 bg-white text-[11px] font-semibold tracking-wide text-neutral-700"
+      >
+        {name}
+      </div>
+    ))}
+  </div>
+);
 
 const PricingPage = () => {
   const navigate = useNavigate();
   const [isYearly, setIsYearly] = useState(false);
-  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
 
-  const handleSubscribe = async (tier: string) => {
-    if (tier === "business") {
-      navigate("/enterprise");
-      return;
-    }
+  const handleSubscribe = async (tier: PlanTier) => {
+    const product_id = isYearly ? PRODUCT_MAP[tier].yearly : PRODUCT_MAP[tier].monthly;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       navigate("/auth?redirect=/pricing");
@@ -210,26 +179,6 @@ const PricingPage = () => {
     }
     setLoadingTier(tier);
     try {
-      const productMap: Record<string, { monthly?: string; yearly?: string }> = {
-        starter: {
-          monthly: "57ebadf5-ae24-4814-a80c-d39c288b68aa",
-          yearly: "eea9ef87-f733-448a-9554-d37d88dec986",
-        },
-        pro: {
-          monthly: "6776d8ca-2027-4893-b419-07ed28796f45",
-          yearly: "bd50728b-1c57-40c3-ad6a-4962cbf38849",
-        },
-        elite: {
-          monthly: "af5a7adb-2713-4fb2-bd07-aad91ec0dd9f",
-          yearly: "f2889c5d-b180-4041-a908-5f3ef568b56d",
-        },
-      };
-      const product_id = isYearly ? productMap[tier]?.yearly : productMap[tier]?.monthly;
-      if (!product_id) {
-        toast.error("هذا المنتج غير مفعّل في Polar بعد. أنشئه من لوحة Polar وأضف الـ Product ID.");
-        setLoadingTier(null);
-        return;
-      }
       const { data, error } = await supabase.functions.invoke("polar-checkout", {
         body: { product_id, plan: tier },
       });
@@ -240,161 +189,358 @@ const PricingPage = () => {
         throw new Error(data?.error || "Checkout failed");
       }
     } catch (e: any) {
-      toast.error(e.message || "حدث خطأ أثناء فتح صفحة الدفع");
+      toast.error(e.message || "Failed to open checkout");
       setLoadingTier(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex items-center gap-3 px-4 py-4 max-w-7xl mx-auto">
-        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground transition-colors">
+    <div className="min-h-screen bg-white text-neutral-900">
+      {/* Bubble + utility CSS scoped to page */}
+      <style>{`
+        @keyframes pricing-bubble-rise {
+          0%   { transform: translateY(0) scale(0.8); opacity: 0; }
+          10%  { opacity: 0.9; }
+          80%  { opacity: 0.6; }
+          100% { transform: translateY(-180px) scale(1.1); opacity: 0; }
+        }
+        .pricing-bubble {
+          position: absolute;
+          border-radius: 9999px;
+          pointer-events: none;
+          will-change: transform, opacity;
+          animation: pricing-bubble-rise 5s ease-in-out infinite;
+        }
+        @keyframes gold-pulse {
+          0%, 100% { box-shadow: 0 0 24px rgba(255,215,0,0.55), 0 0 60px rgba(255,215,0,0.25); }
+          50%      { box-shadow: 0 0 38px rgba(255,215,0,0.85), 0 0 90px rgba(255,215,0,0.45); }
+        }
+      `}</style>
+
+      {/* Top bar */}
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 max-w-7xl mx-auto">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-neutral-500 hover:text-neutral-900 transition-colors"
+          aria-label="Back"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="font-display text-lg font-bold text-foreground">Pricing</h1>
+        <h1 className="text-base font-bold tracking-tight">Pricing</h1>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-          <h2 className="font-display text-4xl md:text-5xl font-black mb-3 text-foreground tracking-tight">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-muted-foreground text-base mb-8 max-w-lg mx-auto">
-            Every MC is real value. No hidden fees. No "unlimited" gimmicks.
-          </p>
+      {/* Hero */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-8 sm:pt-14 pb-10 sm:pb-14 text-center">
+        <motion.h2
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
+          className="font-black tracking-tight leading-[1.02] text-neutral-900"
+          style={{ fontSize: "clamp(2.25rem, 6vw, 4.75rem)", letterSpacing: "-0.03em" }}
+        >
+          One AI Platform.
+          <br />
+          <span className="bg-gradient-to-r from-purple-600 via-fuchsia-500 to-amber-500 bg-clip-text text-transparent">
+            Infinite Possibilities.
+          </span>
+        </motion.h2>
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="mx-auto mt-5 max-w-2xl font-medium text-neutral-600"
+          style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.125rem)" }}
+        >
+          Simple, transparent pricing. No hidden fees. Pay only for real usage across the entire AI ecosystem.
+        </motion.p>
 
-          <div className="inline-flex items-center gap-1 bg-secondary rounded-full p-1">
-            <button
-              onClick={() => setIsYearly(false)}
-              className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${!isYearly ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setIsYearly(true)}
-              className={`inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full text-sm font-medium transition-all ${isYearly ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Yearly
-              <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 leading-none whitespace-nowrap font-bold">
-                Save ~17%
+        {/* Toggle */}
+        <div className="mt-8 inline-flex items-center gap-1 p-1 rounded-full bg-[#F1F5F9]">
+          <button
+            onClick={() => setIsYearly(false)}
+            className={`px-5 sm:px-7 py-2.5 rounded-full text-sm transition-all ${
+              !isYearly
+                ? "bg-[#D1FAE5] text-black font-semibold shadow-sm"
+                : "text-neutral-500 hover:text-neutral-800 font-medium"
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setIsYearly(true)}
+            className={`inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 rounded-full text-sm transition-all ${
+              isYearly
+                ? "bg-[#D1FAE5] text-black font-semibold shadow-sm"
+                : "text-neutral-500 hover:text-neutral-800 font-medium"
+            }`}
+          >
+            Yearly
+            {isYearly && (
+              <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border border-black/80 text-black bg-white whitespace-nowrap">
+                20% off on yearly
               </span>
-            </button>
-          </div>
-        </motion.div>
+            )}
+          </button>
+        </div>
+      </section>
 
-        {/* Plan Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
-          {plans.map((plan, i) => {
-            const style = tierStyles[plan.tier];
-            const price = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
-            const features = isYearly ? plan.yearlyFeatures : plan.features;
-            const isFeatured = plan.featured;
+      {/* Plans grid */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 items-stretch">
+          {PLANS.map((p, i) => {
+            const price = isYearly ? p.yearlyPrice : p.monthlyPrice;
+            const credits = isYearly ? p.yearlyCredits : p.monthlyCredits;
+            const isElite = p.tier === "elite";
 
             return (
               <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
-                className={`relative rounded-2xl border p-6 flex flex-col gap-4 transition-all duration-300 bg-gradient-to-b ${style.gradient} ${style.border} ${
-                  isFeatured ? "md:scale-105 z-10 shadow-xl ring-1 ring-purple-500/20" : ""
+                key={p.tier}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.55, delay: i * 0.07 }}
+                className={`relative rounded-[24px] overflow-hidden flex flex-col ${
+                  isElite ? "lg:-translate-y-3 z-10" : ""
                 }`}
-                style={{ backgroundImage: `radial-gradient(ellipse at top right, ${style.glow}, transparent 60%)` }}
+                style={{
+                  background: p.bg,
+                  color: p.text,
+                  boxShadow: p.glow ?? "0 12px 40px -12px rgba(0,0,0,0.12)",
+                  minHeight: 540,
+                }}
               >
-                {plan.badge && (
-                  <span className={`absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-wider ${
-                    isFeatured ? "bg-purple-500 text-white shadow-lg shadow-purple-500/30" : "bg-rose-500/20 text-rose-300 border border-rose-500/20"
-                  }`}>
-                    {plan.badge}
-                  </span>
+                {/* MOST POPULAR badge above Elite */}
+                {p.topBadge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+                    <span
+                      className="px-4 py-1 text-[11px] font-extrabold tracking-[0.2em] rounded-full text-black"
+                      style={{
+                        background: "#FFD700",
+                        animation: "gold-pulse 2.4s ease-in-out infinite",
+                      }}
+                    >
+                      MOST POPULAR
+                    </span>
+                  </div>
                 )}
 
-                <div>
-                  <h3 className="font-display font-bold text-foreground text-lg">{plan.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {isYearly ? plan.yearlyCredits : plan.monthlyCredits} MC
+                {/* Bubbles */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  {BUBBLES.map((_, b) => {
+                    const size = 10 + ((b * 7) % 22);
+                    const left = (b * 37) % 90;
+                    const delay = (b * 0.7) % 5;
+                    return (
+                      <span
+                        key={b}
+                        className="pricing-bubble"
+                        style={{
+                          width: size,
+                          height: size,
+                          left: `${left}%`,
+                          bottom: `-${size}px`,
+                          background: p.bubbleColor,
+                          animationDelay: `${delay}s`,
+                          animationDuration: `${4.5 + (b % 3)}s`,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 p-7 sm:p-8 flex flex-col flex-1">
+                  {/* Label (glass frame) */}
+                  {!p.topBadge && (
+                    <span
+                      className="self-start inline-block text-[10px] sm:text-[11px] font-bold tracking-[0.18em] px-3 py-1 rounded-full mb-5 backdrop-blur-md"
+                      style={{
+                        background: p.tier === "starter" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.18)",
+                        border: p.tier === "starter" ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(255,255,255,0.35)",
+                        color: p.text,
+                      }}
+                    >
+                      {p.label}
+                    </span>
+                  )}
+                  {p.topBadge && <div className="h-6" />}
+
+                  <h3
+                    className="font-black"
+                    style={{ fontSize: "clamp(1.5rem, 2.5vw, 1.875rem)" }}
+                  >
+                    {p.name}
+                  </h3>
+
+                  <div className="mt-3 flex items-baseline gap-1.5">
+                    <span
+                      className="font-black leading-none"
+                      style={{ fontSize: "clamp(2.5rem, 5vw, 3.5rem)" }}
+                    >
+                      ${price}
+                    </span>
+                    <span className="text-sm font-medium" style={{ color: p.subText }}>
+                      /{isYearly ? "year" : "month"}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 text-sm font-semibold" style={{ color: p.subText }}>
+                    {credits}
                   </p>
-                </div>
 
-                <div className="flex items-baseline gap-1">
-                  <span className="font-display text-4xl font-black text-foreground">${price}</span>
-                  <span className="text-sm text-muted-foreground">/{isYearly ? "year" : "month"}</span>
-                </div>
-
-                {isFeatured ? (
-                  <FancyButton
-                    onClick={() => handleSubscribe(plan.tier)}
-                    className="w-full py-3 text-sm"
-                  >
-                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Get Started"}
-                  </FancyButton>
-                ) : (
+                  {/* CTA */}
                   <button
-                    onClick={() => handleSubscribe(plan.tier)}
-                    disabled={loadingTier === plan.tier}
-                    className="w-full py-3 rounded-xl font-medium text-sm transition-all border border-border bg-secondary/50 hover:bg-secondary text-foreground disabled:opacity-50"
+                    onClick={() => handleSubscribe(p.tier)}
+                    disabled={loadingTier === p.tier}
+                    className="mt-6 w-full py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all active:scale-[0.98] disabled:opacity-60"
+                    style={{
+                      background: p.ctaBg,
+                      color: p.ctaText,
+                      boxShadow: isElite
+                        ? "0 0 30px rgba(255,215,0,0.5), 0 8px 20px rgba(0,0,0,0.15)"
+                        : "0 6px 18px rgba(0,0,0,0.12)",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = p.ctaHover)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = p.ctaBg)}
                   >
-                    {loadingTier === plan.tier ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (plan.tier === "business" ? "Contact Sales" : "Get Started")}
+                    {loadingTier === p.tier ? (
+                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    ) : (
+                      "Get Started"
+                    )}
                   </button>
-                )}
 
-                <ul className="space-y-2.5 mt-2">
-                  {features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${style.check}`} />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                  {/* Features */}
+                  <ul className="mt-6 space-y-2.5 flex-1">
+                    {p.features.map((f) => (
+                      <li
+                        key={f}
+                        className="flex items-start gap-2.5 text-sm"
+                        style={{ color: p.subText }}
+                      >
+                        <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: p.text }} />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </motion.div>
             );
           })}
         </div>
 
-        {/* Enterprise */}
+        {/* Enterprise — full width matte black */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="mt-10"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="mt-12 relative rounded-[28px] overflow-hidden p-8 sm:p-12"
+          style={{
+            background: "#0F0F0F",
+            boxShadow: "0 30px 60px -20px rgba(0,0,0,0.4)",
+          }}
         >
-          <div className="relative rounded-3xl border border-cyan-500/20 p-8 md:p-10 overflow-hidden bg-gradient-to-br from-cyan-950/30 via-background to-indigo-950/20">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(6,182,212,0.08),transparent_50%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(99,102,241,0.06),transparent_50%)]" />
-
-            <div className="relative z-10">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8 mb-8">
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center">
-                      <Building2 className="w-4 h-4 text-white" />
-                    </div>
-                    <h3 className="font-display text-2xl font-black text-foreground">Enterprise</h3>
-                  </div>
-                  <p className="text-muted-foreground max-w-xl">
-                    Custom plans for large teams — dedicated infrastructure, advanced security, SLA guarantees, and a dedicated account manager.
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate("/enterprise")}
-                  className="shrink-0 px-8 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-cyan-500/20"
-                >
-                  Contact Sales
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {enterpriseFeatures.map((text, i) => (
-                  <div key={i} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                    <Check className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
-                    <span>{text}</span>
-                  </div>
-                ))}
-              </div>
+          <div
+            className="absolute inset-0 opacity-60 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse at top right, rgba(255,215,0,0.12), transparent 55%), radial-gradient(ellipse at bottom left, rgba(255,215,0,0.08), transparent 60%)",
+            }}
+          />
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+            <div className="max-w-xl">
+              <span className="inline-block text-[11px] font-bold tracking-[0.2em] px-3 py-1 rounded-full bg-white/5 border border-[#FFD700]/30 text-[#FFD700] mb-4">
+                ENTERPRISE
+              </span>
+              <h3
+                className="font-black text-white leading-tight"
+                style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)" }}
+              >
+                Built for organizations <span className="text-[#FFD700]">at scale</span>.
+              </h3>
+              <p className="mt-4 text-white/65 text-base leading-relaxed">
+                Custom MC allocation, dedicated infrastructure, advanced security (SOC2, GDPR), SLA guarantees, and a dedicated account manager.
+              </p>
             </div>
+            <button
+              onClick={() => navigate("/enterprise")}
+              className="shrink-0 px-8 py-4 rounded-2xl font-bold text-sm sm:text-base text-black transition-transform active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, #FFD700 0%, #FFA500 60%, #FFD700 100%)",
+                boxShadow: "0 10px 30px rgba(255,215,0,0.35)",
+              }}
+            >
+              Contact Sales
+            </button>
           </div>
         </motion.div>
-      </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="max-w-4xl mx-auto px-6 pb-20 text-center">
+        <motion.h3
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="font-black tracking-tight text-neutral-900"
+          style={{ fontSize: "clamp(2rem, 5vw, 3.75rem)", letterSpacing: "-0.025em" }}
+        >
+          Ready to Own the Future?
+        </motion.h3>
+        <motion.button
+          initial={{ opacity: 0, scale: 0.92 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
+          onClick={() => navigate("/auth")}
+          className="mt-8 inline-block px-10 py-4 sm:px-12 sm:py-5 rounded-2xl text-black font-extrabold text-base sm:text-lg"
+          style={{
+            background: "linear-gradient(135deg, #FFD700 0%, #FFC400 50%, #FFD700 100%)",
+            animation: "gold-pulse 2.4s ease-in-out infinite",
+          }}
+        >
+          Start Your Empire Now
+        </motion.button>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-neutral-200 bg-white">
+        <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col items-center gap-6">
+          <PaymentIcons />
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-neutral-500">
+            <a
+              href="https://terms.megsyai.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-neutral-900 transition-colors"
+            >
+              Terms of Service
+            </a>
+            <span>|</span>
+            <a
+              href="https://privacy.megsyai.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-neutral-900 transition-colors"
+            >
+              Privacy Policy
+            </a>
+            <span>|</span>
+            <a
+              href="/cookies"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/cookies");
+              }}
+              className="hover:text-neutral-900 transition-colors"
+            >
+              Cookie Policy
+            </a>
+          </div>
+          <p className="text-xs text-neutral-400">© 2026 Megsy AI. All Rights Reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 };
