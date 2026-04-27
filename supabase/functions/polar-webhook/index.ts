@@ -1,6 +1,6 @@
 // Polar webhook handler — receives subscription/checkout/order events
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { Webhook } from "npm:standardwebhooks@1.0.0";
+import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
