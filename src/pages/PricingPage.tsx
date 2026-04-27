@@ -148,20 +148,83 @@ const PLANS: PlanCardConfig[] = [
   },
 ];
 
-const BUBBLES = Array.from({ length: 7 });
+const BUBBLES = Array.from({ length: 14 });
+
+const ENTERPRISE_FEATURES: string[] = [
+  "Custom MC Allocation — رصيد مخصص حسب الاحتياج",
+  "All Models with Priority Speed — أقصى سرعة وصول لكافة النماذج",
+  "Dedicated Infrastructure — بنية تحتية مستقلة لضمان الاستقرار",
+  "SLA Guarantees — ضمانات مستوى الخدمة والتشغيل",
+  "Custom API Access & Integrations — ربط برمجي مخصص وتكامل مع أنظمتك",
+  "Enterprise Security (SOC2-ready, GDPR & Advanced Encryption)",
+  "Data Privacy & Compliance — التزام كامل بخصوصية بيانات الشركات",
+  "Early Access to New AI Models — أولوية تجربة أحدث النماذج قبل صدورها",
+  "Advanced Analytics & Reporting — تحليلات متقدمة لاستهلاك الفريق",
+  "Dedicated Account Manager — مدير حساب مخصص لمتابعة احتياجاتك",
+  "24/7 Priority Support — دعم فني ذو أولوية على مدار الساعة",
+  "Priority Onboarding & Training — تجهيز الفريق وتدريبه بشكل عاجل",
+  "Monthly Business Reviews — تقييم دوري لنمو وتطور استخدامك",
+  "Volume Discounts — خصومات حصرية للكميات الكبيرة",
+  "Custom Contract, Invoicing & Billing — عقود وفواتير مخصصة تناسب نظامك المالي",
+];
+
+const PaymentBrand = ({ name, children }: { name: string; children: React.ReactNode }) => (
+  <div
+    title={name}
+    aria-label={name}
+    className="h-9 w-14 rounded-md border border-neutral-200 bg-white shadow-sm flex items-center justify-center"
+  >
+    {children}
+  </div>
+);
 
 const PaymentIcons = () => (
-  <div className="flex flex-wrap items-center justify-center gap-5 opacity-70">
-    {[
-      "Visa", "Mastercard", "Amex", "Discover", "Apple Pay", "UnionPay"
-    ].map((name) => (
-      <div
-        key={name}
-        className="px-3 py-1.5 rounded-md border border-neutral-300 bg-white text-[11px] font-semibold tracking-wide text-neutral-700"
-      >
-        {name}
-      </div>
-    ))}
+  <div className="flex flex-wrap items-center justify-center gap-3">
+    {/* Visa */}
+    <PaymentBrand name="Visa">
+      <svg viewBox="0 0 48 16" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="14" fontFamily="Arial Black, sans-serif" fontSize="16" fontWeight="900" fill="#1A1F71" fontStyle="italic">VISA</text>
+      </svg>
+    </PaymentBrand>
+    {/* Mastercard */}
+    <PaymentBrand name="Mastercard">
+      <svg viewBox="0 0 40 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="15" cy="12" r="9" fill="#EB001B" />
+        <circle cx="25" cy="12" r="9" fill="#F79E1B" />
+        <path d="M20 5.5a8.96 8.96 0 0 1 0 13 8.96 8.96 0 0 1 0-13z" fill="#FF5F00" />
+      </svg>
+    </PaymentBrand>
+    {/* Amex */}
+    <PaymentBrand name="American Express">
+      <svg viewBox="0 0 60 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
+        <rect width="60" height="24" rx="3" fill="#2E77BC" />
+        <text x="30" y="15" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="8" fontWeight="900" fill="#FFFFFF">AMEX</text>
+      </svg>
+    </PaymentBrand>
+    {/* Discover */}
+    <PaymentBrand name="Discover">
+      <svg viewBox="0 0 80 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="16" fontFamily="Arial Black, sans-serif" fontSize="11" fontWeight="900" fill="#231F20">DISC</text>
+        <circle cx="50" cy="12" r="6" fill="#FF6000" />
+        <text x="58" y="16" fontFamily="Arial Black, sans-serif" fontSize="11" fontWeight="900" fill="#231F20">VER</text>
+      </svg>
+    </PaymentBrand>
+    {/* Apple Pay */}
+    <PaymentBrand name="Apple Pay">
+      <svg viewBox="0 0 50 20" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.5 5.2c-.5.6-1.3 1.1-2.1 1-.1-.8.3-1.7.8-2.2.5-.6 1.4-1 2.1-1.1.1.9-.3 1.7-.8 2.3zm.8.9c-1.2-.1-2.2.7-2.7.7-.6 0-1.4-.6-2.4-.6-1.2 0-2.4.7-3 1.8-1.3 2.2-.3 5.5 1 7.3.6.9 1.3 1.8 2.3 1.8.9 0 1.3-.6 2.4-.6s1.4.6 2.4.6c1 0 1.6-.9 2.2-1.8.7-1 1-2 1-2-.1 0-2-.8-2-3 0-1.9 1.5-2.8 1.6-2.8-.9-1.3-2.3-1.4-2.8-1.4z" fill="#000"/>
+        <text x="14" y="14" fontFamily="Arial, sans-serif" fontSize="9" fontWeight="700" fill="#000">Pay</text>
+      </svg>
+    </PaymentBrand>
+    {/* UnionPay */}
+    <PaymentBrand name="UnionPay">
+      <svg viewBox="0 0 60 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="2" width="20" height="20" rx="2" fill="#E21836" />
+        <rect x="20" y="2" width="20" height="20" rx="0" fill="#00447C" />
+        <rect x="40" y="2" width="20" height="20" rx="2" fill="#007B5E" />
+        <text x="30" y="15" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="6" fontWeight="900" fill="#FFFFFF">UnionPay</text>
+      </svg>
+    </PaymentBrand>
   </div>
 );
 
@@ -299,7 +362,7 @@ const PricingPage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.55, delay: i * 0.07 }}
-                className={`relative rounded-[24px] overflow-hidden flex flex-col ${
+                className={`relative rounded-[24px] flex flex-col ${
                   isElite ? "lg:-translate-y-3 z-10" : ""
                 }`}
                 style={{
@@ -324,12 +387,12 @@ const PricingPage = () => {
                   </div>
                 )}
 
-                {/* Bubbles */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {/* Bubbles (small & subtle, clipped to card) */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
                   {BUBBLES.map((_, b) => {
-                    const size = 10 + ((b * 7) % 22);
-                    const left = (b * 37) % 90;
-                    const delay = (b * 0.7) % 5;
+                    const size = 3 + ((b * 2) % 5); // 3px - 7px tiny bubbles
+                    const left = (b * 13) % 95;
+                    const delay = (b * 0.4) % 6;
                     return (
                       <span
                         key={b}
@@ -341,7 +404,7 @@ const PricingPage = () => {
                           bottom: `-${size}px`,
                           background: p.bubbleColor,
                           animationDelay: `${delay}s`,
-                          animationDuration: `${4.5 + (b % 3)}s`,
+                          animationDuration: `${5 + (b % 4)}s`,
                         }}
                       />
                     );
@@ -448,31 +511,48 @@ const PricingPage = () => {
                 "radial-gradient(ellipse at top right, rgba(255,215,0,0.12), transparent 55%), radial-gradient(ellipse at bottom left, rgba(255,215,0,0.08), transparent 60%)",
             }}
           />
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-            <div className="max-w-xl">
-              <span className="inline-block text-[11px] font-bold tracking-[0.2em] px-3 py-1 rounded-full bg-white/5 border border-[#FFD700]/30 text-[#FFD700] mb-4">
-                ENTERPRISE
-              </span>
-              <h3
-                className="font-black text-white leading-tight"
-                style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)" }}
+          <div className="relative z-10 flex flex-col gap-8">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
+              <div className="max-w-xl">
+                <span className="inline-block text-[11px] font-bold tracking-[0.2em] px-3 py-1 rounded-full bg-white/5 border border-[#FFD700]/30 text-[#FFD700] mb-4">
+                  ENTERPRISE
+                </span>
+                <h3
+                  className="font-black text-white leading-tight"
+                  style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)" }}
+                >
+                  Built for organizations <span className="text-[#FFD700]">at scale</span>.
+                </h3>
+                <p className="mt-4 text-white/65 text-base leading-relaxed">
+                  Custom MC allocation, dedicated infrastructure, advanced security (SOC2, GDPR), SLA guarantees, and a dedicated account manager.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate("/enterprise")}
+                className="shrink-0 px-8 py-4 rounded-2xl font-bold text-sm sm:text-base text-black transition-transform active:scale-[0.98]"
+                style={{
+                  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 60%, #FFD700 100%)",
+                  boxShadow: "0 10px 30px rgba(255,215,0,0.35)",
+                }}
               >
-                Built for organizations <span className="text-[#FFD700]">at scale</span>.
-              </h3>
-              <p className="mt-4 text-white/65 text-base leading-relaxed">
-                Custom MC allocation, dedicated infrastructure, advanced security (SOC2, GDPR), SLA guarantees, and a dedicated account manager.
-              </p>
+                Contact Sales
+              </button>
             </div>
-            <button
-              onClick={() => navigate("/enterprise")}
-              className="shrink-0 px-8 py-4 rounded-2xl font-bold text-sm sm:text-base text-black transition-transform active:scale-[0.98]"
-              style={{
-                background: "linear-gradient(135deg, #FFD700 0%, #FFA500 60%, #FFD700 100%)",
-                boxShadow: "0 10px 30px rgba(255,215,0,0.35)",
-              }}
-            >
-              Contact Sales
-            </button>
+
+            {/* Enterprise full feature list */}
+            <div>
+              <h4 className="text-white font-bold text-sm tracking-[0.18em] uppercase mb-5">
+                Enterprise Plan Features
+              </h4>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                {ENTERPRISE_FEATURES.map((f) => (
+                  <li key={f} className="flex items-start gap-3 text-white/80 text-sm leading-relaxed">
+                    <Check className="w-4 h-4 mt-0.5 shrink-0 text-[#FFD700]" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </motion.div>
       </section>
