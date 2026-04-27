@@ -2934,7 +2934,7 @@ serve(async (req) => {
     // ==================== رسائل نصية / وسائط ====================
     if (message) {
       const chatId = message.chat.id;
-      const text = message.text;
+      const text = message.text as string | undefined;
 
       if (text === "/start") {
         await clearSession(sb, chatId);
@@ -3418,7 +3418,7 @@ serve(async (req) => {
         const input = text.trim();
 
         if (action === "ps_img_styles") {
-          const styles = input.split(",").map(s => s.trim()).filter(Boolean);
+          const styles = input.split(",").map((s: string) => s.trim()).filter(Boolean);
           const s = await getPageSettings(sb, "images");
           (s as any).styles = styles;
           await savePageSettings(sb, "images", s);
@@ -3431,7 +3431,7 @@ serve(async (req) => {
         }
 
         if (action === "ps_img_aspects") {
-          const aspects = input.split(",").map(s => s.trim()).filter(Boolean);
+          const aspects = input.split(",").map((s: string) => s.trim()).filter(Boolean);
           const s = await getPageSettings(sb, "images");
           (s as any).aspectRatios = aspects;
           await savePageSettings(sb, "images", s);
@@ -3444,7 +3444,7 @@ serve(async (req) => {
         }
 
         if (action === "ps_vid_aspects") {
-          const aspects = input.split(",").map(s => s.trim()).filter(Boolean);
+          const aspects = input.split(",").map((s: string) => s.trim()).filter(Boolean);
           const s = await getPageSettings(sb, "videos");
           (s as any).aspectRatios = aspects;
           await savePageSettings(sb, "videos", s);
@@ -3457,7 +3457,7 @@ serve(async (req) => {
         }
 
         if (action === "ps_vid_durations") {
-          const durations = input.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          const durations = input.split(",").map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n));
           const s = await getPageSettings(sb, "videos");
           (s as any).durations = durations;
           await savePageSettings(sb, "videos", s);
@@ -3470,7 +3470,7 @@ serve(async (req) => {
         }
 
         if (action === "ps_vid_resolutions") {
-          const resolutions = input.split(",").map(s => s.trim()).filter(Boolean);
+          const resolutions = input.split(",").map((s: string) => s.trim()).filter(Boolean);
           const s = await getPageSettings(sb, "videos");
           (s as any).resolutions = resolutions;
           await savePageSettings(sb, "videos", s);
@@ -3658,7 +3658,7 @@ serve(async (req) => {
       }
 
       if (session?.oauthStep === "awaiting_uri" && text && session.oauthAppName) {
-        const uris = text.trim().split("\n").map(u => u.trim()).filter(u => u.length > 0);
+        const uris = text.trim().split("\n").map((u: string) => u.trim()).filter((u: string) => u.length > 0);
         const clientId = `megsy_${generateId(24)}`;
         const clientSecret = generateId(48);
         const secretHash = await hashSecret(clientSecret);
@@ -3707,7 +3707,7 @@ serve(async (req) => {
       }
 
       if (session?.oauthStep === "edit_uri" && text && session.oauthAppId) {
-        const uris = text.trim().split("\n").map(u => u.trim()).filter(u => u.length > 0);
+        const uris = text.trim().split("\n").map((u: string) => u.trim()).filter((u: string) => u.length > 0);
         await sb.from("oauth_clients").update({ redirect_uris: uris }).eq("id", session.oauthAppId);
         await clearSession(sb, chatId);
         await tg(BOT_TOKEN, "sendMessage", {
@@ -3972,7 +3972,7 @@ async function showUsersPage(sb: any, token: string, chatId: number, msgId: numb
     return;
   }
 
-  const rows: { text: string; callback_data: string }[][] = users.map(u => [{
+  const rows: { text: string; callback_data: string }[][] = users.map((u: any) => [{
     text: `${u.display_name || "مستخدم"} — ${Number(u.credits).toFixed(0)} MC (${u.plan})`,
     callback_data: `uview_${u.id}`,
   }]);
