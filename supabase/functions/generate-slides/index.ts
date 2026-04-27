@@ -231,7 +231,7 @@ Rules:
   if (!Array.isArray(outline.slides) || outline.slides.length === 0) {
     outline.slides = [{ type: "cover", title: topic }, { type: "closing", title: "Thank You" }];
   }
-  return outline;
+  return { ...outline, slides: outline.slides };
 }
 
 /* ============================================================
