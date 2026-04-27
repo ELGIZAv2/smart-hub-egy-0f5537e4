@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Building2 } from "lucide-react";
+import { ArrowLeft, Check, Building2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import FancyButton from "@/components/FancyButton";
 
 const plans = [
