@@ -180,14 +180,18 @@ const PAYMENT_METHODS: { name: string; src: string }[] = [
 const PaymentIcons = () => (
   <div className="flex flex-wrap items-center justify-center gap-3">
     {PAYMENT_METHODS.map((p) => (
-      <img
+      <div
         key={p.name}
-        src={p.src}
-        alt={p.name}
         title={p.name}
-        loading="lazy"
-        className="h-9 w-auto rounded-md shadow-sm"
-      />
+        className="h-10 w-16 rounded-lg border border-neutral-200 bg-white shadow-sm flex items-center justify-center px-2"
+      >
+        <img
+          src={p.src}
+          alt={p.name}
+          loading="lazy"
+          className="max-h-6 max-w-full object-contain"
+        />
+      </div>
     ))}
   </div>
 );
