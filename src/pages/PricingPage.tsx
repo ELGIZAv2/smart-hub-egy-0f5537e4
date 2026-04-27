@@ -169,12 +169,12 @@ const ENTERPRISE_FEATURES: string[] = [
 ];
 
 const PAYMENT_METHODS: { name: string; src: string }[] = [
-  { name: "Visa",             src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/visa.svg" },
-  { name: "Mastercard",       src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/mastercard.svg" },
-  { name: "American Express", src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/amex.svg" },
-  { name: "Discover",         src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/discover.svg" },
-  { name: "Apple Pay",        src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/applepay.svg" },
-  { name: "UnionPay",         src: "https://cdn.jsdelivr.net/gh/aaronfagan/svg-credit-card-payment-icons@main/flat-rounded/unionpay.svg" },
+  { name: "Visa",             src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/visa.svg" },
+  { name: "Mastercard",       src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/mastercard.svg" },
+  { name: "American Express", src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/amex.svg" },
+  { name: "Discover",         src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/discover.svg" },
+  { name: "Apple Pay",        src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/apple-pay.svg" },
+  { name: "UnionPay",         src: "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/unionpay.svg" },
 ];
 
 const PaymentIcons = () => (
