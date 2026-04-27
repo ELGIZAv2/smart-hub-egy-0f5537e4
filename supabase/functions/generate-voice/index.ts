@@ -188,7 +188,7 @@ async function handleTTS(supabase: any, lemonKey: any, prompt: string, settings:
         const ct = orResp.headers.get("content-type") || "";
         if (ct.includes("audio") || ct.includes("octet-stream")) {
           const buf = await orResp.arrayBuffer();
-          return { success: true, url: `data:audio/mp3;base64,${base64Encode(new Uint8Array(buf))}`, model: model_id };
+          return { success: true, url: `data:audio/mp3;base64,${base64Encode(buf)}`, model: model_id };
         }
         const data = await orResp.json();
         const url = data.url || data.audio_url || data.output?.url;
@@ -229,7 +229,7 @@ async function handleTTS(supabase: any, lemonKey: any, prompt: string, settings:
     const ct = resp.headers.get("content-type") || "";
     if (ct.includes("audio") || ct.includes("octet-stream")) {
       const buf = await resp.arrayBuffer();
-      return { success: true, url: `data:audio/mp3;base64,${base64Encode(new Uint8Array(buf))}`, model: model_id };
+      return { success: true, url: `data:audio/mp3;base64,${base64Encode(buf)}`, model: model_id };
     }
 
     const data = await resp.json();
