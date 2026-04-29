@@ -1,87 +1,117 @@
+# Plan: Site-wide UX Fixes + Pricing Page Polish
 
-# إعادة تصميم صفحة الأسعار + تحديث ربط Polar
+Six related fixes across the whole site. All scoped, no visual redesign.
 
-## 1) إعادة تصميم `/pricing` بالكامل (`src/pages/PricingPage.tsx`)
+---
 
-**الهيكل الجديد:**
+## 1. No horizontal scroll on any page (mobile-first)
 
-- خلفية بيضاء نقية `#FFFFFF` للصفحة كلها (override للثيم الداكن في هذه الصفحة فقط).
-- Hero:
-  - Headline: **One AI Platform. Infinite Possibilities.** — Extra Bold, حجم كبير جداً (`text-5xl md:text-7xl`).
-  - Subheadline: **Simple, transparent pricing. No hidden fees. Pay only for real usage across the entire AI ecosystem.** — رمادي داكن احترافي.
-- Toggle Monthly/Yearly:
-  - إطار `bg-[#F1F5F9]` rounded-full.
-  - النشط: `bg-[#D1FAE5]` + نص أسود Semi-Bold.
-  - عند Yearly: badge بحدود سوداء رفيعة بنص: **20% off on yearly**.
+**Goal:** every page fits within the viewport width — no left/right scroll, ever.
 
-**البطاقات (4 بطاقات Solid Color edge-to-edge، rounded-[24px]):**
+**Approach (global, one place to fix all pages):**
+- In `src/index.css`, add a global guard:
+  ```css
+  html, body, #root { overflow-x: hidden; max-width: 100vw; }
+  img, video, svg { max-width: 100%; height: auto; }
+  ```
+- In `src/pages/PricingPage.tsx`, the root `<div className="min-h-screen ...">` gets `overflow-x-hidden w-full`, and the hero `<h2>` adjusts `clamp()` minimum so it never exceeds 360px viewport (reduce min from `2.25rem` to `1.85rem`, and add `break-words` / `px-2`).
+- Audit known wide offenders by searching for `whitespace-nowrap`, fixed pixel widths, and marquees outside `overflow-hidden` containers — wrap any found culprits.
 
-| Plan | BG | Text | Label | CTA |
-|---|---|---|---|---|
-| Starter | `#D1FAE5` | `#1A1A1A` | BEST FOR BEGINNERS (glass) | زر أسود `#000` نص أبيض — Get Started |
-| Pro | `#2563EB` | `#FFFFFF` | PROFESSIONAL CHOICE (glass) | زر أبيض نص أزرق — Get Started |
-| Elite | `#7C3AED` | `#FFFFFF` | MOST POPULAR (فوق البطاقة) | زر ذهبي `#FFD700` نص أسود — Get Started |
-| Business | `#D97706` | `#FFFFFF` | BEST VALUE (glass) | زر أبيض نص ذهبي — Get Started |
+This is one CSS rule + a couple of targeted tweaks; it solves the issue globally without touching every page.
 
-- بطاقة Elite مرفوعة `translate-y-[-12px]` مع Outer Glow بنفسجي (`shadow-[0_0_60px_rgba(124,58,237,0.5)]`).
-- داخل كل بطاقة: 6–8 فقاعات CSS متحركة (bottom→top, 5s loop) بألوان متناسقة مع البطاقة.
-- Enterprise card كاملة العرض تحت البطاقات: خلفية `#0F0F0F` matte، نص أبيض بإضاءات ذهبية، زر تدرج ذهبي **Contact Sales**.
+---
 
-**Responsive:**
-- Mobile: Stacked عمودي، touch-friendly (py-4 على الأزرار).
-- Tablet: `md:grid-cols-2`.
-- Desktop: `lg:grid-cols-4`.
-- Fluid typography باستخدام `clamp()` للعناوين.
+## 2. Back button returns to previous page (not home)
 
-**Footer داخل الصفحة:**
-- روابط: Terms | Privacy | Cookie Policy.
-- Copyright: © 2026 Megsy AI. All Rights Reserved.
-- صف أيقونات دفع موحدة اللون (Visa, Mastercard, Amex, Discover, Apple Pay, UnionPay) — SVG inline.
+**Current state:** Most pages already use `navigate(-1)` (e.g. `PricingPage`, `DeleteAccountPage`). A few use hard-coded routes like `/settings/profile`.
 
-**Final CTA Section:**
-- Headline: **Ready to Own the Future?**
-- Button: ذهبي متوهج `#FFD700` بنص: **Start Your Empire Now** → ينقل لـ `/auth`.
-
-## 2) تحديث Polar Product IDs (Frontend)
-
-استبدال `productMap` في `PricingPage.tsx` و `PRODUCT_IDS` في `src/components/landing/PricingPreview.tsx` بالـ IDs الجديدة:
-
-| Plan | Monthly | Yearly |
-|---|---|---|
-| Starter | `c3483e63-7dbd-4214-bec2-894926f5590a` | `729d9b3d-1acc-4d58-8a39-49ab63330674` |
-| Pro | `8da537b0-7192-46cd-b38a-bbe341febdf7` | `bcbd0c61-a5bd-4934-872a-7413324a330c` |
-| Elite | `d212d1e6-4958-4329-a1f4-5b460886fc9d` | `0b8f0aa3-57a7-4dd5-9ab3-ce68cebec7f6` |
-| Business | `1fb17ce3-5bb4-473e-8c67-e50a8ce927dd` | `39752b51-d4cd-4a03-9718-bb2b95f71084` |
-
-- تفعيل زر **Business** ليفتح Polar Checkout بدلاً من التحويل لـ `/enterprise`.
-- زر **Enterprise** فقط هو الذي يفتح `/enterprise` (Contact Sales).
-
-## 3) تحديث `supabase/functions/polar-webhook/index.ts`
-
-استبدال `PRODUCT_MAP` بالكامل بالـ 8 IDs الجديدة + كميات MC الصحيحة:
-
+**Approach:** Standardize back behavior — replace hard-coded back navigations with `navigate(-1)` with a safe fallback when there's no history (e.g. user landed via deep link):
 ```ts
-const PRODUCT_MAP = {
-  "c3483e63-...": { plan: "starter",  credits: 80   },
-  "729d9b3d-...": { plan: "starter",  credits: 880  },
-  "8da537b0-...": { plan: "pro",      credits: 280  },
-  "bcbd0c61-...": { plan: "pro",      credits: 2480 },
-  "d212d1e6-...": { plan: "elite",    credits: 480  },
-  "0b8f0aa3-...": { plan: "elite",    credits: 4980 },
-  "1fb17ce3-...": { plan: "business", credits: 1480 },
-  "39752b51-...": { plan: "business", credits: 12980 },
+const goBack = () => {
+  if (window.history.length > 1) navigate(-1);
+  else navigate("/"); // or contextual fallback
 };
 ```
+Apply to back buttons in: `DeleteAccountPage`, `ChangeEmailPage`, `ChangePasswordPage`, `ResetPasswordPage`, `BillingPage`, `BillingSuccessPage`, `WithdrawPage`, `NotificationsPage`, `NotificationSettingsPage`, `LanguagePage`, `IntegrationsPage`, settings sub-pages, and any tool page that hardcodes a parent route.
 
-ثم إعادة نشر الويبهوك (`deploy_edge_functions`).
+(Hub-return constraint from memory still applies for tool back buttons — for those pages, fallback stays `/images`, `/videos`, etc.)
 
-## 4) تحديث `PricingPreview` (Landing)
+---
 
-- إضافة Business لقائمة `PRODUCT_IDS` لتفعيل زر Get Started.
-- لا تغيير في تصميم الـ Landing — التعديل فقط على ربط الـ IDs.
+## 3. Pages always open scrolled to the top
 
-## ملاحظات تقنية
+**Approach:** Add a `ScrollToTop` component mounted once inside `<BrowserRouter>` in `src/App.tsx`:
+```tsx
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname]);
+  return null;
+}
+```
+Render `<ScrollToTop />` right after `<BrowserRouter>` opens. Single fix, applies to every route.
 
-- صفحة الأسعار ستفرض white background عبر wrapper `<div className="bg-white min-h-screen">` بغض النظر عن ثيم التطبيق.
-- الفقاعات CSS-only (لا حاجة لـ JS) باستخدام `@keyframes` في Tailwind arbitrary values أو inline `<style>`.
-- لن نلمس أي تصميم آخر في المنصة (التزاماً بـ memory: `constraints/performance-optimization`).
+---
+
+## 4. Page refresh stays on the current page (not redirected home)
+
+**Investigation finding:** `BrowserRouter` already preserves the URL on refresh. The reported issue happens because:
+- `LandingPage` (route `/`) auto-redirects authenticated users to `/chat` — fine.
+- But some routes may redirect during loading flicker. The real concern: the user sees the landing page briefly because the `LazyFallback` is plain background while auth is checked.
+
+**Approach:** No router change needed (Lovable hosting already has SPA fallback per docs). Verify by:
+- Confirming `BrowserRouter` is used (it is, line 6 of App.tsx).
+- Ensuring `ProtectedRoute` does not `Navigate` to `/` — it currently navigates to `/auth` for unauthenticated users, which is correct.
+- Any page that currently does `navigate("/")` on mount/error gets reviewed and removed if unjustified.
+
+If a specific page is found redirecting home on refresh, fix it in place. Currently no such offender is identified — the perceived behavior likely comes from the auth redirect on `/`. No code change unless we find a real culprit during implementation.
+
+---
+
+## 5. Pricing page background follows the theme
+
+**Current state:** `PricingPage` is hard-coded to `bg-white text-neutral-900` (always light), regardless of the user's theme.
+
+**Approach:**
+- Replace `bg-white text-neutral-900` on the root `<div>` with `bg-background text-foreground`.
+- Replace footer `bg-white border-neutral-200` with `bg-background border-border`.
+- Replace `text-neutral-*` classes used for chrome (top bar, footer) with `text-muted-foreground` / `text-foreground` so they adapt.
+- The colored plan cards (green/blue/purple/amber) and the Enterprise dark card stay as-is — those are intentional brand surfaces.
+- Hero heading: keep gradient text, but base color uses `text-foreground` instead of `text-neutral-900`.
+
+Result: light theme looks the same; dark/ocean/sunset themes get a matching background instead of jarring white.
+
+---
+
+## 6. "Start Your Empire Now" button signs the user out
+
+**Root cause:** Line 564 of `PricingPage.tsx` — the button calls `navigate("/auth")` unconditionally. The `/auth` page on mount likely calls `supabase.auth.signOut()` for guests or has a side effect that clears the session for already-logged-in users.
+
+**Fix:** Make the CTA context-aware:
+```ts
+const handleStart = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  navigate(session ? "/chat" : "/auth?redirect=/chat");
+};
+```
+- Logged-in users go straight to `/chat` (no sign-out, no auth page).
+- Guests go to `/auth` with redirect back to `/chat` after login.
+
+Also briefly audit `AuthPage` to confirm whether it indeed signs users out on mount; if so, gate that behavior so it only runs when explicitly requested (e.g. `?logout=1`), not on every visit.
+
+---
+
+## Files to edit
+
+- `src/index.css` — global `overflow-x` guard
+- `src/App.tsx` — add `<ScrollToTop />` inside `<BrowserRouter>`
+- `src/pages/PricingPage.tsx` — theme-aware background, fix Start Empire CTA, mobile clamp tweak
+- `src/pages/AuthPage.tsx` — audit and conditionally gate any auto sign-out on mount
+- Back-button standardization across ~10 settings/tool pages (small `navigate(-1)` swap with fallback)
+
+## Out of scope
+
+- Redesign of any page
+- Changing colored plan cards or Enterprise card surfaces
+- Touching tool back-button hub fallback rule (kept per memory)
