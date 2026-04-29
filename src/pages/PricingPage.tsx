@@ -215,13 +215,13 @@ const PricingPage = () => {
       session = refreshed.session;
     }
     if (!session?.access_token) {
+      setLoadingTier(null);
       await supabase.auth.signOut().catch(() => {});
       toast.error("Please sign in again to continue.");
       navigate("/auth?redirect=/pricing");
       return;
     }
 
-    setLoadingTier(tier);
     try {
       const { data, error } = await supabase.functions.invoke("polar-checkout", {
         body: { product_id, plan: tier },
