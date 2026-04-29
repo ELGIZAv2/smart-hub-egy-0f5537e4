@@ -203,24 +203,44 @@ const PricingPage = () => {
 
   const handleSubscribe = async (tier: PlanTier) => {
     const product_id = isYearly ? PRODUCT_MAP[tier].yearly : PRODUCT_MAP[tier].monthly;
-    const { data: { session } } = await supabase.auth.getSession();
+
+    // Validate session and try to refresh if expired — prevents 502 from stale tokens
+    let { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      session = refreshed.session;
+    }
+    if (!session?.access_token) {
+      await supabase.auth.signOut().catch(() => {});
+      toast.error("Please sign in again to continue.");
       navigate("/auth?redirect=/pricing");
       return;
     }
+
     setLoadingTier(tier);
     try {
       const { data, error } = await supabase.functions.invoke("polar-checkout", {
         body: { product_id, plan: tier },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (error) throw error;
+      if (error) {
+        // Auth issue → force re-login instead of showing a confusing gateway error
+        const msg = (error as any)?.message?.toLowerCase?.() || "";
+        if (msg.includes("unauthorized") || msg.includes("401") || msg.includes("jwt")) {
+          await supabase.auth.signOut().catch(() => {});
+          toast.error("Your session expired. Please sign in again.");
+          navigate("/auth?redirect=/pricing");
+          return;
+        }
+        throw error;
+      }
       if (data?.url) {
         window.location.href = data.url;
       } else {
         throw new Error(data?.error || "Checkout failed");
       }
     } catch (e: any) {
-      toast.error(e.message || "Failed to open checkout");
+      toast.error(e?.message || "Failed to open checkout. Please try again.");
       setLoadingTier(null);
     }
   };
