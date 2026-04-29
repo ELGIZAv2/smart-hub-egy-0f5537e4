@@ -451,8 +451,8 @@ const PricingPage = () => {
                   {/* CTA */}
                   <button
                     onClick={() => handleSubscribe(p.tier)}
-                    disabled={loadingTier === p.tier}
-                    className="mt-6 w-full py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all active:scale-[0.98] disabled:opacity-60"
+                    disabled={loadingTier !== null}
+                    className="mt-6 w-full py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
                       background: p.ctaBg,
                       color: p.ctaText,
