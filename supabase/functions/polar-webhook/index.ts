@@ -112,45 +112,39 @@ Deno.serve(async (req) => {
 
         const productId = extractProductId(data);
         const mapping = productId ? PRODUCT_MAP[productId] : null;
-
-        // Idempotency: skip if this order already credited
         const orderId = data.id || data.order_id;
-        if (orderId) {
-          const { data: existing } = await supabase
-            .from("payment_events")
-            .select("id")
-            .eq("event_type", "order.credits.added")
-            .eq("polar_event_id", orderId)
-            .maybeSingle();
-          if (existing) break;
+
+        if (!orderId) {
+          console.warn("order event missing id; skipping to avoid unsafe credit");
+          break;
         }
 
-        if (mapping) {
-          // Add credits via RPC
-          const { error: credErr } = await supabase.rpc("add_credits", {
-            p_user_id: userId,
-            p_amount: mapping.credits,
-            p_description: `Subscription: ${mapping.plan} (Polar order ${orderId || "n/a"})`,
-          });
-          if (credErr) console.error("add_credits failed:", credErr);
-
-          // Update plan
-          await supabase.from("profiles").update({ plan: mapping.plan }).eq("id", userId);
-
-          // Log idempotency marker
-          await supabase.from("payment_events").insert({
-            user_id: userId,
-            event_type: "order.credits.added",
-            polar_event_id: orderId || null,
-            payload: { product_id: productId, plan: mapping.plan, credits: mapping.credits },
-          });
-        } else {
+        if (!mapping) {
           console.warn("order.paid: no PRODUCT_MAP entry for product_id:", productId);
           await supabase.from("payment_events").insert({
             user_id: userId,
-            event_type: "order.paid.processed",
-            payload: { amount: data.amount, currency: data.currency, product_id: productId, unmapped: true },
+            event_type: "order.paid.unmapped",
+            polar_event_id: orderId,
+            payload: { product_id: productId, amount: data.amount, currency: data.currency },
           });
+          break;
+        }
+
+        // Atomic, idempotent: unique constraint on polar_order_id guarantees once-only crediting
+        const { data: result, error: rpcErr } = await supabase.rpc("process_polar_order", {
+          p_order_id: orderId,
+          p_user_id: userId,
+          p_product_id: productId,
+          p_plan: mapping.plan,
+          p_credits: mapping.credits,
+        });
+
+        if (rpcErr) {
+          console.error("process_polar_order failed:", rpcErr);
+        } else if ((result as any)?.duplicate) {
+          console.log("Duplicate order ignored:", orderId);
+        } else {
+          console.log("Credited order:", orderId, "→", mapping.credits, "MC");
         }
         break;
       }
