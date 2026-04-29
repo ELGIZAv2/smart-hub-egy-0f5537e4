@@ -1174,6 +1174,36 @@ export type Database = {
         }
         Relationships: []
       }
+      processed_orders: {
+        Row: {
+          created_at: string
+          credits: number
+          id: string
+          plan: string | null
+          polar_order_id: string
+          product_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits: number
+          id?: string
+          plan?: string | null
+          polar_order_id: string
+          product_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          id?: string
+          plan?: string | null
+          polar_order_id?: string
+          product_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2580,6 +2610,16 @@ export type Database = {
       owns_conversation: {
         Args: { p_conversation_id: string }
         Returns: boolean
+      }
+      process_polar_order: {
+        Args: {
+          p_credits: number
+          p_order_id: string
+          p_plan: string
+          p_product_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       update_profile_safe: {
         Args: {

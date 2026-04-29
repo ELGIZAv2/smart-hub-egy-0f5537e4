@@ -202,6 +202,10 @@ const PricingPage = () => {
   const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
 
   const handleSubscribe = async (tier: PlanTier) => {
+    // Hard double-click guard — block if ANY tier is already processing
+    if (loadingTier) return;
+    setLoadingTier(tier);
+
     const product_id = isYearly ? PRODUCT_MAP[tier].yearly : PRODUCT_MAP[tier].monthly;
 
     // Validate session and try to refresh if expired — prevents 502 from stale tokens
@@ -211,13 +215,13 @@ const PricingPage = () => {
       session = refreshed.session;
     }
     if (!session?.access_token) {
+      setLoadingTier(null);
       await supabase.auth.signOut().catch(() => {});
       toast.error("Please sign in again to continue.");
       navigate("/auth?redirect=/pricing");
       return;
     }
 
-    setLoadingTier(tier);
     try {
       const { data, error } = await supabase.functions.invoke("polar-checkout", {
         body: { product_id, plan: tier },
@@ -447,8 +451,8 @@ const PricingPage = () => {
                   {/* CTA */}
                   <button
                     onClick={() => handleSubscribe(p.tier)}
-                    disabled={loadingTier === p.tier}
-                    className="mt-6 w-full py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all active:scale-[0.98] disabled:opacity-60"
+                    disabled={loadingTier !== null}
+                    className="mt-6 w-full py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
                       background: p.ctaBg,
                       color: p.ctaText,
