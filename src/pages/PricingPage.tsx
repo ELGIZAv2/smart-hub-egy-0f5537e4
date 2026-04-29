@@ -245,8 +245,13 @@ const PricingPage = () => {
     }
   };
 
+  const handleStartEmpire = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    navigate(session ? "/chat" : "/auth?redirect=/chat");
+  };
+
   return (
-    <div className="min-h-screen bg-white text-neutral-900">
+    <div className="min-h-screen w-full overflow-x-hidden bg-background text-foreground">
       {/* Bubble + utility CSS scoped to page */}
       <style>{`
         @keyframes pricing-bubble-rise {
@@ -271,8 +276,8 @@ const PricingPage = () => {
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 sm:px-6 py-4 max-w-7xl mx-auto">
         <button
-          onClick={() => navigate(-1)}
-          className="text-neutral-500 hover:text-neutral-900 transition-colors"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
+          className="text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Back"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -286,8 +291,8 @@ const PricingPage = () => {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
-          className="font-black tracking-tight leading-[1.02] text-neutral-900"
-          style={{ fontSize: "clamp(2.25rem, 6vw, 4.75rem)", letterSpacing: "-0.03em" }}
+          className="font-black tracking-tight leading-[1.05] text-foreground break-words"
+          style={{ fontSize: "clamp(1.75rem, 6vw, 4.75rem)", letterSpacing: "-0.03em" }}
         >
           One AI Platform.
           <br />
@@ -299,7 +304,7 @@ const PricingPage = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="mx-auto mt-5 max-w-2xl font-medium text-neutral-600"
+          className="mx-auto mt-5 max-w-2xl font-medium text-muted-foreground"
           style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.125rem)" }}
         >
           Simple, transparent pricing. No hidden fees. Pay only for real usage across the entire AI ecosystem.
@@ -551,7 +556,7 @@ const PricingPage = () => {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="font-black tracking-tight text-neutral-900"
+          className="font-black tracking-tight text-foreground"
           style={{ fontSize: "clamp(2rem, 5vw, 3.75rem)", letterSpacing: "-0.025em" }}
         >
           Ready to Own the Future?
@@ -561,7 +566,7 @@ const PricingPage = () => {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          onClick={() => navigate("/auth")}
+          onClick={handleStartEmpire}
           className="mt-8 inline-block px-10 py-4 sm:px-12 sm:py-5 rounded-2xl text-black font-extrabold text-base sm:text-lg"
           style={{
             background: "linear-gradient(135deg, #FFD700 0%, #FFC400 50%, #FFD700 100%)",
@@ -573,15 +578,15 @@ const PricingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-neutral-200 bg-white">
+      <footer className="border-t border-border bg-background">
         <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col items-center gap-6">
           <PaymentIcons />
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-neutral-500">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
             <a
               href="https://terms.megsyai.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-neutral-900 transition-colors"
+              className="hover:text-foreground transition-colors"
             >
               Terms of Service
             </a>
@@ -590,7 +595,7 @@ const PricingPage = () => {
               href="https://privacy.megsyai.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-neutral-900 transition-colors"
+              className="hover:text-foreground transition-colors"
             >
               Privacy Policy
             </a>
@@ -601,12 +606,12 @@ const PricingPage = () => {
                 e.preventDefault();
                 navigate("/cookies");
               }}
-              className="hover:text-neutral-900 transition-colors"
+              className="hover:text-foreground transition-colors"
             >
               Cookie Policy
             </a>
           </div>
-          <p className="text-xs text-neutral-400">© 2026 Megsy AI. All Rights Reserved.</p>
+          <p className="text-xs text-muted-foreground/70">© 2026 Megsy AI. All Rights Reserved.</p>
         </div>
       </footer>
     </div>
