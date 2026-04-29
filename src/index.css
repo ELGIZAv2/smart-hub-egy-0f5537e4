@@ -4,6 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global: prevent any horizontal scroll site-wide */
+html, body, #root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+img, video, svg {
+  max-width: 100%;
+}
+
 /* Allow text selection globally, protect UI elements */
 * {
   -webkit-user-select: text;
