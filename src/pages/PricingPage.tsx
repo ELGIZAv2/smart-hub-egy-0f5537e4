@@ -202,6 +202,10 @@ const PricingPage = () => {
   const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
 
   const handleSubscribe = async (tier: PlanTier) => {
+    // Hard double-click guard — block if ANY tier is already processing
+    if (loadingTier) return;
+    setLoadingTier(tier);
+
     const product_id = isYearly ? PRODUCT_MAP[tier].yearly : PRODUCT_MAP[tier].monthly;
 
     // Validate session and try to refresh if expired — prevents 502 from stale tokens
