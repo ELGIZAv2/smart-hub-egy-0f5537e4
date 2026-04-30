@@ -12,6 +12,7 @@ import TranslationWrapper from "./components/TranslationWrapper";
 
 // Critical pages — eagerly loaded
 import AuthPage from "./pages/AuthPage";
+import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 import ChatPage from "./pages/ChatPage";
 import LandingPage from "./pages/LandingPage";
 
@@ -220,6 +221,7 @@ const App = () => {
               <Suspense fallback={<LazyFallback />}>
                 <Routes>
                   <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />
                   <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/share/:shareId" element={<SharedChatPage />} />
