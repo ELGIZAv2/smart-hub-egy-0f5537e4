@@ -603,7 +603,72 @@ const CodeWorkspace = () => {
           )}
         </AnimatePresence>
 
-        {/* Chat area */}
+        {/* + bottom sheet */}
+        <AnimatePresence>
+          {plusMenuOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setPlusMenuOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+                <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
+                  <ImageIcon className="w-5 h-5" /> Attach image
+                </button>
+                <button onClick={() => handleFilePick("file")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
+                  <Paperclip className="w-5 h-5" /> Attach file
+                </button>
+                <button onClick={() => handleFilePick("camera")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
+                  <Camera className="w-5 h-5" /> Take photo
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ... bottom sheet — integrations */}
+        <AnimatePresence>
+          {moreMenuOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setMoreMenuOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+                <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5">Integrations</p>
+                <button
+                  onClick={() => { setMoreMenuOpen(false); setSupabaseModalOpen(true); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Database className="w-5 h-5 text-emerald-500" /> Connect Supabase
+                </button>
+                <button
+                  onClick={handleGithubPush}
+                  disabled={githubBusy}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
+                >
+                  {githubBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
+                  {githubBusy ? "Pushing to GitHub..." : "Push to GitHub"}
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
         <div className="flex-1 overflow-hidden pt-14 pb-44 min-h-0">
           <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} onSubmitApiKey={handleApiKeySubmit} />
         </div>
