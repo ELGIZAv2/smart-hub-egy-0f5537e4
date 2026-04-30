@@ -605,7 +605,7 @@ const CodeWorkspace = () => {
 
         {/* Chat area */}
         <div className="flex-1 overflow-hidden pt-14 pb-44 min-h-0">
-          <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} />
+          <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} onSubmitApiKey={handleApiKeySubmit} />
         </div>
 
         {/* Preview moved to top-right header */}
