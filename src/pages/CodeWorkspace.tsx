@@ -238,6 +238,7 @@ const CodeWorkspace = () => {
       const decoder = new TextDecoder();
       let buffer = "";
       const seenFiles = new Set<string>();
+      let generatedFiles: Record<string, string> = {};
 
       while (true) {
         const { done, value } = await reader.read();
@@ -256,9 +257,12 @@ const CodeWorkspace = () => {
               seenFiles.add(ev.path);
               await addStep("creating", "Creating", ev.path);
             } else if (ev.type === "file_done" && ev.path) {
+              if (typeof ev.content === "string") generatedFiles[ev.path] = ev.content;
               setSteps(prev => prev.map(s =>
                 s.file === ev.path ? { ...s, status: "done" as const } : s
               ));
+            } else if (ev.type === "done" && ev.files && typeof ev.files === "object") {
+              generatedFiles = { ...generatedFiles, ...(ev.files as Record<string, string>) };
             } else if (ev.type === "verify_start") {
               await addStep("searching", "Verifying in browser");
             } else if (ev.type === "verify_done") {
@@ -279,6 +283,9 @@ const CodeWorkspace = () => {
       setMessages(prev => [...prev, { role: "assistant", content: reply, type: "build" }]);
 
       const pid = await ensureProject(msgText, wpid, convId);
+      if (pid && Object.keys(generatedFiles).length > 0) {
+        await supabase.from("projects").update({ files_snapshot: generatedFiles as any }).eq("id", pid);
+      }
 
       if (convId) {
         supabase.from("messages").insert([

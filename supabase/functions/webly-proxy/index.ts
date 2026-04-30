@@ -15,6 +15,15 @@ const corsHeaders = {
 
 const WEBLY_BASE = "https://wxphtsgezburjqoqiqqo.supabase.co/functions/v1";
 
+const sse = (payload: Record<string, unknown>) => `data: ${JSON.stringify(payload)}\n\n`;
+
+const extractHtml = (text: string, prompt: string) => {
+  const fenced = text.match(/```(?:html)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  const raw = fenced || text.trim();
+  if (/<!doctype html/i.test(raw) || /<html[\s>]/i.test(raw)) return raw;
+  return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Generated project</title><style>body{margin:0;font-family:Inter,system-ui,sans-serif;background:#08090d;color:#fff;min-height:100vh;display:grid;place-items:center;padding:32px}main{max-width:880px}h1{font-size:clamp(36px,7vw,72px);line-height:1;margin:0 0 18px}p{font-size:18px;line-height:1.7;color:#d7dae2}</style></head><body><main><h1>${prompt.replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c)).slice(0, 90)}</h1><p>${raw.replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c)).slice(0, 1200)}</p></main></body></html>`;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -43,6 +52,39 @@ Deno.serve(async (req) => {
 
       if (!upstream.ok || !upstream.body) {
         const t = await upstream.text().catch(() => "");
+        if (upstream.status === 404) {
+          const fallback = await fetch(`${WEBLY_BASE}/webly-api`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              stream: false,
+              messages: [
+                { role: "system", content: "Generate a polished production-ready single-file website. Return only complete HTML with embedded CSS and JavaScript. No markdown." },
+                { role: "user", content: body.prompt },
+              ],
+            }),
+          });
+          if (fallback.ok) {
+            const data = await fallback.json().catch(() => ({}));
+            const content = data?.choices?.[0]?.message?.content || data?.content || "";
+            const html = extractHtml(String(content), body.prompt);
+            const stream = new ReadableStream({
+              start(controller) {
+                const enc = new TextEncoder();
+                controller.enqueue(enc.encode(sse({ type: "text", delta: "Generating local preview" })));
+                controller.enqueue(enc.encode(sse({ type: "file_start", path: "/index.html" })));
+                controller.enqueue(enc.encode(sse({ type: "file_done", path: "/index.html", content: html })));
+                controller.enqueue(enc.encode(sse({ type: "done", mode: "local", files: { "/index.html": html } })));
+                controller.enqueue(enc.encode("data: [DONE]\n\n"));
+                controller.close();
+              },
+            });
+            return new Response(stream, {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+            });
+          }
+        }
         const status = upstream.status === 404 ? 404 : 502;
         const msg = upstream.status === 404
           ? "Project not found. Start a new build first."
