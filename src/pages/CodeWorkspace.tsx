@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu, ArrowUp, Plus, MoreHorizontal, Image as ImageIcon, Paperclip, Camera,
-  Loader2, Database, Github, Eye, Settings, Pencil, Coins, X, Check, Sparkles,
+  Loader2, Database, Github, Eye, Settings, Pencil, X, Check, Sparkles, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
