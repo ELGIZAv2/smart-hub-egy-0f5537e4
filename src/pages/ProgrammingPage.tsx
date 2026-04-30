@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Menu, Sparkles } from "lucide-react";
+import { ArrowUp, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/layouts/AppLayout";
 import AppSidebar from "@/components/AppSidebar";
@@ -143,7 +143,6 @@ const ProgrammingPage = () => {
             className="relative rounded-3xl border border-border/60 bg-card/80 backdrop-blur-xl shadow-xl shadow-primary/5 p-2 pl-4"
           >
             <div className="flex items-end gap-2">
-              <Sparkles className="w-5 h-5 text-primary mt-3 shrink-0" />
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
