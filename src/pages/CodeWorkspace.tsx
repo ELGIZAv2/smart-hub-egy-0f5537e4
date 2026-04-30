@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu, ArrowUp, Plus, MoreHorizontal, Image as ImageIcon, Paperclip, Camera,
-  Loader2, Database, Github, Eye, Settings, Pencil, X, Check, Sparkles, ChevronDown,
+  Loader2, Database, Github, Eye, Settings, Pencil, X, Check, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,11 @@ const BUILD_CREDIT_COST = 5;
 interface ChatMsg {
   role: "user" | "assistant" | "system";
   content: string;
-  type?: "plan" | "build" | "log" | "status" | "steps" | "timeline";
+  type?: "plan" | "build" | "log" | "status" | "steps" | "timeline" | "api_key_request";
+  meta?: { durationMs?: number; credits?: number };
+  apiKeyName?: string;
+  apiKeyDescription?: string;
+  apiKeyResolved?: boolean;
 }
 
 interface Attachment { name: string; type: "image" | "file"; data: string; }
@@ -160,16 +164,38 @@ const CodeWorkspace = () => {
     return null;
   };
 
-  // --- Capture screenshot in background ---
-  const captureScreenshot = async (pid: string, weblyId: string) => {
-    if (!userId) return;
-    // Wait a few seconds for site to be ready
-    await new Promise(r => setTimeout(r, 4000));
-    fetch(`${SUPABASE_URL}/functions/v1/webly-proxy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      body: JSON.stringify({ action: "screenshot", project_id: pid, user_id: userId, url: `${WEBLY_BASE}/webly-site/${weblyId}` }),
-    }).catch(() => {});
+  // Screenshot capture disabled — Webly fallback projects don't support it reliably.
+  const captureScreenshot = async (_pid: string, _weblyId: string) => { /* no-op */ };
+
+  // --- Persist a single message to DB ---
+  const persistMessage = async (convId: string | null, msg: ChatMsg) => {
+    if (!convId) return;
+    try {
+      await supabase.from("messages").insert({
+        conversation_id: convId,
+        role: msg.role,
+        content: msg.content,
+      } as any);
+    } catch {}
+  };
+
+  // --- Handle API key submission from inline card ---
+  const handleApiKeySubmit = async (keyName: string, keyValue: string) => {
+    if (!userId || !keyName) return;
+    try {
+      await supabase.from("code_integrations").upsert({
+        user_id: userId,
+        project_id: projectId,
+        provider: keyName,
+        config: { api_key: keyValue },
+      } as any, { onConflict: "user_id,project_id,provider" });
+      setMessages(prev => prev.map(m =>
+        m.type === "api_key_request" && m.apiKeyName === keyName ? { ...m, apiKeyResolved: true } : m
+      ));
+      toast.success(`${keyName} saved`);
+    } catch {
+      toast.error("Failed to save key");
+    }
   };
 
   // --- Send message / build ---
@@ -183,12 +209,15 @@ const CodeWorkspace = () => {
     }
 
     if (!textOverride) setInput("");
-    setMessages(prev => [...prev, { role: "user", content: msgText }]);
+    const userMsg: ChatMsg = { role: "user", content: msgText };
+    setMessages(prev => [...prev, userMsg]);
     setAttachments([]);
     setIsLoading(true);
     setSteps([]);
 
+    const startedAt = Date.now();
     const convId = await ensureConversation(msgText);
+    persistMessage(convId, userMsg);
 
     // Deduct
     if (userId) {
@@ -206,7 +235,16 @@ const CodeWorkspace = () => {
       refreshCredits();
     }
 
-    await addStep("pre_message", planMode ? "Planning your build..." : "Got it. Building now...");
+    // Pre-message: tells the user what's about to happen
+    const isAr = /[\u0600-\u06FF]/.test(msgText);
+    const preText = planMode
+      ? (isAr ? "تمام، هخطط للبناء وأبدأ على طول." : "Got it. Planning the build and starting now.")
+      : (isAr ? "تمام، بدأت الشغل دلوقتي." : "Got it. Starting the build now.");
+    const preMsg: ChatMsg = { role: "assistant", content: preText, type: "status" };
+    setMessages(prev => [...prev, preMsg]);
+    persistMessage(convId, preMsg);
+
+    await addStep("pre_message", preText);
     await addStep("thinking", "Analyzing request");
 
     // Use existing webly project id if available, else generate
@@ -267,6 +305,17 @@ const CodeWorkspace = () => {
               await addStep("searching", "Verifying in browser");
             } else if (ev.type === "verify_done") {
               await addStep("done", ev.ok ? "Verification passed" : "Fixing issues");
+            } else if (ev.type === "request_api_key" && ev.name) {
+              // Inline API key request card
+              const keyMsg: ChatMsg = {
+                role: "assistant",
+                type: "api_key_request",
+                content: `Need API key: ${ev.name}`,
+                apiKeyName: ev.name,
+                apiKeyDescription: ev.description || ev.message || "Required to continue building.",
+              };
+              setMessages(prev => [...prev, keyMsg]);
+              persistMessage(convId, keyMsg);
             }
           } catch {}
         }
@@ -276,33 +325,27 @@ const CodeWorkspace = () => {
       setHasBuilt(true);
 
       const fileCount = seenFiles.size || 1;
-      const isAr = /[\u0600-\u06FF]/.test(msgText);
+      const durationMs = Date.now() - startedAt;
       const reply = isAr
-        ? `تمام، خلصت! بنيت ${fileCount} ملف. اضغط Preview علشان تشوف الموقع.`
-        : `Done! Built ${fileCount} files. Tap Preview to see your site live.`;
-      setMessages(prev => [...prev, { role: "assistant", content: reply, type: "build" }]);
+        ? `تمام، خلصت! بنيت ${fileCount} ملف. اضغط على المعاينة فوق علشان تشوف الموقع.`
+        : `Done! Built ${fileCount} files. Open the preview to see your site live.`;
+      const replyMsg: ChatMsg = { role: "assistant", content: reply, type: "build", meta: { durationMs, credits: BUILD_CREDIT_COST } };
+      setMessages(prev => [...prev, replyMsg]);
+      persistMessage(convId, replyMsg);
 
       const pid = await ensureProject(msgText, wpid, convId);
       if (pid && Object.keys(generatedFiles).length > 0) {
         await supabase.from("projects").update({ files_snapshot: generatedFiles as any }).eq("id", pid);
       }
-
-      if (convId) {
-        supabase.from("messages").insert([
-          { conversation_id: convId, role: "user", content: msgText },
-          { conversation_id: convId, role: "assistant", content: reply },
-        ]);
-      }
-
-      // Background screenshot
-      if (pid) captureScreenshot(pid, wpid);
     } catch (e) {
       completeAllSteps();
-      const isAr = /[\u0600-\u06FF]/.test(msgText);
+      const durationMs = Date.now() - startedAt;
       const fallback = isAr
         ? (buildError ? "خدمة البناء مشغولة حالياً. تم استرداد رصيدك، حاول مرة أخرى." : "حصل خطأ أثناء البناء. تم استرداد رصيدك.")
         : (buildError || "Build failed. Your credits were refunded.");
-      setMessages(prev => [...prev, { role: "assistant", content: fallback }]);
+      const errMsg: ChatMsg = { role: "assistant", content: fallback, meta: { durationMs, credits: 0 } };
+      setMessages(prev => [...prev, errMsg]);
+      persistMessage(convId, errMsg);
       // Refund the deducted credits since the build never started
       if (userId) {
         fetch(`${SUPABASE_URL}/functions/v1/deduct-credits`, {
@@ -560,9 +603,74 @@ const CodeWorkspace = () => {
           )}
         </AnimatePresence>
 
-        {/* Chat area */}
+        {/* + bottom sheet */}
+        <AnimatePresence>
+          {plusMenuOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setPlusMenuOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+                <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
+                  <ImageIcon className="w-5 h-5" /> Attach image
+                </button>
+                <button onClick={() => handleFilePick("file")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
+                  <Paperclip className="w-5 h-5" /> Attach file
+                </button>
+                <button onClick={() => handleFilePick("camera")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
+                  <Camera className="w-5 h-5" /> Take photo
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ... bottom sheet — integrations */}
+        <AnimatePresence>
+          {moreMenuOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setMoreMenuOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+                <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5">Integrations</p>
+                <button
+                  onClick={() => { setMoreMenuOpen(false); setSupabaseModalOpen(true); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Database className="w-5 h-5 text-emerald-500" /> Connect Supabase
+                </button>
+                <button
+                  onClick={handleGithubPush}
+                  disabled={githubBusy}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
+                >
+                  {githubBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
+                  {githubBusy ? "Pushing to GitHub..." : "Push to GitHub"}
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
         <div className="flex-1 overflow-hidden pt-14 pb-44 min-h-0">
-          <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} />
+          <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} onSubmitApiKey={handleApiKeySubmit} />
         </div>
 
         {/* Preview moved to top-right header */}
@@ -595,96 +703,38 @@ const CodeWorkspace = () => {
                 className="w-full bg-transparent border-none outline-none resize-none text-sm text-foreground placeholder:text-muted-foreground/60 px-2 py-1.5 max-h-32"
               />
 
-              {/* Bottom toolbar */}
+              {/* Bottom toolbar — order: +, ..., Plan, ..., Send */}
               <div className="flex items-center gap-1.5 mt-1">
-                {/* Plus menu */}
-                <div className="relative">
-                  <button
-                    onClick={() => { setPlusMenuOpen(o => !o); setMoreMenuOpen(false); }}
-                    className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
-                  <AnimatePresence>
-                    {plusMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setPlusMenuOpen(false)} />
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          className="absolute bottom-full mb-2 left-0 z-40 w-52 rounded-2xl liquid-glass-milk p-1.5"
-                        >
-                          <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
-                            <ImageIcon className="w-4 h-4" /> Attach image
-                          </button>
-                          <button onClick={() => handleFilePick("file")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
-                            <Paperclip className="w-4 h-4" /> Attach file
-                          </button>
-                          <button onClick={() => handleFilePick("camera")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
-                            <Camera className="w-4 h-4" /> Take photo
-                          </button>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
-                </div>
+                <button
+                  onClick={() => { setPlusMenuOpen(true); setMoreMenuOpen(false); }}
+                  className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+                  aria-label="Add"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
 
-                {/* Plan mode */}
+                <button
+                  onClick={() => { setMoreMenuOpen(true); setPlusMenuOpen(false); }}
+                  className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+                  aria-label="More"
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
+
+                {/* Plan mode — clean bordered button, no icon */}
                 <button
                   onClick={() => setPlanMode(p => !p)}
-                  className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium transition-all ${
+                  className={`h-9 px-4 rounded-full text-xs font-semibold transition-all border ${
                     planMode
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "text-foreground border-border/70 hover:border-foreground/40 bg-transparent"
                   }`}
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
                   Plan
                 </button>
 
-                {/* Three dots — integrations */}
-                <div className="relative">
-                  <button
-                    onClick={() => { setMoreMenuOpen(o => !o); setPlusMenuOpen(false); }}
-                    className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-                  >
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
-                  <AnimatePresence>
-                    {moreMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setMoreMenuOpen(false)} />
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          className="absolute bottom-full mb-2 left-0 z-40 w-60 rounded-2xl liquid-glass-milk p-1.5"
-                        >
-                          <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5">Integrations</p>
-                          <button
-                            onClick={() => { setMoreMenuOpen(false); setSupabaseModalOpen(true); }}
-                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors"
-                          >
-                            <Database className="w-4 h-4 text-emerald-500" /> Connect Supabase
-                          </button>
-                          <button
-                            onClick={handleGithubPush}
-                            disabled={githubBusy}
-                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
-                          >
-                            {githubBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Github className="w-4 h-4" />}
-                            {githubBusy ? "Pushing..." : "Push to GitHub"}
-                          </button>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
-                </div>
-
                 <div className="flex-1" />
 
-                {/* Send */}
                 <button
                   onClick={() => handleSend()}
                   disabled={!input.trim() || isLoading}
