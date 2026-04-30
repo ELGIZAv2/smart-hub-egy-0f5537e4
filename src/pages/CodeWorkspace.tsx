@@ -167,6 +167,37 @@ const CodeWorkspace = () => {
   // Screenshot capture disabled — Webly fallback projects don't support it reliably.
   const captureScreenshot = async (_pid: string, _weblyId: string) => { /* no-op */ };
 
+  // --- Persist a single message to DB ---
+  const persistMessage = async (convId: string | null, msg: ChatMsg) => {
+    if (!convId) return;
+    try {
+      await supabase.from("messages").insert({
+        conversation_id: convId,
+        role: msg.role,
+        content: msg.content,
+      } as any);
+    } catch {}
+  };
+
+  // --- Handle API key submission from inline card ---
+  const handleApiKeySubmit = async (keyName: string, keyValue: string) => {
+    if (!userId || !keyName) return;
+    try {
+      await supabase.from("code_integrations").upsert({
+        user_id: userId,
+        project_id: projectId,
+        provider: keyName,
+        config: { api_key: keyValue },
+      } as any, { onConflict: "user_id,project_id,provider" });
+      setMessages(prev => prev.map(m =>
+        m.type === "api_key_request" && m.apiKeyName === keyName ? { ...m, apiKeyResolved: true } : m
+      ));
+      toast.success(`${keyName} saved`);
+    } catch {
+      toast.error("Failed to save key");
+    }
+  };
+
   // --- Send message / build ---
   const handleSend = async (textOverride?: string) => {
     const msgText = textOverride ?? input;
@@ -178,12 +209,15 @@ const CodeWorkspace = () => {
     }
 
     if (!textOverride) setInput("");
-    setMessages(prev => [...prev, { role: "user", content: msgText }]);
+    const userMsg: ChatMsg = { role: "user", content: msgText };
+    setMessages(prev => [...prev, userMsg]);
     setAttachments([]);
     setIsLoading(true);
     setSteps([]);
 
+    const startedAt = Date.now();
     const convId = await ensureConversation(msgText);
+    persistMessage(convId, userMsg);
 
     // Deduct
     if (userId) {
@@ -201,7 +235,16 @@ const CodeWorkspace = () => {
       refreshCredits();
     }
 
-    await addStep("pre_message", planMode ? "Planning your build..." : "Got it. Building now...");
+    // Pre-message: tells the user what's about to happen
+    const isAr = /[\u0600-\u06FF]/.test(msgText);
+    const preText = planMode
+      ? (isAr ? "تمام، هخطط للبناء وأبدأ على طول." : "Got it. Planning the build and starting now.")
+      : (isAr ? "تمام، بدأت الشغل دلوقتي." : "Got it. Starting the build now.");
+    const preMsg: ChatMsg = { role: "assistant", content: preText, type: "status" };
+    setMessages(prev => [...prev, preMsg]);
+    persistMessage(convId, preMsg);
+
+    await addStep("pre_message", preText);
     await addStep("thinking", "Analyzing request");
 
     // Use existing webly project id if available, else generate
@@ -262,6 +305,17 @@ const CodeWorkspace = () => {
               await addStep("searching", "Verifying in browser");
             } else if (ev.type === "verify_done") {
               await addStep("done", ev.ok ? "Verification passed" : "Fixing issues");
+            } else if (ev.type === "request_api_key" && ev.name) {
+              // Inline API key request card
+              const keyMsg: ChatMsg = {
+                role: "assistant",
+                type: "api_key_request",
+                content: `Need API key: ${ev.name}`,
+                apiKeyName: ev.name,
+                apiKeyDescription: ev.description || ev.message || "Required to continue building.",
+              };
+              setMessages(prev => [...prev, keyMsg]);
+              persistMessage(convId, keyMsg);
             }
           } catch {}
         }
@@ -271,33 +325,27 @@ const CodeWorkspace = () => {
       setHasBuilt(true);
 
       const fileCount = seenFiles.size || 1;
-      const isAr = /[\u0600-\u06FF]/.test(msgText);
+      const durationMs = Date.now() - startedAt;
       const reply = isAr
-        ? `تمام، خلصت! بنيت ${fileCount} ملف. اضغط Preview علشان تشوف الموقع.`
-        : `Done! Built ${fileCount} files. Tap Preview to see your site live.`;
-      setMessages(prev => [...prev, { role: "assistant", content: reply, type: "build" }]);
+        ? `تمام، خلصت! بنيت ${fileCount} ملف. اضغط على المعاينة فوق علشان تشوف الموقع.`
+        : `Done! Built ${fileCount} files. Open the preview to see your site live.`;
+      const replyMsg: ChatMsg = { role: "assistant", content: reply, type: "build", meta: { durationMs, credits: BUILD_CREDIT_COST } };
+      setMessages(prev => [...prev, replyMsg]);
+      persistMessage(convId, replyMsg);
 
       const pid = await ensureProject(msgText, wpid, convId);
       if (pid && Object.keys(generatedFiles).length > 0) {
         await supabase.from("projects").update({ files_snapshot: generatedFiles as any }).eq("id", pid);
       }
-
-      if (convId) {
-        supabase.from("messages").insert([
-          { conversation_id: convId, role: "user", content: msgText },
-          { conversation_id: convId, role: "assistant", content: reply },
-        ]);
-      }
-
-      // Background screenshot
-      if (pid) captureScreenshot(pid, wpid);
     } catch (e) {
       completeAllSteps();
-      const isAr = /[\u0600-\u06FF]/.test(msgText);
+      const durationMs = Date.now() - startedAt;
       const fallback = isAr
         ? (buildError ? "خدمة البناء مشغولة حالياً. تم استرداد رصيدك، حاول مرة أخرى." : "حصل خطأ أثناء البناء. تم استرداد رصيدك.")
         : (buildError || "Build failed. Your credits were refunded.");
-      setMessages(prev => [...prev, { role: "assistant", content: fallback }]);
+      const errMsg: ChatMsg = { role: "assistant", content: fallback, meta: { durationMs, credits: 0 } };
+      setMessages(prev => [...prev, errMsg]);
+      persistMessage(convId, errMsg);
       // Refund the deducted credits since the build never started
       if (userId) {
         fetch(`${SUPABASE_URL}/functions/v1/deduct-credits`, {
