@@ -213,6 +213,7 @@ const CodeWorkspace = () => {
     const wpid = weblyProjectId || `megsy-${userId?.slice(0, 8) || "u"}-${Date.now().toString(36)}`;
     if (!weblyProjectId) setWeblyProjectId(wpid);
 
+    let buildError: string | null = null;
     try {
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/webly-proxy`, {
         method: "POST",
@@ -225,7 +226,11 @@ const CodeWorkspace = () => {
         }),
       });
 
-      if (!resp.ok || !resp.body) throw new Error("Build service error");
+      if (!resp.ok || !resp.body) {
+        const errBody = await resp.json().catch(() => ({} as any));
+        buildError = errBody?.error || "Build service is busy right now. Please try again shortly.";
+        throw new Error(buildError);
+      }
 
       await addStep("writing", "Generating code");
 
