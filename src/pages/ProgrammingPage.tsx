@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowUp, Code2, FolderOpen, Sparkles, Plus } from "lucide-react";
+import { ArrowUp, Menu, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/layouts/AppLayout";
+import AppSidebar from "@/components/AppSidebar";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 interface Project {
   id: string;
@@ -37,6 +37,7 @@ const ProgrammingPage = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [heroIdx, setHeroIdx] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => { loadProjects(); }, []);
@@ -78,21 +79,30 @@ const ProgrammingPage = () => {
       onNewChat={() => setConversationId(null)}
       activeConversationId={conversationId}
     >
-      <div className="min-h-screen w-full overflow-x-hidden bg-background text-foreground">
-        {/* Top bar — Pricing-page style */}
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 max-w-7xl mx-auto">
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={() => { setSidebarOpen(false); navigate("/code"); }}
+        onSelectConversation={(id) => { setSidebarOpen(false); navigate(`/code/workspace?conversation_id=${id}`); }}
+        activeConversationId={conversationId}
+        currentMode="code"
+      />
+
+      <div className="h-[100dvh] w-full overflow-y-auto overflow-x-hidden bg-background text-foreground">
+        {/* Top bar — sidebar menu button instead of back */}
+        <div className="sticky top-0 z-20 flex items-center gap-3 px-4 sm:px-6 py-4 max-w-7xl mx-auto bg-background/80 backdrop-blur-xl">
           <button
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Back"
+            onClick={() => setSidebarOpen(true)}
+            className="text-foreground/80 hover:text-foreground transition-colors h-10 w-10 -ml-2 flex items-center justify-center rounded-full hover:bg-accent/40"
+            aria-label="Menu"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <Menu className="w-5 h-5" />
           </button>
           <h1 className="text-base font-bold tracking-tight">Build</h1>
         </div>
 
         {/* Hero */}
-        <section className="max-w-5xl mx-auto px-5 sm:px-8 pt-6 sm:pt-12 pb-8 text-center">
+        <section className="max-w-5xl mx-auto px-5 sm:px-8 pt-2 sm:pt-8 pb-8 text-center">
           <AnimatePresence mode="wait">
             <motion.div
               key={heroIdx}
@@ -170,7 +180,7 @@ const ProgrammingPage = () => {
         </section>
 
         {/* Projects */}
-        <section className="max-w-6xl mx-auto px-5 sm:px-8 mt-14 pb-16">
+        <section className="max-w-6xl mx-auto px-5 sm:px-8 mt-14 pb-24">
           {loading ? null : projects.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground/60 text-sm">
               No projects yet — start by describing your idea above.
@@ -178,12 +188,9 @@ const ProgrammingPage = () => {
           ) : (
             <>
               <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    Your Projects
-                  </h3>
-                </div>
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  Your Projects
+                </h3>
                 <span className="text-xs text-muted-foreground/60">{projects.length}</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -196,8 +203,8 @@ const ProgrammingPage = () => {
                     onClick={() => openProject(project)}
                     className="group relative flex flex-col rounded-2xl border border-border/60 bg-card overflow-hidden text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 transition-all"
                   >
-                    <div className="w-full aspect-video bg-gradient-to-br from-primary/15 via-fuchsia-500/10 to-amber-500/10 flex items-center justify-center overflow-hidden relative">
-                      {project.preview_url ? (
+                    <div className="w-full aspect-video bg-gradient-to-br from-primary/15 via-fuchsia-500/10 to-amber-500/10 overflow-hidden relative">
+                      {project.preview_url && (
                         <img
                           src={project.preview_url}
                           alt={project.name}
@@ -205,8 +212,6 @@ const ProgrammingPage = () => {
                           className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                         />
-                      ) : (
-                        <Code2 className="w-12 h-12 text-foreground/15" />
                       )}
                     </div>
                     <div className="p-4">

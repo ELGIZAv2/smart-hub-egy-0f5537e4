@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu, ArrowUp, Plus, MoreHorizontal, Image as ImageIcon, Paperclip, Camera,
-  Loader2, Database, Github, Eye, Settings, Pencil, Coins, X, Check, Sparkles,
+  Loader2, Database, Github, Eye, Settings, Pencil, X, Check, Sparkles, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -454,77 +454,99 @@ const CodeWorkspace = () => {
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="relative pointer-events-auto">
-            <button
-              onClick={() => setProjectMenuOpen(o => !o)}
-              className="px-4 py-2 rounded-full bg-card/60 backdrop-blur-xl border border-border/40 text-sm font-semibold text-foreground hover:bg-card/80 transition-all max-w-[60vw] truncate"
-            >
-              {projectName}
-            </button>
-            <AnimatePresence>
-              {projectMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setProjectMenuOpen(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-40 w-64 rounded-2xl bg-card/95 backdrop-blur-2xl border border-border/60 shadow-2xl p-2"
-                  >
-                    {/* Credits row with bar */}
-                    <div className="px-3 py-2.5 rounded-xl bg-accent/30">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Coins className="w-3.5 h-3.5" /> Credits
-                        </span>
-                        <span className="text-xs font-bold text-foreground">{credits ?? "—"} MC</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-background/60 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary via-fuchsia-500 to-amber-500 transition-all"
-                          style={{ width: `${Math.min(100, ((credits ?? 0) / 100) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => { setRenameValue(projectName); setRenameOpen(true); }}
-                      className="w-full mt-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" /> Rename project
-                    </button>
-                    <button
-                      onClick={() => { setProjectMenuOpen(false); navigate("/settings"); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors"
-                    >
-                      <Settings className="w-4 h-4" /> Settings
-                    </button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
+          <button
+            onClick={() => setProjectMenuOpen(true)}
+            className="pointer-events-auto px-4 py-2 rounded-full liquid-glass-button text-sm font-semibold text-foreground hover:scale-[1.02] transition-all max-w-[55vw] truncate flex items-center gap-1.5"
+          >
+            {projectName}
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+          </button>
 
-          <div className="w-10" />
+          {/* Preview button — top right */}
+          <button
+            onClick={handleOpenPreview}
+            disabled={!hasBuilt}
+            className="pointer-events-auto h-10 w-10 rounded-full liquid-glass-button flex items-center justify-center text-foreground/80 hover:text-foreground hover:scale-105 transition-all disabled:opacity-40"
+            aria-label="Preview"
+          >
+            <Eye className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Project bottom sheet — full glassmorphism, click outside to close */}
+        <AnimatePresence>
+          {projectMenuOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setProjectMenuOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8 max-h-[80vh] overflow-y-auto"
+              >
+                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+
+                {/* Credits row with bar */}
+                <div className="rounded-2xl liquid-glass-button px-4 py-3.5 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-foreground">Credits</span>
+                    <span className="text-sm font-semibold text-foreground/80">{credits ?? "—"} left</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-foreground/10 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary via-fuchsia-500 to-amber-500 transition-all"
+                      style={{ width: `${Math.min(100, ((credits ?? 0) / 100) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => { setProjectMenuOpen(false); navigate("/settings"); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Settings className="w-5 h-5" /> Settings
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); setRenameValue(projectName); setRenameOpen(true); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Pencil className="w-5 h-5" /> Rename project
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); handleOpenPreview(); }}
+                  disabled={!hasBuilt}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
+                >
+                  <Eye className="w-5 h-5" /> Open preview
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); handleGithubPush(); }}
+                  disabled={githubBusy || !hasBuilt}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
+                >
+                  {githubBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
+                  {githubBusy ? "Pushing to GitHub..." : "Push to GitHub"}
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); setSupabaseModalOpen(true); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Database className="w-5 h-5 text-emerald-500" /> Connect backend
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Chat area */}
         <div className="flex-1 overflow-hidden pt-14 pb-44 min-h-0">
           <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} />
         </div>
 
-        {/* Floating Preview button — vertical right side */}
-        {hasBuilt && (
-          <motion.button
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={handleOpenPreview}
-            className="absolute right-3 bottom-44 z-30 px-3 py-3 rounded-2xl bg-foreground text-background shadow-xl hover:scale-105 transition-transform flex flex-col items-center gap-1"
-            title="Open preview"
-          >
-            <Eye className="w-4 h-4" />
-            <span className="text-[10px] font-semibold tracking-wide">PREVIEW</span>
-          </motion.button>
-        )}
+        {/* Preview moved to top-right header */}
 
         {/* Bottom sticky input */}
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-3 pt-6 bg-gradient-to-t from-background via-background/95 to-transparent">
@@ -572,15 +594,15 @@ const CodeWorkspace = () => {
                           initial={{ opacity: 0, y: 8, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          className="absolute bottom-full mb-2 left-0 z-40 w-48 rounded-2xl bg-card/95 backdrop-blur-2xl border border-border/60 shadow-2xl p-1.5"
+                          className="absolute bottom-full mb-2 left-0 z-40 w-52 rounded-2xl liquid-glass-milk p-1.5"
                         >
-                          <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors">
+                          <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
                             <ImageIcon className="w-4 h-4" /> Attach image
                           </button>
-                          <button onClick={() => handleFilePick("file")} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors">
+                          <button onClick={() => handleFilePick("file")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
                             <Paperclip className="w-4 h-4" /> Attach file
                           </button>
-                          <button onClick={() => handleFilePick("camera")} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors">
+                          <button onClick={() => handleFilePick("camera")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
                             <Camera className="w-4 h-4" /> Take photo
                           </button>
                         </motion.div>
@@ -618,19 +640,19 @@ const CodeWorkspace = () => {
                           initial={{ opacity: 0, y: 8, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          className="absolute bottom-full mb-2 left-0 z-40 w-56 rounded-2xl bg-card/95 backdrop-blur-2xl border border-border/60 shadow-2xl p-1.5"
+                          className="absolute bottom-full mb-2 left-0 z-40 w-60 rounded-2xl liquid-glass-milk p-1.5"
                         >
                           <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5">Integrations</p>
                           <button
                             onClick={() => { setMoreMenuOpen(false); setSupabaseModalOpen(true); }}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors"
+                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors"
                           >
                             <Database className="w-4 h-4 text-emerald-500" /> Connect Supabase
                           </button>
                           <button
                             onClick={handleGithubPush}
                             disabled={githubBusy}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors disabled:opacity-40"
+                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
                           >
                             {githubBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Github className="w-4 h-4" />}
                             {githubBusy ? "Pushing..." : "Push to GitHub"}
@@ -667,7 +689,7 @@ const CodeWorkspace = () => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-sm rounded-3xl bg-card border border-border/60 shadow-2xl p-5"
+                className="w-full max-w-sm rounded-3xl liquid-glass-milk p-5"
               >
                 <h3 className="text-sm font-semibold text-foreground mb-3">Rename project</h3>
                 <input
@@ -694,7 +716,7 @@ const CodeWorkspace = () => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-md rounded-3xl bg-card border border-border/60 shadow-2xl p-5"
+                className="w-full max-w-md rounded-3xl liquid-glass-milk p-5"
               >
                 <div className="flex items-center gap-2 mb-3">
                   <Database className="w-5 h-5 text-emerald-500" />
