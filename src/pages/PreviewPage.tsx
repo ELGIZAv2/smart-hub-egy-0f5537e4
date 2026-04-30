@@ -21,10 +21,21 @@ const PreviewPage = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [localHtml, setLocalHtml] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const previewBase = `${WEBLY_BASE}/webly-site/${webly}`;
   const previewUrl = `${previewBase}${route.startsWith("/") ? route : "/" + route}`;
+  const iframeSrc = localHtml ? `data:text/html;charset=utf-8,${encodeURIComponent(localHtml)}` : previewUrl;
+
+  useEffect(() => {
+    if (!projectId) return;
+    supabase.from("projects").select("files_snapshot").eq("id", projectId).maybeSingle().then(({ data }) => {
+      const files = (data as any)?.files_snapshot || {};
+      const html = files[route] || files[`/${route.replace(/^\/+/, "")}`] || files["/index.html"] || files["index.html"];
+      setLocalHtml(typeof html === "string" ? html : null);
+    });
+  }, [projectId, route, iframeKey]);
 
   const handleRefresh = () => setIframeKey(k => k + 1);
 
@@ -60,11 +71,11 @@ const PreviewPage = () => {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {webly ? (
+      {webly || localHtml ? (
         <iframe
           ref={iframeRef}
           key={iframeKey}
-          src={previewUrl}
+          src={iframeSrc}
           className="absolute inset-0 w-full h-full bg-white border-0"
           title="Project preview"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
