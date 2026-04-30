@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, MoreHorizontal, RotateCw, Globe, Loader2, Check, ExternalLink, Send } from "lucide-react";
+import { MessageSquare, MoreHorizontal, RotateCw, Globe, Loader2, Check, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
