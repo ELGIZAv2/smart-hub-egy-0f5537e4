@@ -829,6 +829,12 @@ const CodeWorkspace = () => {
           )}
         </AnimatePresence>
       </div>
+      <ConnectIntegrationsSheet
+        open={integrationsOpen}
+        onClose={() => setIntegrationsOpen(false)}
+        userId={userId}
+        projectId={projectId}
+      />
     </AppLayout>
   );
 };
