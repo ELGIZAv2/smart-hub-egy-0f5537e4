@@ -80,3 +80,10 @@ verify_jwt = false
 
 [functions.polar-checkout]
 verify_jwt = false
+
+[functions.oauth-github-connect]
+verify_jwt = false
+
+[functions.oauth-supabase-connect]
+verify_jwt = false
+

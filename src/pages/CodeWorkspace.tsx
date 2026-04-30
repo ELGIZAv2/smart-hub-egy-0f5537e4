@@ -12,6 +12,7 @@ import AppLayout from "@/layouts/AppLayout";
 import AppSidebar from "@/components/AppSidebar";
 import CodeChatContainer from "@/components/code/CodeChatContainer";
 import { CodeStep, StepType } from "@/components/code/CodeStepMessage";
+import ConnectIntegrationsSheet from "@/components/code/ConnectIntegrationsSheet";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -65,6 +66,7 @@ const CodeWorkspace = () => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [githubBusy, setGithubBusy] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -651,10 +653,16 @@ const CodeWorkspace = () => {
                 <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
                 <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5">Integrations</p>
                 <button
-                  onClick={() => { setMoreMenuOpen(false); setSupabaseModalOpen(true); }}
+                  onClick={() => { setMoreMenuOpen(false); setIntegrationsOpen(true); }}
                   className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
                 >
                   <Database className="w-5 h-5 text-emerald-500" /> Connect Supabase
+                </button>
+                <button
+                  onClick={() => { setMoreMenuOpen(false); setIntegrationsOpen(true); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Github className="w-5 h-5" /> Connect GitHub
                 </button>
                 <button
                   onClick={handleGithubPush}
@@ -662,7 +670,7 @@ const CodeWorkspace = () => {
                   className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
                 >
                   {githubBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
-                  {githubBusy ? "Pushing to GitHub..." : "Push to GitHub"}
+                  {githubBusy ? "Pushing..." : "Push current to GitHub"}
                 </button>
               </motion.div>
             </>
@@ -821,6 +829,12 @@ const CodeWorkspace = () => {
           )}
         </AnimatePresence>
       </div>
+      <ConnectIntegrationsSheet
+        open={integrationsOpen}
+        onClose={() => setIntegrationsOpen(false)}
+        userId={userId}
+        projectId={projectId}
+      />
     </AppLayout>
   );
 };
