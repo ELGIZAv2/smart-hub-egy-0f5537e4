@@ -454,58 +454,92 @@ const CodeWorkspace = () => {
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="relative pointer-events-auto">
-            <button
-              onClick={() => setProjectMenuOpen(o => !o)}
-              className="px-4 py-2 rounded-full bg-card/60 backdrop-blur-xl border border-border/40 text-sm font-semibold text-foreground hover:bg-card/80 transition-all max-w-[60vw] truncate"
-            >
-              {projectName}
-            </button>
-            <AnimatePresence>
-              {projectMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setProjectMenuOpen(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-40 w-64 rounded-2xl bg-card/95 backdrop-blur-2xl border border-border/60 shadow-2xl p-2"
-                  >
-                    {/* Credits row with bar */}
-                    <div className="px-3 py-2.5 rounded-xl bg-accent/30">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Coins className="w-3.5 h-3.5" /> Credits
-                        </span>
-                        <span className="text-xs font-bold text-foreground">{credits ?? "—"} MC</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-background/60 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary via-fuchsia-500 to-amber-500 transition-all"
-                          style={{ width: `${Math.min(100, ((credits ?? 0) / 100) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => { setRenameValue(projectName); setRenameOpen(true); }}
-                      className="w-full mt-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" /> Rename project
-                    </button>
-                    <button
-                      onClick={() => { setProjectMenuOpen(false); navigate("/settings"); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/40 transition-colors"
-                    >
-                      <Settings className="w-4 h-4" /> Settings
-                    </button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
+          <button
+            onClick={() => setProjectMenuOpen(true)}
+            className="pointer-events-auto px-4 py-2 rounded-full liquid-glass-button text-sm font-semibold text-foreground hover:scale-[1.02] transition-all max-w-[55vw] truncate flex items-center gap-1.5"
+          >
+            {projectName}
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+          </button>
 
-          <div className="w-10" />
+          {/* Preview button — top right */}
+          <button
+            onClick={handleOpenPreview}
+            disabled={!hasBuilt}
+            className="pointer-events-auto h-10 w-10 rounded-full liquid-glass-button flex items-center justify-center text-foreground/80 hover:text-foreground hover:scale-105 transition-all disabled:opacity-40"
+            aria-label="Preview"
+          >
+            <Eye className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Project bottom sheet — full glassmorphism, click outside to close */}
+        <AnimatePresence>
+          {projectMenuOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setProjectMenuOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8 max-h-[80vh] overflow-y-auto"
+              >
+                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+
+                {/* Credits row with bar */}
+                <div className="rounded-2xl liquid-glass-button px-4 py-3.5 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-foreground">Credits</span>
+                    <span className="text-sm font-semibold text-foreground/80">{credits ?? "—"} left</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-foreground/10 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary via-fuchsia-500 to-amber-500 transition-all"
+                      style={{ width: `${Math.min(100, ((credits ?? 0) / 100) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => { setProjectMenuOpen(false); navigate("/settings"); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Settings className="w-5 h-5" /> Settings
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); setRenameValue(projectName); setRenameOpen(true); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Pencil className="w-5 h-5" /> Rename project
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); handleOpenPreview(); }}
+                  disabled={!hasBuilt}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
+                >
+                  <Eye className="w-5 h-5" /> Open preview
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); handleGithubPush(); }}
+                  disabled={githubBusy || !hasBuilt}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
+                >
+                  {githubBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
+                  {githubBusy ? "Pushing to GitHub..." : "Push to GitHub"}
+                </button>
+                <button
+                  onClick={() => { setProjectMenuOpen(false); setSupabaseModalOpen(true); }}
+                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
+                >
+                  <Database className="w-5 h-5 text-emerald-500" /> Connect backend
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Chat area */}
         <div className="flex-1 overflow-hidden pt-14 pb-44 min-h-0">
