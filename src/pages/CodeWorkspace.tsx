@@ -387,10 +387,29 @@ const CodeWorkspace = () => {
     }
     setGithubBusy(true);
     try {
-      // Fetch generated files snapshot from webly
-      const filesResp = await fetch(`${WEBLY_BASE}/webly-site/${weblyProjectId}/__files`);
-      const filesData = await filesResp.json().catch(() => ({}));
-      const files = filesData?.files || filesData || {};
+      // Prefer local snapshot from DB (works for both upstream + fallback builds)
+      let files: Record<string, string> = {};
+      if (projectId) {
+        const { data } = await supabase.from("projects").select("files_snapshot").eq("id", projectId).maybeSingle();
+        const snap = (data as any)?.files_snapshot;
+        if (snap && typeof snap === "object") files = snap;
+      }
+      // Fallback: try webly upstream (silent on 404)
+      if (Object.keys(files).length === 0) {
+        try {
+          const filesResp = await fetch(`${WEBLY_BASE}/webly-site/${weblyProjectId}/__files`);
+          if (filesResp.ok) {
+            const filesData = await filesResp.json().catch(() => ({}));
+            files = filesData?.files || filesData || {};
+          }
+        } catch {}
+      }
+
+      if (!files || Object.keys(files).length === 0) {
+        toast.error("No files to push yet. Build the project first.");
+        setGithubBusy(false);
+        return;
+      }
 
       const r = await fetch(`${SUPABASE_URL}/functions/v1/github-push`, {
         method: "POST",
@@ -399,7 +418,7 @@ const CodeWorkspace = () => {
           user_id: userId,
           project_name: projectName,
           description: `Built with Megsy AI — ${projectName}`,
-          files: typeof files === "object" ? files : {},
+          files,
         }),
       });
       const data = await r.json();
