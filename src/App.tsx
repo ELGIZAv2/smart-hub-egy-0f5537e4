@@ -21,6 +21,7 @@ const VideosPage = lazy(() => import("./pages/VideosPage"));
 const FilesPage = lazy(() => import("./pages/FilesPage"));
 const ProgrammingPage = lazy(() => import("./pages/ProgrammingPage"));
 const CodeWorkspace = lazy(() => import("./pages/CodeWorkspace"));
+const PreviewPage = lazy(() => import("./pages/PreviewPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -286,6 +287,7 @@ const App = () => {
                   <Route path="/research/preview/:id" element={<ProtectedRoute><ResearchPreviewPage /></ProtectedRoute>} />
                   <Route path="/code" element={<ProtectedRoute><ProgrammingPage key={currentUserId} /></ProtectedRoute>} />
                   <Route path="/code/workspace" element={<ProtectedRoute><CodeWorkspace key={currentUserId} /></ProtectedRoute>} />
+                  <Route path="/code/preview/:projectId" element={<ProtectedRoute><PreviewPage /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                   <Route path="/settings/customization" element={<ProtectedRoute><CustomizationPage /></ProtectedRoute>} />

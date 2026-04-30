@@ -206,6 +206,44 @@ export type Database = {
         }
         Relationships: []
       }
+      code_integrations: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          project_id: string | null
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "code_integrations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_submissions: {
         Row: {
           ai_reply: string | null
@@ -1241,41 +1279,50 @@ export type Database = {
         Row: {
           conversation_id: string | null
           created_at: string
+          description: string | null
           files_snapshot: Json | null
           fly_app_name: string | null
           fly_machine_id: string | null
           id: string
           name: string
           preview_url: string | null
+          repo_url: string | null
           status: string
           updated_at: string
           user_id: string
+          webly_project_id: string | null
         }
         Insert: {
           conversation_id?: string | null
           created_at?: string
+          description?: string | null
           files_snapshot?: Json | null
           fly_app_name?: string | null
           fly_machine_id?: string | null
           id?: string
           name?: string
           preview_url?: string | null
+          repo_url?: string | null
           status?: string
           updated_at?: string
           user_id: string
+          webly_project_id?: string | null
         }
         Update: {
           conversation_id?: string | null
           created_at?: string
+          description?: string | null
           files_snapshot?: Json | null
           fly_app_name?: string | null
           fly_machine_id?: string | null
           id?: string
           name?: string
           preview_url?: string | null
+          repo_url?: string | null
           status?: string
           updated_at?: string
           user_id?: string
+          webly_project_id?: string | null
         }
         Relationships: [
           {
