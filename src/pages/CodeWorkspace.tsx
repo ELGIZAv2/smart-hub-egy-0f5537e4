@@ -160,17 +160,8 @@ const CodeWorkspace = () => {
     return null;
   };
 
-  // --- Capture screenshot in background ---
-  const captureScreenshot = async (pid: string, weblyId: string) => {
-    if (!userId) return;
-    // Wait a few seconds for site to be ready
-    await new Promise(r => setTimeout(r, 4000));
-    fetch(`${SUPABASE_URL}/functions/v1/webly-proxy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      body: JSON.stringify({ action: "screenshot", project_id: pid, user_id: userId, url: `${WEBLY_BASE}/webly-site/${weblyId}` }),
-    }).catch(() => {});
-  };
+  // Screenshot capture disabled — Webly fallback projects don't support it reliably.
+  const captureScreenshot = async (_pid: string, _weblyId: string) => { /* no-op */ };
 
   // --- Send message / build ---
   const handleSend = async (textOverride?: string) => {
