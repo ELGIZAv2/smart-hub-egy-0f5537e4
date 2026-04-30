@@ -292,10 +292,18 @@ const CodeWorkspace = () => {
     } catch (e) {
       completeAllSteps();
       const isAr = /[\u0600-\u06FF]/.test(msgText);
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: isAr ? "حصل خطأ أثناء البناء. حاول تاني." : "Build failed. Please try again.",
-      }]);
+      const fallback = isAr
+        ? (buildError ? "خدمة البناء مشغولة حالياً. تم استرداد رصيدك، حاول مرة أخرى." : "حصل خطأ أثناء البناء. تم استرداد رصيدك.")
+        : (buildError || "Build failed. Your credits were refunded.");
+      setMessages(prev => [...prev, { role: "assistant", content: fallback }]);
+      // Refund the deducted credits since the build never started
+      if (userId) {
+        fetch(`${SUPABASE_URL}/functions/v1/deduct-credits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          body: JSON.stringify({ user_id: userId, amount: -BUILD_CREDIT_COST, action_type: "code_build_refund", description: "Refund: build service unavailable" }),
+        }).then(() => refreshCredits()).catch(() => {});
+      }
     }
 
     setIsLoading(false);
