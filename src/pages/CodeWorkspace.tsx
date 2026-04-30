@@ -349,10 +349,9 @@ const CodeWorkspace = () => {
     // Fixed messages
     setMessages(prev => [
       ...prev,
-      { role: "user", content: "I have connected the backend.", type: "fixed_supabase" },
+      { role: "user", content: "I have connected the backend." },
       {
         role: "assistant",
-        type: "fixed_supabase_reply",
         content:
           "Backend connected. We can now build:\n\n• User authentication (sign-up, sign-in, password reset)\n• User profiles & settings\n• Database tables with row-level security\n• File uploads & storage\n• Real-time data sync\n• Subscription & payment flows\n\nJust tell me what you want to add.",
       },
