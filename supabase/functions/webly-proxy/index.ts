@@ -133,8 +133,9 @@ Deno.serve(async (req) => {
 
       const accessKey = Deno.env.get("ScreenshotOne_Access Key");
       if (!accessKey) {
-        return new Response(JSON.stringify({ error: "Screenshot service not configured" }), {
-          status: 503,
+        // Silent skip — screenshots are optional
+        return new Response(JSON.stringify({ ok: false, skipped: true }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -153,41 +154,49 @@ Deno.serve(async (req) => {
         delay: "2",
       });
 
-      const shotResp = await fetch(`https://api.screenshotone.com/take?${params}`);
-      if (!shotResp.ok) {
-        return new Response(JSON.stringify({ error: "Screenshot capture failed" }), {
-          status: 502,
+      try {
+        const shotResp = await fetch(`https://api.screenshotone.com/take?${params}`);
+        if (!shotResp.ok) {
+          // Silent skip — preview not ready yet, no need to error the UI
+          return new Response(JSON.stringify({ ok: false, skipped: true, reason: "capture_failed" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const blob = await shotResp.arrayBuffer();
+
+        const supabase = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+
+        const path = `${userId}/projects/${projectId}.jpg`;
+        const { error: uploadErr } = await supabase.storage.from("user-images").upload(path, blob, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+        if (uploadErr) {
+          return new Response(JSON.stringify({ ok: false, skipped: true, reason: "upload_failed" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: pub } = supabase.storage.from("user-images").getPublicUrl(path);
+        const previewUrl = `${pub.publicUrl}?t=${Date.now()}`;
+
+        await supabase.from("projects").update({ preview_url: previewUrl }).eq("id", projectId);
+
+        return new Response(JSON.stringify({ ok: true, preview_url: previewUrl }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch {
+        return new Response(JSON.stringify({ ok: false, skipped: true, reason: "exception" }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const blob = await shotResp.arrayBuffer();
-
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      );
-
-      const path = `${userId}/projects/${projectId}.jpg`;
-      const { error: uploadErr } = await supabase.storage.from("user-images").upload(path, blob, {
-        contentType: "image/jpeg",
-        upsert: true,
-      });
-      if (uploadErr) {
-        return new Response(JSON.stringify({ error: "Storage upload failed" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { data: pub } = supabase.storage.from("user-images").getPublicUrl(path);
-      const previewUrl = `${pub.publicUrl}?t=${Date.now()}`;
-
-      await supabase.from("projects").update({ preview_url: previewUrl }).eq("id", projectId);
-
-      return new Response(JSON.stringify({ ok: true, preview_url: previewUrl }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }), {
