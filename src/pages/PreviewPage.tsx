@@ -60,15 +60,25 @@ const PreviewPage = () => {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* Iframe — full screen */}
-      <iframe
-        ref={iframeRef}
-        key={iframeKey}
-        src={previewUrl}
-        className="absolute inset-0 w-full h-full bg-white border-0"
-        title="Project preview"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-      />
+      {webly ? (
+        <iframe
+          ref={iframeRef}
+          key={iframeKey}
+          src={previewUrl}
+          className="absolute inset-0 w-full h-full bg-white border-0"
+          title="Project preview"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 bg-gradient-to-br from-background to-muted text-foreground">
+          <div className="w-16 h-16 rounded-2xl bg-foreground/5 flex items-center justify-center mb-4">
+            <Globe className="w-7 h-7 opacity-60" />
+          </div>
+          <h2 className="text-lg font-semibold mb-1">No preview yet</h2>
+          <p className="text-sm text-muted-foreground max-w-xs">Start a build from chat — your live preview will appear here automatically.</p>
+          <button onClick={handleBackToChat} className="mt-5 px-4 h-10 rounded-full bg-foreground text-background text-sm font-medium hover:scale-[1.02] transition-transform">Back to chat</button>
+        </div>
+      )}
 
       {/* Floating bottom dock */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-50 max-w-[calc(100vw-2rem)]">
