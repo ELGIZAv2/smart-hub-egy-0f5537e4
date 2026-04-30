@@ -23,6 +23,13 @@ Deno.serve(async (req) => {
     const action = body.action || "generate";
 
     if (action === "generate") {
+      if (!body.project_id || !body.prompt) {
+        return new Response(JSON.stringify({ error: "Missing project_id or prompt" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // Streaming pass-through
       const upstream = await fetch(`${WEBLY_BASE}/webly-generate`, {
         method: "POST",
@@ -30,14 +37,18 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           project_id: body.project_id,
           prompt: body.prompt,
-          messages: body.messages,
+          messages: body.messages ?? [],
         }),
       });
 
       if (!upstream.ok || !upstream.body) {
         const t = await upstream.text().catch(() => "");
-        return new Response(JSON.stringify({ error: "Build service unavailable", detail: t.slice(0, 200) }), {
-          status: 502,
+        const status = upstream.status === 404 ? 404 : 502;
+        const msg = upstream.status === 404
+          ? "Project not found. Start a new build first."
+          : "Build service is busy. Please retry.";
+        return new Response(JSON.stringify({ error: msg, detail: t.slice(0, 200) }), {
+          status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
