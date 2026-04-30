@@ -689,7 +689,7 @@ const CodeWorkspace = () => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-sm rounded-3xl bg-card border border-border/60 shadow-2xl p-5"
+                className="w-full max-w-sm rounded-3xl liquid-glass-milk p-5"
               >
                 <h3 className="text-sm font-semibold text-foreground mb-3">Rename project</h3>
                 <input
@@ -716,7 +716,7 @@ const CodeWorkspace = () => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-md rounded-3xl bg-card border border-border/60 shadow-2xl p-5"
+                className="w-full max-w-md rounded-3xl liquid-glass-milk p-5"
               >
                 <div className="flex items-center gap-2 mb-3">
                   <Database className="w-5 h-5 text-emerald-500" />
