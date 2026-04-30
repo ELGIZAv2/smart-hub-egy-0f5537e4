@@ -107,16 +107,30 @@ Deno.serve(async (req) => {
     }
 
     if (action === "deploy") {
-      const r = await fetch(`${WEBLY_BASE}/webly-deploy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: body.project_id }),
-      });
-      const data = await r.json().catch(() => ({}));
-      return new Response(JSON.stringify(data), {
-        status: r.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      try {
+        const r = await fetch(`${WEBLY_BASE}/webly-deploy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project_id: body.project_id }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          // Silent skip for missing upstream projects (local fallback builds)
+          return new Response(
+            JSON.stringify({ ok: false, skipped: true, reason: r.status === 404 ? "not_found" : "upstream_error" }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch {
+        return new Response(JSON.stringify({ ok: false, skipped: true, reason: "exception" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (action === "screenshot") {
