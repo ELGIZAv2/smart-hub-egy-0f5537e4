@@ -546,19 +546,7 @@ const CodeWorkspace = () => {
           <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} />
         </div>
 
-        {/* Floating Preview button — vertical right side */}
-        {hasBuilt && (
-          <motion.button
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={handleOpenPreview}
-            className="absolute right-3 bottom-44 z-30 px-3 py-3 rounded-2xl bg-foreground text-background shadow-xl hover:scale-105 transition-transform flex flex-col items-center gap-1"
-            title="Open preview"
-          >
-            <Eye className="w-4 h-4" />
-            <span className="text-[10px] font-semibold tracking-wide">PREVIEW</span>
-          </motion.button>
-        )}
+        {/* Preview moved to top-right header */}
 
         {/* Bottom sticky input */}
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-3 pt-6 bg-gradient-to-t from-background via-background/95 to-transparent">
