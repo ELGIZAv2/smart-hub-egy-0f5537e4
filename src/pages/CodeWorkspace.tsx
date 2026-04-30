@@ -21,7 +21,11 @@ const BUILD_CREDIT_COST = 5;
 interface ChatMsg {
   role: "user" | "assistant" | "system";
   content: string;
-  type?: "plan" | "build" | "log" | "status" | "steps" | "timeline";
+  type?: "plan" | "build" | "log" | "status" | "steps" | "timeline" | "api_key_request";
+  meta?: { durationMs?: number; credits?: number };
+  apiKeyName?: string;
+  apiKeyDescription?: string;
+  apiKeyResolved?: boolean;
 }
 
 interface Attachment { name: string; type: "image" | "file"; data: string; }
