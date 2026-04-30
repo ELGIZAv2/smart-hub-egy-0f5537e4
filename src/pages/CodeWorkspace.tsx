@@ -638,96 +638,38 @@ const CodeWorkspace = () => {
                 className="w-full bg-transparent border-none outline-none resize-none text-sm text-foreground placeholder:text-muted-foreground/60 px-2 py-1.5 max-h-32"
               />
 
-              {/* Bottom toolbar */}
+              {/* Bottom toolbar — order: +, ..., Plan, ..., Send */}
               <div className="flex items-center gap-1.5 mt-1">
-                {/* Plus menu */}
-                <div className="relative">
-                  <button
-                    onClick={() => { setPlusMenuOpen(o => !o); setMoreMenuOpen(false); }}
-                    className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
-                  <AnimatePresence>
-                    {plusMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setPlusMenuOpen(false)} />
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          className="absolute bottom-full mb-2 left-0 z-40 w-52 rounded-2xl liquid-glass-milk p-1.5"
-                        >
-                          <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
-                            <ImageIcon className="w-4 h-4" /> Attach image
-                          </button>
-                          <button onClick={() => handleFilePick("file")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
-                            <Paperclip className="w-4 h-4" /> Attach file
-                          </button>
-                          <button onClick={() => handleFilePick("camera")} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors">
-                            <Camera className="w-4 h-4" /> Take photo
-                          </button>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
-                </div>
+                <button
+                  onClick={() => { setPlusMenuOpen(true); setMoreMenuOpen(false); }}
+                  className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+                  aria-label="Add"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
 
-                {/* Plan mode */}
+                <button
+                  onClick={() => { setMoreMenuOpen(true); setPlusMenuOpen(false); }}
+                  className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+                  aria-label="More"
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
+
+                {/* Plan mode — clean bordered button, no icon */}
                 <button
                   onClick={() => setPlanMode(p => !p)}
-                  className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium transition-all ${
+                  className={`h-9 px-4 rounded-full text-xs font-semibold transition-all border ${
                     planMode
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "text-foreground border-border/70 hover:border-foreground/40 bg-transparent"
                   }`}
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
                   Plan
                 </button>
 
-                {/* Three dots — integrations */}
-                <div className="relative">
-                  <button
-                    onClick={() => { setMoreMenuOpen(o => !o); setPlusMenuOpen(false); }}
-                    className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-                  >
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
-                  <AnimatePresence>
-                    {moreMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setMoreMenuOpen(false)} />
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          className="absolute bottom-full mb-2 left-0 z-40 w-60 rounded-2xl liquid-glass-milk p-1.5"
-                        >
-                          <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5">Integrations</p>
-                          <button
-                            onClick={() => { setMoreMenuOpen(false); setSupabaseModalOpen(true); }}
-                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors"
-                          >
-                            <Database className="w-4 h-4 text-emerald-500" /> Connect Supabase
-                          </button>
-                          <button
-                            onClick={handleGithubPush}
-                            disabled={githubBusy}
-                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
-                          >
-                            {githubBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Github className="w-4 h-4" />}
-                            {githubBusy ? "Pushing..." : "Push to GitHub"}
-                          </button>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
-                </div>
-
                 <div className="flex-1" />
 
-                {/* Send */}
                 <button
                   onClick={() => handleSend()}
                   disabled={!input.trim() || isLoading}
