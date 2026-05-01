@@ -30,31 +30,40 @@ const PreviewPage = () => {
   const previewUrl = `${previewBase}${route.startsWith("/") ? route : "/" + route}`;
   const iframeSrc = localHtml ? `data:text/html;charset=utf-8,${encodeURIComponent(localHtml)}` : previewUrl;
 
-  // Load HTML for current route + collect available routes from snapshot
+  // Load HTML for current route + collect available routes from snapshot + read published URL
   useEffect(() => {
     if (!projectId) return;
-    supabase.from("projects").select("files_snapshot, status, preview_url").eq("id", projectId).maybeSingle().then(({ data }) => {
-      const files = (data as any)?.files_snapshot || {};
-      const html = files[route] || files[`/${route.replace(/^\/+/, "")}`] || files["/index.html"] || files["index.html"];
-      setLocalHtml(typeof html === "string" ? html : null);
+    supabase
+      .from("projects")
+      .select("files_snapshot, status, preview_url")
+      .eq("id", projectId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const files = (data as any)?.files_snapshot || {};
+        const html =
+          files[route] ||
+          files[`/${route.replace(/^\/+/, "")}`] ||
+          files["/index.html"] ||
+          files["index.html"];
+        setLocalHtml(typeof html === "string" ? html : null);
 
-      // Build a clean routes list from html files
-      const found = Object.keys(files)
-        .filter(p => /\.html?$/i.test(p))
-        .map(p => {
-          let r = p.startsWith("/") ? p : "/" + p;
-          r = r.replace(/index\.html?$/i, "");
-          r = r.replace(/\.html?$/i, "");
-          if (r === "") r = "/";
-          return r;
-        });
-      const unique = Array.from(new Set(["/", ...found]));
-      setRoutes(unique);
+        const found = Object.keys(files)
+          .filter((p) => /\.html?$/i.test(p))
+          .map((p) => {
+            let r = p.startsWith("/") ? p : "/" + p;
+            r = r.replace(/index\.html?$/i, "");
+            r = r.replace(/\.html?$/i, "");
+            if (r === "") r = "/";
+            return r;
+          });
+        setRoutes(Array.from(new Set(["/", ...found])));
 
-      if ((data as any)?.status === "published" && (data as any)?.preview_url?.startsWith("http")) {
-        // keep — published_url stored elsewhere; nothing to do here
-      }
-    });
+        const status = (data as any)?.status;
+        const url = (data as any)?.preview_url;
+        if (status === "published" && typeof url === "string" && url.startsWith("http")) {
+          setPublishedUrl(url);
+        }
+      });
   }, [projectId, route, iframeKey]);
 
   const handleRefresh = () => setIframeKey(k => k + 1);
