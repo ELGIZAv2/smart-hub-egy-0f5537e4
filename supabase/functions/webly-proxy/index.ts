@@ -107,28 +107,76 @@ Deno.serve(async (req) => {
     }
 
     if (action === "deploy") {
+      // Try the upstream Webly deploy first.
       try {
         const r = await fetch(`${WEBLY_BASE}/webly-deploy`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ project_id: body.project_id }),
         });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          // Silent skip for missing upstream projects (local fallback builds)
-          return new Response(
-            JSON.stringify({ ok: false, skipped: true, reason: r.status === 404 ? "not_found" : "upstream_error" }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        const data = await r.json().catch(() => ({} as any));
+        if (r.ok && (data?.cloudflare_url || data?.url)) {
+          return new Response(JSON.stringify({ ok: true, ...data, cloudflare_url: data.cloudflare_url || data.url }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch {}
+
+      // Fallback: publish the local snapshot to the published-sites bucket.
+      try {
+        const supabase = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+        const projectRowId = body.project_row_id;
+        if (!projectRowId) {
+          return new Response(JSON.stringify({ ok: false, error: "Missing project_row_id" }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: row } = await supabase
+          .from("projects")
+          .select("files_snapshot, user_id")
+          .eq("id", projectRowId)
+          .maybeSingle();
+        const files = (row as any)?.files_snapshot || {};
+        const indexHtml: string | undefined =
+          files["/index.html"] || files["index.html"] || Object.values(files).find((v) => typeof v === "string" && /<html/i.test(String(v))) as string | undefined;
+        if (!indexHtml) {
+          return new Response(JSON.stringify({ ok: false, error: "No index.html in snapshot" }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Upload every html file under sites/<project_id>/...
+        const slug = String(body.project_id).replace(/[^a-z0-9-]/gi, "").slice(0, 40) || "site";
+        const base = `sites/${slug}`;
+        const uploads: Promise<unknown>[] = [];
+        for (const [path, content] of Object.entries(files)) {
+          if (typeof content !== "string") continue;
+          const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+          const objectPath = `${base}/${cleanPath || "index.html"}`;
+          const ct =
+            cleanPath.endsWith(".html") || cleanPath === "" ? "text/html; charset=utf-8" :
+            cleanPath.endsWith(".css") ? "text/css" :
+            cleanPath.endsWith(".js") ? "application/javascript" :
+            cleanPath.endsWith(".json") ? "application/json" :
+            cleanPath.endsWith(".svg") ? "image/svg+xml" : "text/plain";
+          uploads.push(
+            supabase.storage.from("published-sites").upload(objectPath, new Blob([content], { type: ct }), {
+              contentType: ct,
+              upsert: true,
+            }),
           );
         }
-        return new Response(JSON.stringify(data), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        await Promise.allSettled(uploads);
+        const { data: pub } = supabase.storage.from("published-sites").getPublicUrl(`${base}/index.html`);
+        const url = pub.publicUrl;
+        return new Response(JSON.stringify({ ok: true, url, cloudflare_url: url }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch {
-        return new Response(JSON.stringify({ ok: false, skipped: true, reason: "exception" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ ok: false, error: "Publish failed" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
