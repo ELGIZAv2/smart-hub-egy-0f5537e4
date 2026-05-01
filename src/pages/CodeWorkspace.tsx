@@ -2,21 +2,19 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Menu, ArrowUp, Plus, MoreHorizontal, Image as ImageIcon, Paperclip, Camera,
-  Loader2, Database, Github, Eye, Settings, Pencil, X, Check, ChevronDown,
+  ArrowLeft, ArrowUp, Plus, Image as ImageIcon, Paperclip, Camera,
+  Loader2, Database, Github, Play, Settings, Pencil, X, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
 import AppLayout from "@/layouts/AppLayout";
-import AppSidebar from "@/components/AppSidebar";
 import CodeChatContainer from "@/components/code/CodeChatContainer";
 import { CodeStep, StepType } from "@/components/code/CodeStepMessage";
 import ConnectIntegrationsSheet from "@/components/code/ConnectIntegrationsSheet";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const WEBLY_BASE = "https://wxphtsgezburjqoqiqqo.supabase.co/functions/v1";
 const BUILD_CREDIT_COST = 5;
 
 interface ChatMsg {
@@ -50,7 +48,6 @@ const CodeWorkspace = () => {
   const [steps, setSteps] = useState<CodeStep[]>([]);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [planMode, setPlanMode] = useState(false);
 
   const [conversationId, setConversationId] = useState<string | null>(paramConversationId || null);
   const [projectId, setProjectId] = useState<string | null>(paramProjectId || null);
@@ -59,19 +56,24 @@ const CodeWorkspace = () => {
   const [hasBuilt, setHasBuilt] = useState(false);
 
   // UI state
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-  const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
-  const [githubBusy, setGithubBusy] = useState(false);
+  const [integrationsInitialView, setIntegrationsInitialView] = useState<"menu" | "supabase" | "github">("menu");
+
+  // Resizable bottom sheet
+  const [projectMenuHeight, setProjectMenuHeight] = useState(440);
+  const dragStartY = useRef<number | null>(null);
+  const dragStartH = useRef<number>(440);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const initRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
   const { userId, credits, hasEnoughCredits, refreshCredits, loading: creditsLoading } = useCredits();
 
@@ -93,7 +95,7 @@ const CodeWorkspace = () => {
     })();
   }, [paramProjectId]);
 
-  // --- Load conversation messages ---
+  // --- Load conversation messages — never wipe local; merge if needed ---
   useEffect(() => {
     if (!paramConversationId) return;
     (async () => {
@@ -111,6 +113,7 @@ const CodeWorkspace = () => {
     if (initRef.current || !initialPrompt || messages.length > 0 || creditsLoading) return;
     initRef.current = true;
     handleSend(initialPrompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPrompt, creditsLoading]);
 
   // --- Step helpers ---
@@ -176,13 +179,28 @@ const CodeWorkspace = () => {
     if (data) {
       setProjectId(data.id);
       setProjectName(name);
+      // Capture screenshot in background once a preview exists
+      captureScreenshot(data.id, weblyId);
       return data.id;
     }
     return null;
   };
 
-  // Screenshot capture disabled — Webly fallback projects don't support it reliably.
-  const captureScreenshot = async (_pid: string, _weblyId: string) => { /* no-op */ };
+  // --- Screenshot via Webly preview URL → store on project.preview_url is the published URL.
+  // For card thumbnails we use a separate column `thumbnail_url`. We try to fetch a screenshot
+  // via the screenshot edge function (uses ScreenshotOne).
+  const captureScreenshot = async (pid: string, weblyId: string) => {
+    try {
+      const url = `https://wxphtsgezburjqoqiqqo.supabase.co/functions/v1/webly-site/${weblyId}/`;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/capture-screenshot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ url, project_id: pid }),
+      });
+      // Edge function (best-effort) writes to projects.thumbnail_url itself; ignore errors
+      if (!r.ok) return;
+    } catch {}
+  };
 
   // --- Persist a single message to DB ---
   const persistMessage = async (convId: string | null, msg: ChatMsg) => {
@@ -196,7 +214,7 @@ const CodeWorkspace = () => {
     } catch {}
   };
 
-  // --- Handle API key submission from inline card ---
+  // --- Handle API key submission ---
   const handleApiKeySubmit = async (keyName: string, keyValue: string) => {
     if (!userId || !keyName) return;
     try {
@@ -215,7 +233,7 @@ const CodeWorkspace = () => {
     }
   };
 
-  // --- Send message / build ---
+  // --- Send / build ---
   const handleSend = async (textOverride?: string) => {
     const msgText = textOverride ?? input;
     if (!msgText.trim() || isLoading) return;
@@ -236,7 +254,6 @@ const CodeWorkspace = () => {
     const convId = await ensureConversation(msgText);
     persistMessage(convId, userMsg);
 
-    // Deduct
     if (userId) {
       const dedResp = await fetch(`${SUPABASE_URL}/functions/v1/deduct-credits`, {
         method: "POST",
@@ -254,8 +271,6 @@ const CodeWorkspace = () => {
 
     await addStep("thinking", "Thinking");
 
-    // ALWAYS reuse the existing webly project id when present so follow-ups
-    // become edits to the same site, not a brand new project.
     const wpid = weblyProjectId || `megsy-${userId?.slice(0, 8) || "u"}-${Date.now().toString(36)}`;
     if (!weblyProjectId) setWeblyProjectId(wpid);
 
@@ -271,7 +286,7 @@ const CodeWorkspace = () => {
     };
 
     try {
-      // Pure pass-through: only what Webly needs. No system prompt, no fake messages.
+      // Pure pass-through to the Webly backend (per user instruction)
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/webly-proxy`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
@@ -307,7 +322,6 @@ const CodeWorkspace = () => {
           if (data === "[DONE]") continue;
           try {
             const ev = JSON.parse(data);
-            // Stream text from the backend straight into the chat.
             if (ev.type === "text" && typeof ev.delta === "string") {
               assistantBuffer += ev.delta;
             } else if (ev.type === "status" && typeof ev.message === "string") {
@@ -347,6 +361,8 @@ const CodeWorkspace = () => {
       const pid = await ensureProject(msgText, wpid, convId);
       if (pid && Object.keys(generatedFiles).length > 0) {
         await supabase.from("projects").update({ files_snapshot: generatedFiles as any }).eq("id", pid);
+        // Now snapshot exists — try a screenshot
+        captureScreenshot(pid, wpid);
       }
     } catch (e) {
       completeAllSteps();
@@ -359,7 +375,6 @@ const CodeWorkspace = () => {
       };
       setMessages(prev => [...prev, errMsg]);
       persistMessage(convId, errMsg);
-      // Refund
       if (userId) {
         fetch(`${SUPABASE_URL}/functions/v1/deduct-credits`, {
           method: "POST",
@@ -406,90 +421,52 @@ const CodeWorkspace = () => {
     toast.success("Project renamed");
   };
 
-  // --- Supabase connect (fixed-text UX) ---
-  const [supaUrl, setSupaUrl] = useState("");
-  const [supaKey, setSupaKey] = useState("");
-  const handleSupabaseConnect = async () => {
-    if (!supaUrl.trim() || !supaKey.trim() || !userId) return;
-    // Save to integrations (server-only readable from edge functions)
-    await supabase.from("code_integrations").upsert({
-      user_id: userId,
-      project_id: projectId,
-      provider: "supabase",
-      config: { url: supaUrl.trim(), anon_key: supaKey.trim() },
-    } as any, { onConflict: "user_id,project_id,provider" });
-
-    setSupabaseModalOpen(false);
-    setSupaUrl(""); setSupaKey("");
-    toast.success("Backend connected");
+  const openIntegrations = (initial: "menu" | "supabase" | "github" = "menu") => {
+    setProjectMenuOpen(false);
+    setPlusMenuOpen(false);
+    setIntegrationsInitialView(initial);
+    setIntegrationsOpen(true);
   };
 
-  // --- GitHub push ---
-  const handleGithubPush = async () => {
-    setMoreMenuOpen(false);
-    if (!hasBuilt || !weblyProjectId) {
-      toast.error("Build something first.");
-      return;
-    }
-    setGithubBusy(true);
-    try {
-      // Prefer local snapshot from DB (works for both upstream + fallback builds)
-      let files: Record<string, string> = {};
-      if (projectId) {
-        const { data } = await supabase.from("projects").select("files_snapshot").eq("id", projectId).maybeSingle();
-        const snap = (data as any)?.files_snapshot;
-        if (snap && typeof snap === "object") files = snap;
-      }
-      // Fallback: try webly upstream (silent on 404)
-      if (Object.keys(files).length === 0) {
-        try {
-          const filesResp = await fetch(`${WEBLY_BASE}/webly-site/${weblyProjectId}/__files`);
-          if (filesResp.ok) {
-            const filesData = await filesResp.json().catch(() => ({}));
-            files = filesData?.files || filesData || {};
-          }
-        } catch {}
-      }
-
-      if (!files || Object.keys(files).length === 0) {
-        toast.error("No files to push yet. Build the project first.");
-        setGithubBusy(false);
-        return;
-      }
-
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/github-push`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({
-          user_id: userId,
-          project_name: projectName,
-          description: `Built with Megsy AI — ${projectName}`,
-          files,
-        }),
-      });
-      const data = await r.json();
-      if (data.ok && data.repo_url) {
-        await supabase.from("projects").update({ repo_url: data.repo_url }).eq("id", projectId!);
-        toast.success("Pushed to GitHub");
-        window.open(data.repo_url, "_blank", "noopener,noreferrer");
-      } else if (data.needs_oauth) {
-        toast.error("Connect your GitHub account first (coming soon).");
-      } else {
-        toast.error("GitHub push failed.");
-      }
-    } catch {
-      toast.error("GitHub push failed.");
-    }
-    setGithubBusy(false);
-  };
-
-  const handleOpenPreview = () => {
+  const handleOpenPreview = useCallback(() => {
     if (!weblyProjectId || !projectId) {
       toast.info("Build something first to preview.");
       return;
     }
     navigate(`/code/preview/${projectId}?webly=${weblyProjectId}${conversationId ? `&conversation_id=${conversationId}` : ""}`);
+  }, [weblyProjectId, projectId, conversationId, navigate]);
+
+  // --- Swipe-left → preview ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartX.current = t.clientX;
+    touchStartY.current = t.clientY;
   };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const sx = touchStartX.current, sy = touchStartY.current;
+    if (sx == null || sy == null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 80 && Math.abs(dy) < 60 && dx < 0 && hasBuilt) {
+      handleOpenPreview();
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  // --- Resizable sheet handlers ---
+  const onResizeStart = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStartY.current = e.clientY;
+    dragStartH.current = projectMenuHeight;
+  };
+  const onResizeMove = (e: React.PointerEvent) => {
+    if (dragStartY.current == null) return;
+    const dy = e.clientY - dragStartY.current;
+    const h = Math.max(220, Math.min(window.innerHeight * 0.9, dragStartH.current - dy));
+    setProjectMenuHeight(h);
+  };
+  const onResizeEnd = () => { dragStartY.current = null; };
 
   return (
     <AppLayout
@@ -497,23 +474,20 @@ const CodeWorkspace = () => {
       onNewChat={() => navigate("/code")}
       activeConversationId={conversationId}
     >
-      <div className="relative h-[100dvh] w-full bg-background overflow-hidden flex flex-col">
-        <AppSidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          onNewChat={() => navigate("/code")}
-          onSelectConversation={(id) => navigate(`/code/workspace?conversation_id=${id}`)}
-          activeConversationId={conversationId}
-          currentMode="code"
-        />
-
-        {/* Floating header — no background, no border */}
+      <div
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="relative h-[100dvh] w-full bg-background overflow-hidden flex flex-col"
+      >
+        {/* Floating header */}
         <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 py-3 pointer-events-none">
           <button
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => navigate("/code")}
             className="pointer-events-auto h-10 w-10 rounded-full flex items-center justify-center text-foreground/80 hover:text-foreground hover:bg-card/60 backdrop-blur-md transition-all"
+            aria-label="Back"
           >
-            <Menu className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
 
           <button
@@ -524,18 +498,19 @@ const CodeWorkspace = () => {
             <ChevronDown className="w-3.5 h-3.5 opacity-60" />
           </button>
 
-          {/* Preview button — top right */}
+          {/* Preview pill — Play icon + label */}
           <button
             onClick={handleOpenPreview}
             disabled={!hasBuilt}
-            className="pointer-events-auto h-10 w-10 rounded-full liquid-glass-button flex items-center justify-center text-foreground/80 hover:text-foreground hover:scale-105 transition-all disabled:opacity-40"
+            className="pointer-events-auto h-10 px-3.5 rounded-full liquid-glass-button flex items-center gap-1.5 text-foreground/90 hover:text-foreground hover:scale-[1.02] transition-all disabled:opacity-40"
             aria-label="Preview"
           >
-            <Eye className="w-5 h-5" />
+            <Play className="w-4 h-4" fill="currentColor" />
+            <span className="text-xs font-semibold">Preview</span>
           </button>
         </div>
 
-        {/* Project bottom sheet — full glassmorphism, click outside to close */}
+        {/* Project bottom sheet — resizable */}
         <AnimatePresence>
           {projectMenuOpen && (
             <>
@@ -547,11 +522,21 @@ const CodeWorkspace = () => {
               <motion.div
                 initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8 max-h-[80vh] overflow-y-auto"
+                style={{ height: projectMenuHeight }}
+                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8 overflow-y-auto"
               >
-                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+                {/* drag handle (resize) */}
+                <div
+                  onPointerDown={onResizeStart}
+                  onPointerMove={onResizeMove}
+                  onPointerUp={onResizeEnd}
+                  onPointerCancel={onResizeEnd}
+                  className="w-full h-6 flex items-center justify-center cursor-ns-resize touch-none mb-1"
+                >
+                  <div className="w-12 h-1.5 rounded-full bg-foreground/25" />
+                </div>
 
-                {/* Credits row with bar */}
+                {/* Credits */}
                 <div className="rounded-2xl liquid-glass-button px-4 py-3.5 mb-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-foreground">Credits</span>
@@ -582,28 +567,14 @@ const CodeWorkspace = () => {
                   disabled={!hasBuilt}
                   className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
                 >
-                  <Eye className="w-5 h-5" /> Open preview
-                </button>
-                <button
-                  onClick={() => { setProjectMenuOpen(false); handleGithubPush(); }}
-                  disabled={githubBusy || !hasBuilt}
-                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
-                >
-                  {githubBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
-                  {githubBusy ? "Pushing to GitHub..." : "Push to GitHub"}
-                </button>
-                <button
-                  onClick={() => { setProjectMenuOpen(false); setSupabaseModalOpen(true); }}
-                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
-                >
-                  <Database className="w-5 h-5 text-emerald-500" /> Connect backend
+                  <Play className="w-5 h-5" fill="currentColor" /> Open preview
                 </button>
               </motion.div>
             </>
           )}
         </AnimatePresence>
 
-        {/* + bottom sheet */}
+        {/* + plus menu — grid (Supabase, Image, File) */}
         <AnimatePresence>
           {plusMenuOpen && (
             <>
@@ -619,72 +590,52 @@ const CodeWorkspace = () => {
                 onClick={e => e.stopPropagation()}
               >
                 <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
-                <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
-                  <ImageIcon className="w-5 h-5" /> Attach image
-                </button>
-                <button onClick={() => handleFilePick("file")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
-                  <Paperclip className="w-5 h-5" /> Attach file
-                </button>
-                <button onClick={() => handleFilePick("camera")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
-                  <Camera className="w-5 h-5" /> Take photo
+                <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-1 mb-3">Add to project</p>
+
+                {/* Top row: 2 squares */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <button
+                    onClick={() => openIntegrations("supabase")}
+                    className="aspect-[4/3] rounded-2xl liquid-glass-button flex flex-col items-center justify-center gap-2 text-foreground hover:scale-[1.02] transition-transform"
+                  >
+                    <Database className="w-7 h-7 text-emerald-500" />
+                    <span className="text-sm font-semibold">Supabase</span>
+                    <span className="text-[10px] text-muted-foreground">Connect database</span>
+                  </button>
+                  <button
+                    onClick={() => handleFilePick("image")}
+                    className="aspect-[4/3] rounded-2xl liquid-glass-button flex flex-col items-center justify-center gap-2 text-foreground hover:scale-[1.02] transition-transform"
+                  >
+                    <ImageIcon className="w-7 h-7 text-fuchsia-500" />
+                    <span className="text-sm font-semibold">Image</span>
+                    <span className="text-[10px] text-muted-foreground">Attach a photo</span>
+                  </button>
+                </div>
+
+                {/* Bottom: full-width */}
+                <button
+                  onClick={() => handleFilePick("file")}
+                  className="w-full rounded-2xl liquid-glass-button flex items-center gap-3 px-5 py-4 text-foreground hover:scale-[1.01] transition-transform"
+                >
+                  <Paperclip className="w-6 h-6 text-amber-500" />
+                  <div className="text-left">
+                    <p className="text-sm font-semibold">File</p>
+                    <p className="text-[11px] text-muted-foreground">Attach any document</p>
+                  </div>
                 </button>
               </motion.div>
             </>
           )}
         </AnimatePresence>
 
-        {/* ... bottom sheet — integrations */}
-        <AnimatePresence>
-          {moreMenuOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={() => setMoreMenuOpen(false)}
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed bottom-0 inset-x-0 z-50 rounded-t-[28px] liquid-glass-milk px-5 pt-3 pb-8"
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
-                <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5">Integrations</p>
-                <button
-                  onClick={() => { setMoreMenuOpen(false); setIntegrationsOpen(true); }}
-                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
-                >
-                  <Database className="w-5 h-5 text-emerald-500" /> Connect Supabase
-                </button>
-                <button
-                  onClick={() => { setMoreMenuOpen(false); setIntegrationsOpen(true); }}
-                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
-                >
-                  <Github className="w-5 h-5" /> Connect GitHub
-                </button>
-                <button
-                  onClick={handleGithubPush}
-                  disabled={githubBusy}
-                  className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors disabled:opacity-40"
-                >
-                  {githubBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
-                  {githubBusy ? "Pushing..." : "Push current to GitHub"}
-                </button>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
+        {/* Chat */}
         <div className="flex-1 overflow-hidden pt-14 pb-44 min-h-0">
           <CodeChatContainer messages={messages} steps={steps} activeStepId={activeStepId} isThinking={isLoading && steps.length === 0} onSubmitApiKey={handleApiKeySubmit} />
         </div>
 
-        {/* Preview moved to top-right header */}
-
-        {/* Bottom sticky input */}
+        {/* Bottom input */}
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-3 pt-6 bg-gradient-to-t from-background via-background/95 to-transparent">
           <div className="max-w-2xl mx-auto">
-            {/* Attachments */}
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2 px-2">
                 {attachments.map((a, i) => (
@@ -704,56 +655,43 @@ const CodeWorkspace = () => {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                placeholder={hasBuilt ? "Describe your changes..." : "Describe your project..."}
+                placeholder={isLoading ? "Building..." : hasBuilt ? "Describe your changes..." : "Describe your project..."}
                 rows={1}
-                className="w-full bg-transparent border-none outline-none resize-none text-sm text-foreground placeholder:text-muted-foreground/60 px-2 py-1.5 max-h-32"
+                disabled={isLoading}
+                className="w-full bg-transparent border-none outline-none resize-none text-sm text-foreground placeholder:text-muted-foreground/60 px-2 py-1.5 max-h-32 disabled:opacity-60"
               />
 
-              {/* Bottom toolbar — order: +, ..., Plan, ..., Send */}
               <div className="flex items-center gap-1.5 mt-1">
                 <button
-                  onClick={() => { setPlusMenuOpen(true); setMoreMenuOpen(false); }}
+                  onClick={() => setPlusMenuOpen(true)}
                   className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
                   aria-label="Add"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
 
-                <button
-                  onClick={() => { setMoreMenuOpen(true); setPlusMenuOpen(false); }}
-                  className="h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-                  aria-label="More"
-                >
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
-
-                {/* Plan mode — clean bordered button, no icon */}
-                <button
-                  onClick={() => setPlanMode(p => !p)}
-                  className={`h-9 px-4 rounded-full text-xs font-semibold transition-all border ${
-                    planMode
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "text-foreground border-border/70 hover:border-foreground/40 bg-transparent"
-                  }`}
-                >
-                  Plan
-                </button>
-
                 <div className="flex-1" />
 
-                <button
-                  onClick={() => handleSend()}
-                  disabled={!input.trim() || isLoading}
-                  className="h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-25 flex items-center justify-center"
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
-                </button>
+                {/* Send — fully hidden while building (per user request) */}
+                {!isLoading && (
+                  <button
+                    onClick={() => handleSend()}
+                    disabled={!input.trim()}
+                    className="h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-25 flex items-center justify-center"
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </button>
+                )}
+                {isLoading && (
+                  <div className="h-9 w-9 flex items-center justify-center text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Hidden file inputs */}
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
 
@@ -783,55 +721,14 @@ const CodeWorkspace = () => {
             </div>
           )}
         </AnimatePresence>
-
-        {/* Supabase connect dialog */}
-        <AnimatePresence>
-          {supabaseModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSupabaseModalOpen(false)}>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                onClick={e => e.stopPropagation()}
-                className="w-full max-w-md rounded-3xl liquid-glass-milk p-5"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <Database className="w-5 h-5 text-emerald-500" />
-                  <h3 className="text-base font-semibold text-foreground">Connect Backend</h3>
-                </div>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Paste your Supabase project URL and anon key. They are stored securely and used only by the AI when building your backend.
-                </p>
-                <div className="space-y-2.5">
-                  <input
-                    type="url" value={supaUrl} onChange={e => setSupaUrl(e.target.value)}
-                    placeholder="https://xxxx.supabase.co"
-                    className="w-full bg-secondary rounded-xl px-3 py-2.5 text-sm text-foreground border border-border outline-none focus:border-primary transition-colors"
-                  />
-                  <input
-                    type="password" value={supaKey} onChange={e => setSupaKey(e.target.value)}
-                    placeholder="Anon key (eyJhbGc...)"
-                    className="w-full bg-secondary rounded-xl px-3 py-2.5 text-sm text-foreground border border-border outline-none focus:border-primary transition-colors"
-                  />
-                </div>
-                <div className="flex gap-2 mt-5">
-                  <button onClick={() => setSupabaseModalOpen(false)} className="flex-1 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-medium">Cancel</button>
-                  <button
-                    onClick={handleSupabaseConnect}
-                    disabled={!supaUrl.trim() || !supaKey.trim()}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-1.5"
-                  >
-                    <Check className="w-4 h-4" /> Connect
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
+
       <ConnectIntegrationsSheet
         open={integrationsOpen}
         onClose={() => setIntegrationsOpen(false)}
         userId={userId}
         projectId={projectId}
+        initialView={integrationsInitialView}
       />
     </AppLayout>
   );
