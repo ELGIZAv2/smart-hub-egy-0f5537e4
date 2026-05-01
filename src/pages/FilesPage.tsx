@@ -1,250 +1,171 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
-import ResearchFlow, { ResearchStep } from "@/components/files/ResearchFlow";
-import FilePreviewPanel from "@/components/files/FilePreviewPanel";
-import ExportDialog from "@/components/files/ExportDialog";
-import { buildPreviewHtml } from "@/lib/filesHtmlBuilders";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu, ArrowUp, Plus, X, Download, Eye, FileText, Undo2, Redo2, Paperclip, Image, HardDrive, Upload } from "lucide-react";
+import {
+  Menu, ArrowUp, FileText, Presentation, FileSpreadsheet,
+  ScrollText, Map, GitBranch, Calendar, Mail, User, Loader2, Eye, Download, X,
+} from "lucide-react";
 
-import type { SlideDeck } from "@/lib/slides/types";
-import SlideDeckPreview from "@/components/files/SlideDeckPreview";
-import BriefCard, { type FileBrief } from "@/components/files/BriefCard";
-import SmartQuestionFlow, { type SmartQuestion } from "@/components/files/SmartQuestionFlow";
-import { getBuilder, type FileBuilderType } from "@/lib/builders";
-import { detectLanguage } from "@/lib/detectLanguage";
+// ---------- Backend (Docs Design Studio) ----------
+const DDS_BASE = "https://docs-design-studio.lovable.app";
 
+type Kind =
+  | "slides" | "document" | "resume" | "report"
+  | "spreadsheet" | "letter" | "roadmap" | "mindmap" | "timeline";
 
-const SPECIALIZED_BUILDERS: FileBuilderType[] = [
-  "document", "resume", "report", "spreadsheet",
-  "letter", "roadmap", "mindmap", "timeline",
-];
+interface Template {
+  type: Kind;
+  id: string;
+  name: string;
+  description?: string;
+  preview?: string;
+  style?: string;
+}
+
+interface DocsDoc {
+  kind: Kind;
+  template?: string;
+  accentColor?: string;
+  background?: "dark" | "light" | "gradient";
+  slides?: Array<{ html: string; title?: string; notes?: string }>;
+  blocks?: Array<any>;
+  title?: string;
+  subtitle?: string;
+  // resume
+  name?: string;
+  contact?: any;
+  summary?: string;
+  experience?: any[];
+  education?: any[];
+  skills?: string[];
+  // spreadsheet
+  sheet?: { name?: string; headers: string[]; rows: string[][]; totals?: string[] };
+}
 
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
-  htmlContent?: string;
-  pdfPreviewUrl?: string;
-  downloadUrl?: string;
-  mimeType?: string;
-  deck?: SlideDeck;
-  /** When set, this assistant message renders a BriefCard awaiting user confirmation. */
-  brief?: FileBrief;
-  briefForType?: FileBuilderType;
-  briefTopic?: string;
-  briefConsumed?: boolean;
-  /** When set, this assistant message renders a SmartQuestionFlow card. */
-  questions?: SmartQuestion[];
-  questionsForType?: FileBuilderType;
-  questionsTopic?: string;
-  questionsAnswered?: boolean;
-  questionsAnswer?: string;
-  questionsLanguage?: string;
+  status?: string;          // streaming status
+  generationId?: string;
+  doc?: DocsDoc;
+  htmlPreview?: string;     // pre-rendered HTML page from /export?format=html
 }
 
-interface AttachedFile {
-  name: string;
-  type: string;
-  data: string;
-}
-
-interface SavedFile {
-  id: string;
-  title: string;
-  created_at: string;
-  mode: string;
-  preview_html?: string;
-  preview_deck?: SlideDeck;
-}
-
-interface SlideTemplate {
-  id: string;
-  template_id: string;
-  image_url: string | null;
-  name?: string | null;
-  description?: string | null;
-  template_engine?: string | null;
-  component_name?: string | null;
-}
-
-const FILE_SERVICES = [
-  { id: "slides", label: "Slides" },
-  { id: "document", label: "Document" },
-  { id: "resume", label: "Resume" },
-  { id: "report", label: "Report" },
-  { id: "spreadsheet", label: "Spreadsheet" },
-  { id: "letter", label: "Letter" },
-  { id: "roadmap", label: "Roadmap" },
-  { id: "mindmap", label: "Mindmap" },
-  { id: "timeline", label: "Timeline" },
+const KINDS: { id: Kind; label: string; icon: any; gradient: string }[] = [
+  { id: "slides",      label: "Slides",      icon: Presentation,    gradient: "from-purple-500 to-fuchsia-500" },
+  { id: "document",    label: "Document",    icon: FileText,        gradient: "from-blue-500 to-cyan-500" },
+  { id: "resume",      label: "Resume",      icon: User,            gradient: "from-emerald-500 to-teal-500" },
+  { id: "report",      label: "Report",      icon: ScrollText,      gradient: "from-amber-500 to-orange-500" },
+  { id: "spreadsheet", label: "Spreadsheet", icon: FileSpreadsheet, gradient: "from-green-500 to-emerald-500" },
+  { id: "letter",      label: "Letter",      icon: Mail,            gradient: "from-rose-500 to-pink-500" },
+  { id: "roadmap",     label: "Roadmap",     icon: Map,             gradient: "from-indigo-500 to-blue-500" },
+  { id: "mindmap",     label: "Mindmap",     icon: GitBranch,       gradient: "from-violet-500 to-purple-500" },
+  { id: "timeline",    label: "Timeline",    icon: Calendar,        gradient: "from-yellow-500 to-amber-500" },
 ];
 
-const SPREADSHEET_TEMPLATES = [
-  { label: "Financial Report", prompt: "Create a comprehensive financial report spreadsheet with revenue, expenses, net income, assets, liabilities, and key financial ratios" },
-  { label: "Employee Directory", prompt: "Create an employee directory spreadsheet with columns for name, department, position, email, phone, hire date, and status" },
-  { label: "Sales Tracker", prompt: "Create a sales tracking spreadsheet with columns for date, product, quantity, unit price, total, salesperson, and region" },
-  { label: "Project Budget", prompt: "Create a project budget spreadsheet with categories, planned budget, actual spending, variance, and completion status" },
-  { label: "Data Analysis", prompt: "Create a data analysis spreadsheet with sample dataset, summary statistics, pivot table, and trend analysis" },
-];
+// ---------- SSE reader ----------
+async function streamGenerate(
+  body: any,
+  onStatus: (msg: string) => void,
+): Promise<{ docJson: string; id: string; url: string | null }> {
+  const res = await fetch(`${DDS_BASE}/api/v1/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) throw new Error(`Generation failed (${res.status})`);
 
-const spring = { type: "spring" as const, damping: 22, stiffness: 350 };
-
-async function readSSEStreamWithStatus(
-  body: ReadableStream<Uint8Array>,
-  onStatus?: (status: string) => void,
-  onContent?: (chunk: string) => void
-): Promise<string> {
-  const reader = body.getReader();
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let result = "";
   let buffer = "";
   while (true) {
-    const { done, value } = await reader.read();
+    const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    let idx: number;
-    while ((idx = buffer.indexOf("\n")) !== -1) {
-      let line = buffer.slice(0, idx);
-      buffer = buffer.slice(idx + 1);
-      if (line.endsWith("\r")) line = line.slice(0, -1);
-      if (!line.startsWith("data: ")) continue;
-      const json = line.slice(6).trim();
-      if (json === "[DONE]") return result;
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      let event = "message", data = "";
+      for (const line of raw.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) data += line.slice(5).trim();
+      }
+      if (!data) continue;
       try {
-        const parsed = JSON.parse(json);
-        const delta = parsed.choices?.[0]?.delta?.content;
-        if (delta) {
-          const statusMatch = delta.match(/\[STATUS:\s*(.*?)\]/);
-          if (statusMatch && onStatus) onStatus(statusMatch[1]);
-          const cleanDelta = delta.replace(/\[STATUS:\s*.*?\]/g, "");
-          if (cleanDelta) { result += cleanDelta; onContent?.(cleanDelta); }
-        }
-      } catch {}
+        const payload = JSON.parse(data);
+        if (event === "status" && payload.message) onStatus(payload.message);
+        if (event === "done") return payload;
+        if (event === "error") throw new Error(payload.message || "Generation failed");
+      } catch (e: any) {
+        if (event === "error") throw e;
+      }
     }
   }
-  return result;
+  throw new Error("Stream ended without completion");
 }
 
-function extractChatDisplay(content: string): string {
-  const summaryMatch = content.match(/---SUMMARY---([\s\S]*?)$/);
-  if (summaryMatch) return summaryMatch[1].replace(/\[STATUS:\s*.*?\]/g, "").trim();
-  const hasHtml = /<!doctype html|<html[\s>]|<body[\s>]|<div[\s>]|<section[\s>]|<table[\s>]/i.test(content);
-  if (hasHtml) return "Your file is ready. Tap Preview to view it.";
-  return content
-    .replace(/```html[\s\S]*?```/g, "")
-    .replace(/```json[\s\S]*?```/g, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/\[STATUS:\s*.*?\]/g, "")
-    .replace(/<[^>]+>/g, "")
-    .trim();
+// ---------- AI naming (2 words) ----------
+async function generateProjectName(prompt: string): Promise<string> {
+  try {
+    const { data } = await supabase.functions.invoke("name-project", { body: { prompt } });
+    if (data?.name) return data.name;
+  } catch {}
+  return prompt.split(/\s+/).slice(0, 2).join(" ") || "New File";
 }
 
-type AgentMode = "plan" | "work";
-
+// ---------- Main ----------
 const FilesPage = () => {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [selectedKind, setSelectedKind] = useState<Kind>("slides");
+  const [templatesByKind, setTemplatesByKind] = useState<Record<string, Template[]>>({});
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [activeAgent, setActiveAgent] = useState<string | null>(null);
-  const [savedFiles, setSavedFiles] = useState<SavedFile[]>([]);
   const [statusText, setStatusText] = useState("");
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<SlideTemplate | null>(null);
-  const [slideTemplates, setSlideTemplates] = useState<SlideTemplate[]>([]);
-  const [researchSteps, setResearchSteps] = useState<ResearchStep[]>([]);
-  const [slideCount, setSlideCount] = useState<number>(0); // 0 = AI decides
-  const [showExport, setShowExport] = useState(false);
-  const [exportHtml, setExportHtml] = useState("");
-  const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat");
-  const [undoStack, setUndoStack] = useState<ChatMsg[][]>([]);
-  const [redoStack, setRedoStack] = useState<ChatMsg[][]>([]);
-  const [activeDeck, setActiveDeck] = useState<SlideDeck | null>(null);
-  // (intake state removed — replaced by in-chat SmartQuestionFlow)
-  const [pendingBuilder, setPendingBuilder] = useState<{ type: FileBuilderType; topic: string; extras: Record<string, string> } | null>(null);
-  const [plusMenuOpen, setPlusMenuOpen] = useState<"outer" | "inner" | null>(null);
-  const [agentMode, setAgentMode] = useState<AgentMode>("work");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [useResearch, setUseResearch] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const plusMenuRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isGenerating]);
-
+  // Load templates from backend
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("slide_templates").select("*").eq("is_active", true);
-      if (data && data.length > 0) {
-        // Random order so users discover different templates each visit.
-        const shuffled = [...data].sort(() => Math.random() - 0.5);
-        setSlideTemplates(shuffled);
+      try {
+        const res = await fetch(`${DDS_BASE}/api/v1/templates`);
+        const json = await res.json();
+        const grouped: Record<string, Template[]> = {};
+        for (const t of (json.templates || [])) {
+          if (!grouped[t.type]) grouped[t.type] = [];
+          grouped[t.type].push(t);
+        }
+        setTemplatesByKind(grouped);
+      } catch {
+        // silently degrade — templates optional
       }
     })();
   }, []);
 
+  // Auto-pick first template per kind
   useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: convs } = await supabase
-        .from("conversations")
-        .select("id, title, created_at, mode")
-        .eq("user_id", user.id)
-        .eq("mode", "files")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      if (!convs) return;
+    const list = templatesByKind[selectedKind];
+    if (list && list.length > 0) setSelectedTemplate(list[0]);
+    else setSelectedTemplate(null);
+  }, [selectedKind, templatesByKind]);
 
-      // For the first 6, fetch the latest assistant message and pull a preview.
-      const enriched: SavedFile[] = await Promise.all(convs.map(async (c) => {
-        const base: SavedFile = c as SavedFile;
-        try {
-          const { data: msgs } = await supabase
-            .from("messages")
-            .select("role, content, images")
-            .eq("conversation_id", c.id)
-            .eq("role", "assistant")
-            .order("created_at", { ascending: false })
-            .limit(1);
-          const msg = msgs?.[0];
-          if (msg?.images?.[0]) {
-            try {
-              const meta = JSON.parse(msg.images[0]);
-              if (meta?.htmlContent && typeof meta.htmlContent === "string") {
-                if (meta.htmlContent.startsWith("{")) {
-                  // It's a serialized deck
-                  try {
-                    const inner = JSON.parse(meta.htmlContent);
-                    if (inner?.__deck) base.preview_deck = inner.__deck as SlideDeck;
-                  } catch { /* */ }
-                } else {
-                  base.preview_html = meta.htmlContent;
-                }
-              }
-            } catch { /* */ }
-          }
-        } catch { /* */ }
-        return base;
-      }));
-      setSavedFiles(enriched);
-    })();
-  }, []);
-
-  useEffect(() => {
-    setShowTemplates(activeAgent === "slides");
-    if (activeAgent !== "slides") setSelectedTemplate(null);
-  }, [activeAgent]);
-
+  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -252,1076 +173,389 @@ const FilesPage = () => {
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }, [input]);
 
+  // Scroll to bottom on message updates
   useEffect(() => {
-    if (!conversationId || messages.length === 0) return;
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg.htmlContent) {
-      setPreviewHtml(lastMsg.htmlContent);
-      if (!isMobile) setActiveTab("preview");
-    }
-  }, [messages, conversationId, isMobile]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, statusText]);
 
-  useEffect(() => {
-    if (!plusMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target as Node)) setPlusMenuOpen(null);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [plusMenuOpen]);
+  const currentTemplates = useMemo(() => templatesByKind[selectedKind] || [], [selectedKind, templatesByKind]);
 
-  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    Array.from(files).forEach(file => {
-      if (file.size > 10 * 1024 * 1024) { toast.error(`${file.name} too large (max 10MB)`); return; }
-      const reader = new FileReader();
-      if (file.type.startsWith("image/")) {
-        reader.onload = () => setAttachedFiles(prev => [...prev, { name: file.name, type: "image", data: reader.result as string }]);
-        reader.readAsDataURL(file);
-      } else {
-        reader.onload = () => setAttachedFiles(prev => [...prev, { name: file.name, type: file.type, data: (reader.result as string).slice(0, 10000) }]);
-        reader.readAsText(file);
-      }
-    });
-    e.target.value = "";
-  };
+  const handleSend = useCallback(async () => {
+    const prompt = input.trim();
+    if (!prompt || isGenerating) return;
 
-  const getOrCreateConversation = async (firstMsg: string) => {
-    if (conversationId) return conversationId;
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const { data } = await supabase.from("conversations").insert({ title: firstMsg.slice(0, 50) || "File Generation", mode: "files", user_id: user.id } as any).select("id").single();
-    if (data) { setConversationId(data.id); return data.id; }
-    return null;
-  };
-
-  const loadConversation = async (id: string) => {
-    setConversationId(id);
-    const { data: msgs } = await supabase.from("messages").select("*").eq("conversation_id", id).order("created_at", { ascending: true });
-    if (msgs) {
-      const loaded = msgs.map(m => {
-        const msg: ChatMsg = { role: m.role as "user" | "assistant", content: m.content };
-        if (m.role === "assistant" && m.images?.[0]) {
-          try { const meta = JSON.parse(m.images[0]); if (meta.htmlContent) msg.htmlContent = meta.htmlContent; if (meta.downloadUrl) msg.downloadUrl = meta.downloadUrl; } catch {}
-        }
-        return msg;
-      });
-      setMessages(loaded);
-      const lastHtml = [...loaded].reverse().find(m => m.htmlContent);
-      if (lastHtml?.htmlContent) {
-        setPreviewHtml(lastHtml.htmlContent);
-        if (!isMobile) setActiveTab("preview");
-      }
-    }
-  };
-
-  const saveMsg = async (convId: string, role: string, content: string, meta?: { htmlContent?: string; downloadUrl?: string }) => {
-    await supabase.from("messages").insert({ conversation_id: convId, role, content, images: meta ? [JSON.stringify(meta)] : null });
-  };
-
-  const addResearchStep = (label: string) => {
-    setResearchSteps(prev => {
-      const updated = prev.map(s => ({ ...s, status: "done" as const }));
-      return [...updated, { id: `step-${Date.now()}`, label, status: "active" as const }];
-    });
-  };
-
-  const doResearchWithStreaming = async (topic: string): Promise<string> => {
-    setResearchSteps([{ id: "start", label: "Starting research...", status: "active" }]);
-    const systemPrompt = `You are a deep research agent. Research the following topic thoroughly and provide comprehensive, detailed information.
-IMPORTANT: As you research, output [STATUS: description] markers to show your progress.
-After all status updates, provide your full research findings in detail. Include facts, statistics, dates, names, and verified information.
-Write at least 2000 words of research content. Be thorough and accurate.
-Do NOT invent information. Only provide verified facts.`;
-
-    try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: `Research this topic deeply and provide comprehensive information: ${topic}` }
-          ],
-          model: "z-ai/glm-4.5-air:free",
-          mode: "files",
-          searchEnabled: true,
-        }),
-      });
-      if (!resp.ok || !resp.body) return "";
-      return await readSSEStreamWithStatus(resp.body, (status) => { addResearchStep(status); });
-    } catch { return ""; }
-  };
-
-  const generateSlides = async (userInput: string, researchContent: string, convId: string | null) => {
-    addResearchStep("Creating your presentation...");
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase.functions.invoke("generate-slides", {
-      body: {
-        topic: userInput,
-        content: researchContent || userInput,
-        templateId: selectedTemplate?.template_id || undefined,
-        tier: "normal",
-        userId: user?.id,
-        pageCount: slideCount,
-      },
-    });
-    if (error || !data?.success) return null;
-
-    // Premium React deck path
-    if (data?.engine === "react-native" && data?.deck) {
-      const deck = data.deck as SlideDeck;
-      const summary = `Your ${deck.slides.length}-slide presentation "${deck.title || userInput}" is ready. Tap Preview to view it or download as PPTX.`;
-      pushMessage({ role: "assistant", content: summary, deck });
-      if (convId) await saveMsg(convId, "assistant", summary, { htmlContent: JSON.stringify({ __deck: deck }) });
-      setActiveDeck(deck);
-      return true;
-    }
-
-    if (data?.download_url) {
-      const summary = `Your presentation "${userInput}" is ready with ${data.slide_count || slideCount || 10} professional slides.`;
-      pushMessage({ role: "assistant", content: summary, downloadUrl: data.download_url });
-      if (convId) await saveMsg(convId, "assistant", summary, { downloadUrl: data.download_url });
-      return true;
-    }
-    return null;
-  };
-
-  const generateHtmlFile = async (userInput: string, files: AttachedFile[], researchContent: string, convId: string | null) => {
-    addResearchStep("Generating your file...");
-
-    const agentType = activeAgent || "document";
-    const imageFiles = files.filter(f => f.type === "image");
-    const textFiles = files.filter(f => f.type !== "image");
-
-    const systemPrompt = `You are an intelligent file generation agent called Megsy.
-Current mode: ${agentMode === "plan" ? "PLAN — Only discuss, plan, and ask clarifying questions. Do NOT generate any HTML or files." : "WORK — Generate files. You MUST output HTML content."}
-${agentMode === "work" ? `
-You MUST generate a complete HTML file. Do NOT respond with just text.
-Current file type: ${agentType}
-
-CRITICAL RULES FOR FILE GENERATION:
-- This is a FILE, NOT a website. Do NOT include navigation bars, fixed headers, buttons, or interactive UI elements.
-- Generate LARGE, comprehensive content. Minimum 2000 words for reports/documents.
-- Do NOT invent information. Use ONLY the research data provided and the user's explicit instructions.
-- Do NOT add placeholder images, random tables, or filler content unless specifically requested.
-- Do NOT abbreviate, summarize, or truncate the user's request.
-- If the user attached images, analyze them carefully and incorporate the visual content into your response.
-- Output ONLY complete, valid HTML for file content. Do NOT wrap it in code fences.
-- Respond in the SAME LANGUAGE as the user's message.
-- Choose a unique design style that fits the topic.
-
-${agentType === "spreadsheet" ? `SPREADSHEET RULES: Generate interactive tables with contenteditable cells, sort buttons, sum/total rows, responsive with horizontal scroll, professional styling.` : ""}
-${agentType === "resume" ? `RESUME RULES: Use ONLY user data. Include Contact Info, Summary, Experience, Education, Skills, Projects, Languages, Certifications.` : ""}
-${agentType === "roadmap" ? "Generate a visual project roadmap as HTML with timeline-based layout, milestones, and phases." : ""}
-${agentType === "mindmap" ? "Generate a visual mind map as HTML with hierarchical nodes, connecting lines, and proper spacing." : ""}
-${agentType === "timeline" ? "Generate a visual chronological timeline as HTML with events, dates, and descriptions." : ""}
-
-After the HTML content, write a personalized summary starting with ---SUMMARY--- on a new line.
-As you work, output [STATUS: description] markers to show progress.` : `
-Current file type context: ${agentType}
-Help the user plan their ${agentType}. Ask clarifying questions about content, structure, style, and audience.
-Be conversational and helpful. Do NOT generate any HTML.
-Respond in the SAME LANGUAGE as the user's message.`}`;
-
-    let prompt = `User request: ${userInput}`;
-    if (researchContent) prompt += `\n\nResearch data to use (verified information):\n${researchContent.slice(0, 6000)}`;
-
-    if (agentMode === "work" && ["slides", "document", "report", "roadmap", "timeline"].includes(agentType) && !userInput.toLowerCase().includes("no image")) {
-      addResearchStep("Finding relevant images...");
-      try {
-        const { data: imgData } = await supabase.functions.invoke("search", { body: { query: `${userInput} high quality photos` } });
-        const urls = Array.isArray(imgData?.images) ? imgData.images.slice(0, 6) : [];
-        if (urls.length) prompt += `\n\nRelevant images you may use (only if contextually appropriate):\n${urls.map((u: string, i: number) => `${i + 1}. ${u}`).join("\n")}`;
-      } catch {}
-    }
-
-    textFiles.forEach(f => { prompt += `\n\n--- Attached: ${f.name} ---\n${f.data}`; });
-
-    const userMessage: any = imageFiles.length > 0
-      ? { role: "user", content: [
-          { type: "text", text: prompt },
-          ...imageFiles.map(img => ({ type: "image_url", image_url: { url: img.data } }))
-        ]}
-      : { role: "user", content: prompt };
-
-    addResearchStep(agentMode === "plan" ? "Thinking..." : "Writing content...");
-    const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-      body: JSON.stringify({
-        messages: [{ role: "system", content: systemPrompt }, userMessage],
-        model: "z-ai/glm-4.5-air:free",
-        mode: "files",
-      }),
-    });
-
-    if (!resp.ok || !resp.body) {
-      pushMessage({ role: "assistant", content: "Generation failed. Please try again." });
+    if (!user) {
+      toast.error("Please sign in to generate files");
+      navigate("/auth");
       return;
     }
 
-    let content = await readSSEStreamWithStatus(resp.body, (status) => { addResearchStep(status); });
-
-    // In PLAN mode, always accept text response
-    if (agentMode === "plan") {
-      const cleanContent = content.replace(/\[STATUS:\s*.*?\]/g, "").replace(/---SUMMARY---[\s\S]*$/, "").replace(/<[^>]+>/g, "").trim();
-      pushMessage({ role: "assistant", content: cleanContent });
-      if (convId) await saveMsg(convId, "assistant", cleanContent);
-      return;
-    }
-
-    // In WORK mode, check if AI generated HTML
-    const hasHtml = /<!doctype html|<html[\s>]|<body[\s>]|<div[\s>]|<section[\s>]|<table[\s>]/i.test(content);
-    if (!hasHtml && !content.includes("---SUMMARY---")) {
-      // AI didn't generate a file in work mode — retry with stronger instruction
-      addResearchStep("Retrying file generation...");
-      const retryResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: `You MUST generate a complete HTML file. Output ONLY HTML. Do not chat. Generate a ${agentType} about the user's topic. Respond in the user's language. After HTML, add ---SUMMARY--- with a brief description.` },
-            userMessage
-          ],
-          model: "z-ai/glm-4.5-air:free",
-          mode: "files",
-        }),
-      });
-      if (retryResp.ok && retryResp.body) {
-        content = await readSSEStreamWithStatus(retryResp.body, (status) => { addResearchStep(status); });
-      }
-      const retryHasHtml = /<!doctype html|<html[\s>]|<body[\s>]|<div[\s>]|<section[\s>]|<table[\s>]/i.test(content);
-      if (!retryHasHtml) {
-        const cleanContent = content.replace(/\[STATUS:\s*.*?\]/g, "").replace(/<[^>]+>/g, "").trim();
-        pushMessage({ role: "assistant", content: cleanContent || "Could not generate the file. Please try with more details." });
-        if (convId) await saveMsg(convId, "assistant", cleanContent);
-        return;
-      }
-    }
-
-    let summary = "";
-    const summaryMatch = content.match(/---SUMMARY---([\s\S]*?)$/);
-    if (summaryMatch) {
-      summary = summaryMatch[1].replace(/\[STATUS:\s*.*?\]/g, "").trim();
-      content = content.replace(/---SUMMARY---[\s\S]*$/, "").trim();
-    }
-    content = content.replace(/\[STATUS:\s*.*?\]/g, "").trim();
-
-    const html = buildPreviewHtml({ content, agent: activeAgent, request: userInput });
-    const desc = summary || "Your file is ready. Tap Preview to view it.";
-
-    pushMessage({ role: "assistant", content: desc, htmlContent: html });
-    if (convId) await saveMsg(convId, "assistant", desc, { htmlContent: html });
-    setPreviewHtml(html);
-    if (!isMobile) setActiveTab("preview");
-  };
-
-  const pushMessage = (msg: ChatMsg) => {
-    setUndoStack(prev => [...prev, messages]);
-    setRedoStack([]);
-    setMessages(prev => [...prev, msg]);
-  };
-
-  const handleUndo = () => {
-    if (undoStack.length === 0) return;
-    setRedoStack(prev => [...prev, messages]);
-    setMessages(undoStack[undoStack.length - 1]);
-    setUndoStack(prev => prev.slice(0, -1));
-  };
-
-  const handleRedo = () => {
-    if (redoStack.length === 0) return;
-    setUndoStack(prev => [...prev, messages]);
-    setMessages(redoStack[redoStack.length - 1]);
-    setRedoStack(prev => prev.slice(0, -1));
-  };
-
-  const handleGenerate = useCallback(async (overrideInput?: string) => {
-    const userInput = overrideInput || input;
-    if (!userInput.trim() && attachedFiles.length === 0) return;
-
-    // Specialized builders: ask smart questions in-chat first, then brief, then build.
-    if (
-      agentMode === "work" &&
-      activeAgent &&
-      SPECIALIZED_BUILDERS.includes(activeAgent as FileBuilderType) &&
-      !pendingBuilder
-    ) {
-      await startSmartQuestionFlow(activeAgent as FileBuilderType, userInput);
-      return;
-    }
-
-    const userContent = userInput || `[Attached ${attachedFiles.length} file(s)]`;
-    pushMessage({ role: "user", content: userContent });
     setInput("");
-    const files = [...attachedFiles];
-    setAttachedFiles([]);
+    const userMsg: ChatMsg = { role: "user", content: prompt };
+    const assistantMsg: ChatMsg = { role: "assistant", content: "", status: "Starting..." };
+    setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsGenerating(true);
     setStatusText("Starting...");
-    setResearchSteps([]);
-    if (isMobile) setActiveTab("chat");
 
-    const convId = await getOrCreateConversation(userContent);
-    if (convId) await saveMsg(convId, "user", userContent);
-
-    try {
-      // In plan mode, skip research and slides — just chat
-      if (agentMode === "plan") {
-        await generateHtmlFile(userInput, files, "", convId);
-      } else {
-        const isSlides = activeAgent === "slides";
-        const needsResearch = ["slides", "report", "document", "roadmap", "mindmap", "timeline", "spreadsheet"].includes(activeAgent || "");
-
-        let research = "";
-        if (needsResearch && activeAgent !== "resume" && activeAgent !== "letter") {
-          research = await doResearchWithStreaming(userInput);
-        }
-
-        if (isSlides) {
-          const result = await generateSlides(userInput, research, convId);
-          if (!result) await generateHtmlFile(userInput, files, research, convId);
-        } else {
-          await generateHtmlFile(userInput, files, research, convId);
-        }
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from("conversations").select("id, title, created_at, mode").eq("user_id", user.id).eq("mode", "files").order("created_at", { ascending: false }).limit(20);
-        if (data) setSavedFiles(data as SavedFile[]);
-      }
-    } catch (e) {
-      console.error("Generation error:", e);
-      pushMessage({ role: "assistant", content: "Something went wrong. Please try again." });
+    // Persist conversation
+    let convId = conversationId;
+    if (!convId) {
+      const name = await generateProjectName(prompt);
+      const { data: conv } = await supabase
+        .from("conversations")
+        .insert({ user_id: user.id, title: name, mode: "files" })
+        .select("id")
+        .single();
+      convId = conv?.id || null;
+      if (convId) setConversationId(convId);
     }
 
-    setIsGenerating(false);
-    setStatusText("");
-    setResearchSteps([]);
-  }, [input, attachedFiles, activeAgent, conversationId, selectedTemplate, isMobile, agentMode, pendingBuilder]);
-
-  // ---- Specialized builder flow: Smart Questions -> Brief -> Build ----
-
-  /** Step 1 — show topic, fetch in-language smart questions, render in chat. */
-  const startSmartQuestionFlow = async (type: FileBuilderType, topic: string) => {
-    const userLanguage = detectLanguage(topic);
-    setPendingBuilder({ type, topic, extras: { userLanguage } });
-    setInput("");
-    pushMessage({ role: "user", content: topic });
-    const convId = await getOrCreateConversation(topic);
-    if (convId) await saveMsg(convId, "user", topic);
-    if (isMobile) setActiveTab("chat");
-
-    setIsGenerating(true);
-    setStatusText("");
-    setResearchSteps([{ id: "qs", label: "Preparing a few quick questions...", status: "active" }]);
-    try {
-      const avoidKey = `files_qs_history_${type}`;
-      let avoidQuestions: string[] = [];
-      try { avoidQuestions = JSON.parse(localStorage.getItem(avoidKey) || "[]"); } catch {}
-      const { data } = await supabase.functions.invoke("generate-file-questions", {
-        body: { fileType: type, topic, userLanguage, seed: Date.now(), avoidQuestions },
+    if (convId) {
+      await supabase.from("messages").insert({
+        conversation_id: convId, user_id: user.id, role: "user", content: prompt,
       });
-      const qs: SmartQuestion[] = Array.isArray(data?.questions) ? data.questions : [];
-      if (qs.length > 0) {
-        try {
-          const titles = qs.map(q => q.title).filter(Boolean);
-          const updated = [...titles, ...avoidQuestions].slice(0, 12);
-          localStorage.setItem(avoidKey, JSON.stringify(updated));
-        } catch {}
-        pushMessage({
-          role: "assistant",
-          content: "",
-          questions: qs,
-          questionsForType: type,
-          questionsTopic: topic,
-          questionsLanguage: userLanguage,
-        });
-      } else {
-        // No questions returned — go straight to brief.
-        await draftBriefAndShow(type, topic, "", userLanguage, convId);
-      }
-    } catch {
-      await draftBriefAndShow(type, topic, "", userLanguage, convId);
     }
-    setIsGenerating(false);
-    setResearchSteps([]);
-  };
 
-  /** Step 2 — when user finishes the smart-question card. */
-  const handleQuestionsComplete = async (msgIdx: number, mergedAnswer: string) => {
-    const msg = messages[msgIdx];
-    if (!msg?.questionsForType || !msg.questionsTopic) return;
-    setMessages(prev => prev.map((m, i) =>
-      i === msgIdx ? { ...m, questionsAnswered: true, questionsAnswer: mergedAnswer } : m
-    ));
-    const convId = conversationId ?? (await getOrCreateConversation(msg.questionsTopic));
-    await draftBriefAndShow(msg.questionsForType, msg.questionsTopic, mergedAnswer, msg.questionsLanguage || detectLanguage(msg.questionsTopic), convId);
-  };
-
-  /** Step 3 — call brief generator (in user language) and render BriefCard. */
-  const draftBriefAndShow = async (
-    type: FileBuilderType,
-    topic: string,
-    questionAnswers: string,
-    userLanguage: string,
-    convId: string | null
-  ) => {
-    setIsGenerating(true);
-    setResearchSteps([{ id: "brief", label: "Drafting your plan...", status: "active" }]);
     try {
-      const { data } = await supabase.functions.invoke("generate-file-brief", {
-        body: {
-          fileType: type,
-          topic,
-          userLanguage,
-          extra: { answers: questionAnswers, language: userLanguage },
+      const result = await streamGenerate(
+        {
+          kind: selectedKind,
+          template: selectedTemplate?.id || "modern",
+          templateStyle: selectedTemplate?.style || "",
+          prompt,
+          useResearch,
+          depth: 3,
         },
-      });
-      const brief: FileBrief = data?.brief ?? { summary: topic, language: userLanguage };
-      if (!brief.language) brief.language = userLanguage;
-      setPendingBuilder({ type, topic, extras: { userLanguage, answers: questionAnswers } });
-      pushMessage({
-        role: "assistant",
-        content: brief.summary || "",
-        brief,
-        briefForType: type,
-        briefTopic: topic,
-      });
-    } catch {
-      await runBuilder(type, topic, { language: userLanguage }, convId);
-    }
-    setIsGenerating(false);
-    setResearchSteps([]);
-  };
+        (msg) => {
+          setStatusText(msg);
+          setMessages(prev => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last?.role === "assistant") last.status = msg;
+            return copy;
+          });
+        },
+      );
 
-  const runBuilder = async (
-    type: FileBuilderType,
-    topic: string,
-    brief: FileBrief | undefined,
-    convId: string | null
-  ) => {
-    const builder = getBuilder(type);
-    if (!builder) return;
-    setIsGenerating(true);
-    setResearchSteps([{ id: "build", label: `Building your ${type}...`, status: "active" }]);
-    try {
-      const result = await builder(topic, brief);
-      pushMessage({
-        role: "assistant",
-        content: result.summary,
-        htmlContent: result.previewHtml,
-        pdfPreviewUrl: result.pdfPreviewUrl,
-        downloadUrl: result.downloadUrl,
-        mimeType: result.mimeType,
+      const doc: DocsDoc = JSON.parse(result.docJson);
+
+      // Fetch standalone HTML for preview
+      let htmlPreview = "";
+      try {
+        const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${result.id}/export?format=html`, {
+          method: "POST",
+        });
+        if (expRes.ok) htmlPreview = await expRes.text();
+      } catch {}
+
+      setMessages(prev => {
+        const copy = [...prev];
+        const last = copy[copy.length - 1];
+        if (last?.role === "assistant") {
+          last.status = undefined;
+          last.content = `Your ${selectedKind} is ready.`;
+          last.generationId = result.id;
+          last.doc = doc;
+          last.htmlPreview = htmlPreview;
+        }
+        return copy;
       });
+
       if (convId) {
-        await saveMsg(convId, "assistant", result.summary, {
-          htmlContent: result.previewHtml,
-          downloadUrl: result.downloadUrl,
+        await supabase.from("messages").insert({
+          conversation_id: convId, user_id: user.id, role: "assistant",
+          content: `Your ${selectedKind} is ready.`,
+          images: [JSON.stringify({ generationId: result.id, kind: selectedKind })],
         });
       }
-      if (result.pdfPreviewUrl) {
-        setPreviewPdfUrl(result.pdfPreviewUrl);
-        setPreviewHtml(null);
-        if (!isMobile) setActiveTab("preview");
-      } else if (result.previewHtml) {
-        setPreviewHtml(result.previewHtml);
-        setPreviewPdfUrl(null);
-        if (!isMobile) setActiveTab("preview");
+
+      setStatusText("");
+
+      // Open preview if HTML available
+      if (htmlPreview) {
+        setPreviewHtml(htmlPreview);
+        setPreviewOpen(true);
       }
-    } catch (e) {
-      console.error("builder failed:", e);
-      pushMessage({ role: "assistant", content: "Generation failed. Please try again." });
+    } catch (e: any) {
+      setMessages(prev => {
+        const copy = [...prev];
+        const last = copy[copy.length - 1];
+        if (last?.role === "assistant") {
+          last.status = undefined;
+          last.content = "Sorry — generation didn't complete. Please try again.";
+        }
+        return copy;
+      });
+      toast.error(e?.message || "Generation failed");
+    } finally {
+      setIsGenerating(false);
+      setStatusText("");
     }
-    setIsGenerating(false);
-    setResearchSteps([]);
-  };
+  }, [input, isGenerating, selectedKind, selectedTemplate, useResearch, conversationId, navigate]);
 
-  const handleBriefConfirm = async (msgIdx: number, editedBrief: FileBrief) => {
-    const msg = messages[msgIdx];
-    if (!msg?.briefForType || !msg.briefTopic) return;
-    setMessages(prev => prev.map((m, i) => i === msgIdx ? { ...m, briefConsumed: true } : m));
-    await runBuilder(msg.briefForType, msg.briefTopic, editedBrief, conversationId);
-    setPendingBuilder(null);
-  };
+  const handleDownload = useCallback(async (msg: ChatMsg) => {
+    if (!msg.generationId) return;
+    try {
+      const res = await fetch(`${DDS_BASE}/api/v1/generations/${msg.generationId}/export?format=html`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${msg.doc?.title || msg.doc?.kind || "document"}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Downloaded");
+    } catch (e: any) {
+      toast.error(e?.message || "Download failed");
+    }
+  }, []);
 
-  const newChat = () => {
-    setMessages([]); setInput(""); setPreviewHtml(null); setAttachedFiles([]);
-    setConversationId(null); setActiveAgent(null); setStatusText("");
-    setShowTemplates(false); setSelectedTemplate(null); setResearchSteps([]);
-    setActiveTab("chat"); setUndoStack([]); setRedoStack([]);
-  };
+  const handlePreview = useCallback((msg: ChatMsg) => {
+    if (msg.htmlPreview) {
+      setPreviewHtml(msg.htmlPreview);
+      setPreviewOpen(true);
+    }
+  }, []);
 
-  const hasMessages = messages.length > 0;
-  const showPreviewPanel = !isMobile && previewHtml && hasMessages;
-
-  // Segmented Plan/Work control
-  const ModeToggle = () => (
-    <div className="ios-segment-control">
-      {(["plan", "work"] as const).map(mode => (
-        <motion.button
-          key={mode}
-          onClick={() => setAgentMode(mode)}
-          className={`relative z-10 px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${
-            agentMode === mode ? "text-foreground" : "text-muted-foreground"
-          }`}
-          whileTap={{ scale: 0.95 }}
-          transition={spring}
-        >
-          {agentMode === mode && (
-            <motion.div
-              layoutId="mode-indicator"
-              className="absolute inset-0 rounded-full liquid-glass-button"
-              transition={spring}
-            />
-          )}
-          <span className="relative z-10">{mode === "plan" ? "Plan" : "Work"}</span>
-        </motion.button>
-      ))}
-    </div>
-  );
-
-  // Plus menu component
-  const PlusMenu = ({ context }: { context: "outer" | "inner" }) => (
-    <AnimatePresence>
-      {plusMenuOpen === context && (
-        <motion.div
-          ref={plusMenuRef}
-          initial={{ opacity: 0, y: 12, scale: 0.92 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 12, scale: 0.92 }}
-          transition={spring}
-          className="absolute bottom-full mb-2 left-0 z-50 w-56 rounded-3xl p-2 shadow-2xl liquid-glass-milk"
-        >
-          {[
-            { icon: Paperclip, label: "Attach File", action: () => fileInputRef.current?.click() },
-            { icon: Image, label: "Attach Image", action: () => imageInputRef.current?.click() },
-            { icon: Upload, label: "Upload from Device", action: () => fileInputRef.current?.click() },
-          ].map((item, i) => (
-            <motion.button
-              key={item.label}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...spring, delay: i * 0.03 }}
-              onClick={() => { setPlusMenuOpen(null); item.action(); }}
-              className="ios-menu-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-sm text-foreground/90 hover:bg-accent/30"
-              whileTap={{ scale: 0.96 }}
-            >
-              <item.icon className="w-4 h-4 text-muted-foreground" /> {item.label}
-            </motion.button>
-          ))}
-          <div className="border-t border-border/15 my-1.5" />
-          <motion.button
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...spring, delay: 0.09 }}
-            disabled
-            className="ios-menu-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-sm text-muted-foreground/40 cursor-not-allowed"
-          >
-            <HardDrive className="w-4 h-4" /> Google Drive
-            <span className="ml-auto text-[10px] uppercase tracking-wider opacity-50">Soon</span>
-          </motion.button>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-
-  const chatPanel = (
-    <div className="flex flex-col h-full">
-      {isMobile && (
-        <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3">
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            transition={spring}
-            onClick={() => setSidebarOpen(true)}
-            className="w-9 h-9 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </motion.button>
-          <div className="flex items-center gap-1">
-            {undoStack.length > 0 && (
-              <motion.button whileTap={{ scale: 0.9 }} transition={spring} onClick={handleUndo} className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground"><Undo2 className="w-4 h-4" /></motion.button>
-            )}
-            {redoStack.length > 0 && (
-              <motion.button whileTap={{ scale: 0.9 }} transition={spring} onClick={handleRedo} className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground"><Redo2 className="w-4 h-4" /></motion.button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
-        {!hasMessages ? (
-          <div className="flex flex-col items-center justify-center min-h-full px-4">
-            <div className="flex-1" />
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center max-w-2xl w-full">
-              <h1 className="font-display text-5xl md:text-7xl font-black tracking-tighter leading-[0.9] mb-3">
-                <span className="text-foreground">CREATE</span><br />
-                <span className="bg-gradient-to-r from-primary via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">ANYTHING</span>
-              </h1>
-              <p className="text-muted-foreground/50 text-sm mb-10 max-w-xs mx-auto">
-                Slides, documents, resumes, reports — powered by AI
-              </p>
-
-              {/* Input area */}
-              <div className="max-w-xl mx-auto mb-5">
-                {(activeAgent || selectedTemplate) && (
-                  <motion.div layout className="flex items-center gap-2 mb-2 px-1 flex-wrap">
-                    {activeAgent && (
-                      <motion.span
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={spring}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full liquid-glass-pill text-xs font-medium text-primary"
-                      >
-                        {FILE_SERVICES.find(s => s.id === activeAgent)?.label}
-                        <button onClick={() => setActiveAgent(null)} className="ml-0.5 hover:text-foreground"><X className="w-3 h-3" /></button>
-                      </motion.span>
-                    )}
-                    {selectedTemplate && (
-                      <motion.span
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={spring}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full liquid-glass-pill text-xs font-medium text-violet-400"
-                      >
-                        Template
-                        <button onClick={() => setSelectedTemplate(null)} className="ml-0.5 hover:text-foreground"><X className="w-3 h-3" /></button>
-                      </motion.span>
-                    )}
-                  </motion.div>
-                )}
-
-                {attachedFiles.length > 0 && (
-                  <div className="flex gap-2 mb-2 px-1 flex-wrap">
-                    {attachedFiles.map((f, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={spring}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full liquid-glass-button text-xs text-foreground"
-                      >
-                        <span className="truncate max-w-[100px]">{f.name}</span>
-                        <button onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="liquid-glass rounded-3xl overflow-visible">
-                  <div className="flex items-end gap-2 px-4 py-3 min-h-[100px] relative">
-                    <div className="relative self-end">
-                      <motion.button
-                        whileTap={{ scale: 0.9 }}
-                        transition={spring}
-                        onClick={() => setPlusMenuOpen(plusMenuOpen === "outer" ? null : "outer")}
-                        className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <Plus className="w-5 h-5" />
-                      </motion.button>
-                      <PlusMenu context="outer" />
-                    </div>
-                    <textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={e => setInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter" && !e.shiftKey && !isMobile) { e.preventDefault(); handleGenerate(); }
-                      }}
-                      placeholder={agentMode === "plan" ? "Describe your file idea..." : "Describe what you want to create..."}
-                      className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 resize-none outline-none min-h-[60px] max-h-[160px] py-1 select-text"
-                      rows={3}
-                      enterKeyHint="enter"
-                    />
-                    <div className="flex flex-col items-center gap-2 self-end">
-                      <ModeToggle />
-                      <motion.button
-                        whileTap={{ scale: 0.9 }}
-                        transition={spring}
-                        onClick={() => handleGenerate()}
-                        disabled={isGenerating || (!input.trim() && attachedFiles.length === 0)}
-                        className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-foreground hover:bg-muted-foreground/10 transition-colors disabled:opacity-20"
-                      >
-                        {isGenerating ? <span className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" /> : <ArrowUp className="w-4 h-4" />}
-                      </motion.button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Services */}
-              <div className="max-w-xl mx-auto mb-6">
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
-                  {FILE_SERVICES.map(svc => (
-                    <motion.button
-                      key={svc.id}
-                      whileTap={{ scale: 0.93 }}
-                      transition={spring}
-                      onClick={() => setActiveAgent(activeAgent === svc.id ? null : svc.id)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm whitespace-nowrap shrink-0 transition-all ${
-                        activeAgent === svc.id
-                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                          : "liquid-glass-button text-foreground/70 hover:text-foreground"
-                      }`}
-                    >
-                      <span className="font-medium">{svc.label}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Spreadsheet templates */}
-              {activeAgent === "spreadsheet" && (
-                <div className="max-w-xl mx-auto mb-6">
-                  <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider mb-3 text-left px-1">Quick Templates</p>
-                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
-                    {SPREADSHEET_TEMPLATES.map(tmpl => (
-                      <motion.button key={tmpl.label} whileTap={{ scale: 0.95 }} transition={spring} onClick={() => { setInput(tmpl.prompt); }} className="px-4 py-2 rounded-full liquid-glass-button text-xs text-foreground/70 hover:text-foreground whitespace-nowrap shrink-0">
-                        {tmpl.label}
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Slide templates */}
-              <AnimatePresence>
-                {showTemplates && slideTemplates.length > 0 && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={spring} className="max-w-xl mx-auto mb-6 overflow-hidden">
-                    <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider mb-3 px-1">Choose a template</p>
-                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
-                      {slideTemplates.map(tmpl => {
-                        const selected = selectedTemplate?.id === tmpl.id;
-                        return (
-                          <motion.button
-                            key={tmpl.id}
-                            whileTap={{ scale: 0.95 }}
-                            whileHover={{ scale: 1.03 }}
-                            transition={spring}
-                            onClick={() => setSelectedTemplate(selected ? null : tmpl)}
-                            className={`shrink-0 w-28 aspect-[16/10] rounded-xl overflow-hidden transition-all relative ${
-                              selected ? "ring-2 ring-primary shadow-lg shadow-primary/20" : "ring-1 ring-border/30"
-                            }`}
-                          >
-                            {tmpl.image_url ? (
-                              <img src={tmpl.image_url} alt={tmpl.name || "Template"} className="w-full h-full object-cover" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-primary/20 via-purple-500/15 to-pink-500/20 flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-foreground/80 px-2 text-center uppercase tracking-wider">{tmpl.name || tmpl.template_id.slice(-8)}</span>
-                              </div>
-                            )}
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-
-            {/* Recent files */}
-            <div className="flex-1 flex flex-col justify-start pt-6 max-w-xl w-full px-4">
-              {savedFiles.length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40 font-medium">Recent</p>
-                  {savedFiles.slice(0, 6).map((f, i) => (
-                    <motion.button
-                      key={f.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ ...spring, delay: i * 0.04 }}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => loadConversation(f.id)}
-                      className="w-full rounded-2xl liquid-glass-button text-left overflow-hidden"
-                    >
-                      <div className="relative w-full aspect-[16/9] bg-secondary/30 overflow-hidden">
-                        {f.preview_html ? (
-                          <iframe
-                            srcDoc={f.preview_html}
-                            className="pointer-events-none border-0"
-                            sandbox=""
-                            title="preview"
-                            style={{ width: "200%", height: "200%", transform: "scale(0.5)", transformOrigin: "top left" }}
-                          />
-                        ) : f.preview_deck ? (
-                          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-purple-500/15 to-pink-500/20 flex items-center justify-center">
-                            <span className="text-xs font-bold text-foreground/70 uppercase tracking-widest">{f.preview_deck.slides?.length ?? 0} Slides</span>
-                          </div>
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center">
-                            <FileText className="w-8 h-8 text-primary/40" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
-                      </div>
-                      <div className="px-4 py-3">
-                        <p className="text-sm font-semibold text-foreground truncate">{f.title}</p>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-2xl mx-auto py-4 px-4 space-y-4">
-            {messages.map((msg, i) => (
-              <div key={i}>
-                {msg.role === "user" ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={spring}
-                    className="flex justify-end mb-4"
-                  >
-                    <div className="max-w-[85%] liquid-glass-subtle text-foreground px-4 py-2.5 rounded-[1.6rem] rounded-br-md text-sm leading-relaxed select-text">{msg.content}</div>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={spring}
-                    className="mb-4 space-y-3"
-                  >
-                    <div className="text-foreground text-sm select-text leading-relaxed whitespace-pre-wrap">
-                      {extractChatDisplay(msg.content)}
-                    </div>
-
-                    {msg.questions && msg.questionsForType && (
-                      <SmartQuestionFlow
-                        questions={msg.questions}
-                        answered={msg.questionsAnswered}
-                        finalAnswer={msg.questionsAnswer}
-                        onComplete={(ans) => handleQuestionsComplete(i, ans)}
-                      />
-                    )}
-
-                    {msg.brief && msg.briefForType && !msg.briefConsumed && (
-                      <BriefCard
-                        brief={msg.brief}
-                        fileType={msg.briefForType}
-                        onConfirm={(edited) => handleBriefConfirm(i, edited)}
-                      />
-                    )}
-
-                    
-                    {(msg.htmlContent || msg.pdfPreviewUrl) && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={spring}
-                        className="rounded-3xl overflow-hidden liquid-glass-subtle max-w-sm"
-                      >
-                        <div className="relative h-[120px] overflow-hidden bg-white rounded-t-3xl">
-                          {msg.pdfPreviewUrl ? (
-                            <iframe
-                              src={`${msg.pdfPreviewUrl}#toolbar=0&navpanes=0&view=FitH`}
-                              className="w-full h-full pointer-events-none"
-                              title="PDF thumbnail"
-                            />
-                          ) : (
-                            <iframe
-                              srcDoc={msg.htmlContent}
-                              className="w-full h-full pointer-events-none"
-                              sandbox=""
-                              title="File thumbnail"
-                              style={{ transform: "scale(0.5)", transformOrigin: "top left", width: "200%", height: "200%" }}
-                            />
-                          )}
-                        </div>
-                        <div className="px-4 py-3 flex items-center justify-between gap-2">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {messages.find(m => m.role === "user")?.content?.slice(0, 40) || "Document"}
-                          </p>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <motion.button
-                              whileTap={{ scale: 0.9 }}
-                              transition={spring}
-                              onClick={() => { if (isMobile) setActiveTab("chat"); textareaRef.current?.focus(); }}
-                              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg"
-                            >
-                              Edit
-                            </motion.button>
-                            <motion.button
-                              whileTap={{ scale: 0.9 }}
-                              transition={spring}
-                              onClick={() => {
-                                if (msg.pdfPreviewUrl) { setPreviewPdfUrl(msg.pdfPreviewUrl); setPreviewHtml(null); }
-                                else if (msg.htmlContent) { setPreviewHtml(msg.htmlContent); setPreviewPdfUrl(null); }
-                                if (isMobile) setActiveTab("preview");
-                              }}
-                              className="text-xs text-primary font-medium hover:text-primary/80 transition-colors px-2 py-1 rounded-lg"
-                            >
-                              Preview
-                            </motion.button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {msg.deck && (
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        transition={spring}
-                        onClick={() => setActiveDeck(msg.deck!)}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-                      >
-                        <Eye className="w-4 h-4" /> Preview Slides ({msg.deck.slides.length})
-                      </motion.button>
-                    )}
-
-                    {msg.downloadUrl && (
-                      <motion.a
-                        whileTap={{ scale: 0.95 }}
-                        transition={spring}
-                        href={msg.downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-                      >
-                        <Download className="w-4 h-4" />
-                        {msg.mimeType === "image/svg+xml" ? "Download SVG"
-                          : msg.mimeType === "application/pdf" ? "Download PDF"
-                          : msg.mimeType?.includes("spreadsheet") ? "Download XLSX"
-                          : "Download"}
-                      </motion.a>
-                    )}
-                  </motion.div>
-                )}
-              </div>
-            ))}
-            {isGenerating && researchSteps.length > 0 && <ResearchFlow steps={researchSteps} />}
-            {isGenerating && researchSteps.length === 0 && (
-              <div className="flex items-center gap-2.5 py-2">
-                <motion.svg width="18" height="18" viewBox="0 0 100 100" className="shrink-0 text-primary" animate={{ rotate: [0, 180, 360], scale: [1, 1.2, 1] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
-                  <path d="M50 5 L60 40 L95 50 L60 60 L50 95 L40 60 L5 50 L40 40 Z" fill="currentColor" />
-                </motion.svg>
-                <span className="text-sm text-foreground">{statusText || "Working..."}</span>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Floating Preview button removed */}
-
-      {/* Bottom input */}
-      {hasMessages && (
-        <div className="sticky bottom-0 px-4 pb-4 pt-2 bg-gradient-to-t from-background via-background to-transparent">
-          <div className="max-w-2xl mx-auto">
-            {attachedFiles.length > 0 && (
-              <div className="flex gap-2 mb-2 flex-wrap">
-                {attachedFiles.map((f, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={spring}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full liquid-glass-button text-xs text-foreground"
-                  >
-                    <span className="truncate max-w-[100px]">{f.name}</span>
-                    <button onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-            <div className="liquid-glass rounded-3xl overflow-visible">
-              <div className="flex items-end gap-2 px-3 py-2 relative">
-                <div className="relative self-end">
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    transition={spring}
-                    onClick={() => setPlusMenuOpen(plusMenuOpen === "inner" ? null : "inner")}
-                    className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </motion.button>
-                  <PlusMenu context="inner" />
-                </div>
-                <textarea
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter" && !e.shiftKey && !isMobile) { e.preventDefault(); handleGenerate(); }
-                  }}
-                  placeholder={agentMode === "plan" ? "Discuss your plan..." : "Ask for changes..."}
-                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 resize-none outline-none min-h-[24px] max-h-[120px] py-2 select-text"
-                  rows={1}
-                  enterKeyHint="enter"
-                />
-                <div className="flex items-center gap-2 self-end">
-                  <ModeToggle />
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    transition={spring}
-                    onClick={() => handleGenerate()}
-                    disabled={isGenerating || (!input.trim() && attachedFiles.length === 0)}
-                    className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-foreground hover:bg-muted-foreground/10 transition-colors disabled:opacity-20"
-                  >
-                    {isGenerating ? <span className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" /> : <ArrowUp className="w-4 h-4" />}
-                  </motion.button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <input ref={fileInputRef} type="file" accept=".txt,.pdf,.doc,.docx,.csv,.json,.md,.xlsx,.pptx,image/*" multiple className="hidden" onChange={handleFileAttach} />
-      <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileAttach} />
-    </div>
-  );
-
-  const previewPanel = (previewHtml || previewPdfUrl) ? (
-    <FilePreviewPanel
-      html={previewHtml}
-      pdfUrl={previewPdfUrl}
-      title={messages.find(m => m.role === "user")?.content?.slice(0, 50) || "Preview"}
-      onClose={() => { if (isMobile) setActiveTab("chat"); else { setPreviewHtml(null); setPreviewPdfUrl(null); } }}
-      onEdit={() => { if (isMobile) setActiveTab("chat"); }}
-      onDownload={() => { if (previewHtml) { setExportHtml(previewHtml); setShowExport(true); } else if (previewPdfUrl) { window.open(previewPdfUrl, "_blank"); } }}
-    />
-  ) : null;
+  const showHero = messages.length === 0;
 
   return (
-    <AppLayout onSelectConversation={loadConversation} onNewChat={newChat} activeConversationId={conversationId}>
-      <div className="h-full flex flex-col bg-background overflow-x-hidden">
-        <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={newChat} onSelectConversation={loadConversation} activeConversationId={conversationId} currentMode="files" />
+    <AppLayout disablePadding>
+      <AppSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <ExportDialog open={showExport} onClose={() => setShowExport(false)} html={exportHtml} fileName={activeAgent || "document"} isSpreadsheet={activeAgent === "spreadsheet"} />
-
-        {isMobile ? (
-          <div className="flex-1 min-h-0 relative">
-            {activeTab === "chat" ? chatPanel : (previewPanel || chatPanel)}
+      <div className="min-h-screen w-full bg-background text-foreground flex flex-col">
+        {/* Top bar */}
+        <header className="sticky top-0 z-20 backdrop-blur-xl bg-background/70 border-b border-border/40">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <h1 className="text-base font-bold tracking-tight">Files</h1>
+            <div className="w-10" />
           </div>
-        ) : (
-          <div className={`flex-1 min-h-0 ${showPreviewPanel ? "grid grid-cols-[minmax(350px,2fr)_3fr]" : "flex flex-col"}`}>
-            {showPreviewPanel ? (
-              <>
-                <div className="border-r border-border/20 overflow-hidden">{chatPanel}</div>
-                <div className="overflow-hidden relative">{previewPanel}</div>
-              </>
-            ) : (
-              chatPanel
+        </header>
+
+        {/* Hero */}
+        <AnimatePresence>
+          {showHero && (
+            <motion.section
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="max-w-3xl w-full mx-auto px-5 sm:px-8 pt-10 sm:pt-16 pb-6 text-center"
+            >
+              <h2 className="font-black tracking-tight leading-[1.05] text-4xl sm:text-6xl">
+                Create anything.{" "}
+                <span className="bg-gradient-to-r from-purple-600 via-fuchsia-500 to-amber-500 bg-clip-text text-transparent">
+                  Beautifully.
+                </span>
+              </h2>
+              <p className="mt-5 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
+                Slides, resumes, reports, spreadsheets — generated, designed, and ready to share.
+              </p>
+            </motion.section>
+          )}
+        </AnimatePresence>
+
+        {/* Kind picker */}
+        {showHero && (
+          <div className="max-w-5xl w-full mx-auto px-5 sm:px-8 mt-2">
+            <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-1 px-1 scrollbar-hide">
+              {KINDS.map((k) => {
+                const Active = selectedKind === k.id;
+                const Icon = k.icon;
+                return (
+                  <button
+                    key={k.id}
+                    onClick={() => setSelectedKind(k.id)}
+                    className={`snap-start shrink-0 group relative rounded-2xl border transition-all px-4 py-3 flex items-center gap-2.5 ${
+                      Active
+                        ? "border-foreground/80 bg-foreground text-background shadow-md"
+                        : "border-border/60 bg-card hover:border-foreground/40"
+                    }`}
+                  >
+                    <div className={`h-8 w-8 rounded-xl flex items-center justify-center bg-gradient-to-br ${k.gradient} text-white`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <span className="font-semibold text-sm">{k.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Template strip */}
+            {currentTemplates.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-3 font-semibold">Style</p>
+                <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
+                  {currentTemplates.map((t) => {
+                    const Active = selectedTemplate?.id === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedTemplate(t)}
+                        className={`shrink-0 px-4 py-2 rounded-full text-xs font-medium transition-all border ${
+                          Active
+                            ? "bg-foreground text-background border-foreground"
+                            : "bg-card text-muted-foreground border-border/60 hover:text-foreground hover:border-foreground/40"
+                        }`}
+                      >
+                        {t.preview ? <span className="mr-1.5">{t.preview}</span> : null}
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {/* IntakeForm removed — replaced by in-chat SmartQuestionFlow */}
+        {/* Messages */}
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 space-y-4 overflow-y-auto">
+          {messages.map((m, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                  m.role === "user"
+                    ? "bg-foreground text-background"
+                    : "bg-card border border-border/60"
+                }`}
+              >
+                {m.status ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>{m.status}</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                    {m.role === "assistant" && m.generationId && (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => handlePreview(m)}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 bg-foreground text-background hover:opacity-90 transition"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> Preview
+                        </button>
+                        <button
+                          onClick={() => handleDownload(m)}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 border border-border hover:bg-muted transition"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Download
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          ))}
+          <div ref={messagesEndRef} />
+        </main>
 
-        {/* Premium slide deck preview overlay */}
-        <AnimatePresence>
-          {activeDeck && (
-            <SlideDeckPreview deck={activeDeck} onClose={() => setActiveDeck(null)} />
-          )}
-        </AnimatePresence>
+        {/* Input bar */}
+        <div className="sticky bottom-0 z-10 backdrop-blur-xl bg-background/85 border-t border-border/40">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3">
+            <div className="rounded-2xl border border-border/70 bg-card shadow-sm focus-within:border-foreground/60 transition-colors">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder={`Describe your ${selectedKind}...`}
+                rows={1}
+                disabled={isGenerating}
+                className="w-full resize-none bg-transparent px-4 py-3 text-sm focus:outline-none disabled:opacity-60 max-h-40"
+              />
+              <div className="flex items-center justify-between px-3 pb-2">
+                <button
+                  onClick={() => setUseResearch(v => !v)}
+                  className={`text-[11px] font-semibold rounded-full px-3 py-1 transition-all ${
+                    useResearch
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Live web research"
+                >
+                  {useResearch ? "● Research on" : "○ Research"}
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isGenerating}
+                  className="h-9 w-9 rounded-xl bg-foreground text-background flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
+                  aria-label="Send"
+                >
+                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            {statusText && !messages.some(m => m.status) && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">{statusText}</p>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Preview modal */}
+      <AnimatePresence>
+        {previewOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-stretch justify-center p-0 sm:p-6"
+            onClick={() => setPreviewOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 12 }}
+              transition={{ type: "spring", damping: 24, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-6xl bg-background rounded-none sm:rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="flex items-center justify-between px-4 h-12 border-b border-border/60 bg-card/80 backdrop-blur-xl">
+                <span className="text-sm font-semibold">Preview</span>
+                <button
+                  onClick={() => setPreviewOpen(false)}
+                  className="h-9 w-9 rounded-xl hover:bg-muted flex items-center justify-center"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <iframe
+                srcDoc={previewHtml}
+                title="Document preview"
+                className="flex-1 w-full bg-white"
+                sandbox="allow-same-origin allow-scripts"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AppLayout>
   );
 };
