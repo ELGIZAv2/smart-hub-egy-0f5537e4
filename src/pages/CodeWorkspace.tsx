@@ -140,6 +140,21 @@ const CodeWorkspace = () => {
     return null;
   };
 
+  // --- AI two-word project name ---
+  const generateProjectName = async (prompt: string): Promise<string> => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/name-project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await r.json().catch(() => ({} as any));
+      const name = (data?.name || "").trim();
+      if (name) return name;
+    } catch {}
+    return prompt.split(/\s+/).slice(0, 2).join(" ").slice(0, 30) || "New Project";
+  };
+
   // --- Project helper ---
   const ensureProject = async (firstMessage: string, weblyId: string, convId: string | null) => {
     if (projectId) {
@@ -149,7 +164,7 @@ const CodeWorkspace = () => {
       return projectId;
     }
     if (!userId) return null;
-    const name = firstMessage.slice(0, 60) || "Untitled Project";
+    const name = await generateProjectName(firstMessage);
     const { data } = await supabase.from("projects").insert({
       user_id: userId,
       name,
@@ -230,31 +245,33 @@ const CodeWorkspace = () => {
       });
       const ded = await dedResp.json().catch(() => ({}));
       if (!ded.success) {
-        toast.error(ded.error || "MC deduction failed");
+        toast.error(ded.error || "Not enough credits");
         setIsLoading(false);
         return;
       }
       refreshCredits();
     }
 
-    // Pre-message: tells the user what's about to happen
-    const isAr = /[\u0600-\u06FF]/.test(msgText);
-    const preText = planMode
-      ? (isAr ? "تمام، هخطط للبناء وأبدأ على طول." : "Got it. Planning the build and starting now.")
-      : (isAr ? "تمام، بدأت الشغل دلوقتي." : "Got it. Starting the build now.");
-    const preMsg: ChatMsg = { role: "assistant", content: preText, type: "status" };
-    setMessages(prev => [...prev, preMsg]);
-    persistMessage(convId, preMsg);
+    await addStep("thinking", "Thinking");
 
-    await addStep("pre_message", preText);
-    await addStep("thinking", "Analyzing request");
-
-    // Use existing webly project id if available, else generate
+    // ALWAYS reuse the existing webly project id when present so follow-ups
+    // become edits to the same site, not a brand new project.
     const wpid = weblyProjectId || `megsy-${userId?.slice(0, 8) || "u"}-${Date.now().toString(36)}`;
     if (!weblyProjectId) setWeblyProjectId(wpid);
 
     let buildError: string | null = null;
+    let assistantBuffer = "";
+    const flushAssistant = () => {
+      if (!assistantBuffer.trim()) return;
+      const finalText = assistantBuffer.trim();
+      assistantBuffer = "";
+      const m: ChatMsg = { role: "assistant", content: finalText, type: "build" };
+      setMessages(prev => [...prev, m]);
+      persistMessage(convId, m);
+    };
+
     try {
+      // Pure pass-through: only what Webly needs. No system prompt, no fake messages.
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/webly-proxy`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
@@ -262,17 +279,14 @@ const CodeWorkspace = () => {
           action: "generate",
           project_id: wpid,
           prompt: msgText,
-          messages: messages.map(m => ({ role: m.role, content: m.content })).concat([{ role: "user", content: msgText }]),
         }),
       });
 
       if (!resp.ok || !resp.body) {
         const errBody = await resp.json().catch(() => ({} as any));
-        buildError = errBody?.error || "Build service is busy right now. Please try again shortly.";
+        buildError = errBody?.error || "Build service is busy. Try again shortly.";
         throw new Error(buildError);
       }
-
-      await addStep("writing", "Generating code");
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -293,28 +307,31 @@ const CodeWorkspace = () => {
           if (data === "[DONE]") continue;
           try {
             const ev = JSON.parse(data);
-            if (ev.type === "file_start" && ev.path && !seenFiles.has(ev.path)) {
+            // Stream text from the backend straight into the chat.
+            if (ev.type === "text" && typeof ev.delta === "string") {
+              assistantBuffer += ev.delta;
+            } else if (ev.type === "status" && typeof ev.message === "string") {
+              await addStep("thinking", ev.message);
+            } else if (ev.type === "file_start" && ev.path && !seenFiles.has(ev.path)) {
               seenFiles.add(ev.path);
               await addStep("creating", "Creating", ev.path);
             } else if (ev.type === "file_done" && ev.path) {
               if (typeof ev.content === "string") generatedFiles[ev.path] = ev.content;
-              setSteps(prev => prev.map(s =>
-                s.file === ev.path ? { ...s, status: "done" as const } : s
-              ));
+              setSteps(prev => prev.map(s => s.file === ev.path ? { ...s, status: "done" as const } : s));
             } else if (ev.type === "done" && ev.files && typeof ev.files === "object") {
               generatedFiles = { ...generatedFiles, ...(ev.files as Record<string, string>) };
             } else if (ev.type === "verify_start") {
-              await addStep("searching", "Verifying in browser");
+              await addStep("searching", "Verifying");
             } else if (ev.type === "verify_done") {
-              await addStep("done", ev.ok ? "Verification passed" : "Fixing issues");
+              await addStep("done", ev.ok ? "Verified" : "Fixing");
             } else if (ev.type === "request_api_key" && ev.name) {
-              // Inline API key request card
+              flushAssistant();
               const keyMsg: ChatMsg = {
                 role: "assistant",
                 type: "api_key_request",
                 content: `Need API key: ${ev.name}`,
                 apiKeyName: ev.name,
-                apiKeyDescription: ev.description || ev.message || "Required to continue building.",
+                apiKeyDescription: ev.description || ev.message || "Required to continue.",
               };
               setMessages(prev => [...prev, keyMsg]);
               persistMessage(convId, keyMsg);
@@ -325,15 +342,7 @@ const CodeWorkspace = () => {
 
       completeAllSteps();
       setHasBuilt(true);
-
-      const fileCount = seenFiles.size || 1;
-      const durationMs = Date.now() - startedAt;
-      const reply = isAr
-        ? `تمام، خلصت! بنيت ${fileCount} ملف. اضغط على المعاينة فوق علشان تشوف الموقع.`
-        : `Done! Built ${fileCount} files. Open the preview to see your site live.`;
-      const replyMsg: ChatMsg = { role: "assistant", content: reply, type: "build", meta: { durationMs, credits: BUILD_CREDIT_COST } };
-      setMessages(prev => [...prev, replyMsg]);
-      persistMessage(convId, replyMsg);
+      flushAssistant();
 
       const pid = await ensureProject(msgText, wpid, convId);
       if (pid && Object.keys(generatedFiles).length > 0) {
@@ -341,19 +350,21 @@ const CodeWorkspace = () => {
       }
     } catch (e) {
       completeAllSteps();
+      flushAssistant();
       const durationMs = Date.now() - startedAt;
-      const fallback = isAr
-        ? (buildError ? "خدمة البناء مشغولة حالياً. تم استرداد رصيدك، حاول مرة أخرى." : "حصل خطأ أثناء البناء. تم استرداد رصيدك.")
-        : (buildError || "Build failed. Your credits were refunded.");
-      const errMsg: ChatMsg = { role: "assistant", content: fallback, meta: { durationMs, credits: 0 } };
+      const errMsg: ChatMsg = {
+        role: "assistant",
+        content: buildError || (e instanceof Error ? e.message : "Build failed."),
+        meta: { durationMs, credits: 0 },
+      };
       setMessages(prev => [...prev, errMsg]);
       persistMessage(convId, errMsg);
-      // Refund the deducted credits since the build never started
+      // Refund
       if (userId) {
         fetch(`${SUPABASE_URL}/functions/v1/deduct-credits`, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-          body: JSON.stringify({ user_id: userId, amount: -BUILD_CREDIT_COST, action_type: "code_build_refund", description: "Refund: build service unavailable" }),
+          body: JSON.stringify({ user_id: userId, amount: -BUILD_CREDIT_COST, action_type: "code_build_refund", description: "Refund: build failed" }),
         }).then(() => refreshCredits()).catch(() => {});
       }
     }
@@ -410,17 +421,7 @@ const CodeWorkspace = () => {
 
     setSupabaseModalOpen(false);
     setSupaUrl(""); setSupaKey("");
-
-    // Fixed messages
-    setMessages(prev => [
-      ...prev,
-      { role: "user", content: "I have connected the backend." },
-      {
-        role: "assistant",
-        content:
-          "Backend connected. We can now build:\n\n• User authentication (sign-up, sign-in, password reset)\n• User profiles & settings\n• Database tables with row-level security\n• File uploads & storage\n• Real-time data sync\n• Subscription & payment flows\n\nJust tell me what you want to add.",
-      },
-    ]);
+    toast.success("Backend connected");
   };
 
   // --- GitHub push ---
@@ -469,11 +470,8 @@ const CodeWorkspace = () => {
       const data = await r.json();
       if (data.ok && data.repo_url) {
         await supabase.from("projects").update({ repo_url: data.repo_url }).eq("id", projectId!);
-        setMessages(prev => [...prev, {
-          role: "assistant",
-          content: `Repository created on your GitHub: [${data.repo_url}](${data.repo_url})`,
-        }]);
         toast.success("Pushed to GitHub");
+        window.open(data.repo_url, "_blank", "noopener,noreferrer");
       } else if (data.needs_oauth) {
         toast.error("Connect your GitHub account first (coming soon).");
       } else {
