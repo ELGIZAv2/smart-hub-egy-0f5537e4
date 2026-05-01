@@ -470,11 +470,8 @@ const CodeWorkspace = () => {
       const data = await r.json();
       if (data.ok && data.repo_url) {
         await supabase.from("projects").update({ repo_url: data.repo_url }).eq("id", projectId!);
-        setMessages(prev => [...prev, {
-          role: "assistant",
-          content: `Repository created on your GitHub: [${data.repo_url}](${data.repo_url})`,
-        }]);
         toast.success("Pushed to GitHub");
+        window.open(data.repo_url, "_blank", "noopener,noreferrer");
       } else if (data.needs_oauth) {
         toast.error("Connect your GitHub account first (coming soon).");
       } else {
