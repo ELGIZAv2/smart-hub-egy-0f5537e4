@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Menu, ArrowUp, Plus, MoreHorizontal, Image as ImageIcon, Paperclip, Camera,
-  Loader2, Database, Github, Eye, Settings, Pencil, X, Check, ChevronDown,
+  ArrowLeft, ArrowUp, Plus, Image as ImageIcon, Paperclip, Camera,
+  Loader2, Database, Github, Play, Settings, Pencil, X, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,15 +59,15 @@ const CodeWorkspace = () => {
   const [hasBuilt, setHasBuilt] = useState(false);
 
   // UI state
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-  const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
-  const [githubBusy, setGithubBusy] = useState(false);
+  const [integrationsInitialView, setIntegrationsInitialView] = useState<"menu" | "supabase" | "github">("menu");
+  const [projectMenuHeight, setProjectMenuHeight] = useState(420); // resizable
+  const dragStartY = useRef<number | null>(null);
+  const dragStartH = useRef<number>(420);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
