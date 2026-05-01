@@ -81,13 +81,14 @@ const PreviewPage = () => {
       const r = await fetch(`${SUPABASE_URL}/functions/v1/webly-proxy`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({ action: "deploy", project_id: webly }),
+        body: JSON.stringify({ action: "deploy", project_id: webly, project_row_id: projectId }),
       });
-      const data = await r.json();
-      if (data.ok && data.cloudflare_url) {
-        setPublishedUrl(data.cloudflare_url);
-        toast.success(publishedUrl ? "Republished" : "Project published");
-        await supabase.from("projects").update({ status: "published" }).eq("id", projectId);
+      const data = await r.json().catch(() => ({} as any));
+      const url = data?.cloudflare_url || data?.url || data?.public_url;
+      if (data?.ok && url) {
+        setPublishedUrl(url);
+        await supabase.from("projects").update({ status: "published", preview_url: url }).eq("id", projectId);
+        toast.success(publishedUrl ? "Republished" : "Published");
       } else {
         toast.error("Publish failed. Try again.");
       }
