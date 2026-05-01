@@ -421,17 +421,7 @@ const CodeWorkspace = () => {
 
     setSupabaseModalOpen(false);
     setSupaUrl(""); setSupaKey("");
-
-    // Fixed messages
-    setMessages(prev => [
-      ...prev,
-      { role: "user", content: "I have connected the backend." },
-      {
-        role: "assistant",
-        content:
-          "Backend connected. We can now build:\n\n• User authentication (sign-up, sign-in, password reset)\n• User profiles & settings\n• Database tables with row-level security\n• File uploads & storage\n• Real-time data sync\n• Subscription & payment flows\n\nJust tell me what you want to add.",
-      },
-    ]);
+    toast.success("Backend connected");
   };
 
   // --- GitHub push ---
