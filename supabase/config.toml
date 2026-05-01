@@ -87,3 +87,6 @@ verify_jwt = false
 [functions.oauth-supabase-connect]
 verify_jwt = false
 
+
+[functions.name-project]
+verify_jwt = false
