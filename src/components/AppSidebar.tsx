@@ -34,6 +34,8 @@ const THEME_PALETTES = [
   { bg: "hsl(0, 0%, 4%)", surface: "hsl(0, 0%, 8%)" },
 ];
 
+const cacheKey = (mode: string, uid: string) => `sidebar:convos:${mode}:${uid}`;
+
 const AppSidebar = ({ open, onClose, onNewChat, onSelectConversation, activeConversationId, currentMode = "chat" }: AppSidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -42,6 +44,7 @@ const AppSidebar = ({ open, onClose, onNewChat, onSelectConversation, activeConv
   const [userEmail, setUserEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [credits, setCredits] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const palette = useMemo(() => {
     if (!open) return THEME_PALETTES[0];
@@ -51,16 +54,39 @@ const AppSidebar = ({ open, onClose, onNewChat, onSelectConversation, activeConv
   const showRecent = ["chat", "files", "learning", "shopping", "research"].includes(currentMode);
   const hideStudioAndHistory = ["images", "videos", "code"].includes(currentMode);
 
+  // Hydrate from cache instantly so the list never disappears between page changes.
   useEffect(() => {
-    if (open) {
-      if (showRecent) loadConversations();
-      loadUserInfo();
-    }
-  }, [open, currentMode]);
+    if (!showRecent || !currentUserId) return;
+    try {
+      const raw = localStorage.getItem(cacheKey(currentMode, currentUserId));
+      if (raw) {
+        const cached = JSON.parse(raw) as Conversation[];
+        if (Array.isArray(cached)) setConversations(cached);
+      }
+    } catch {}
+  }, [currentUserId, currentMode, showRecent]);
+
+  // Always load user info + conversations on mount and when mode changes.
+  // Don't gate on `open` — the list should be ready the instant the user taps the menu.
+  useEffect(() => {
+    loadUserInfo();
+  }, []);
+
+  useEffect(() => {
+    if (showRecent) loadConversations();
+  }, [currentMode, currentUserId]);
+
+  // Refresh on focus so newly created conversations show up.
+  useEffect(() => {
+    const onFocus = () => { if (showRecent) loadConversations(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [currentMode, showRecent, currentUserId]);
 
   const loadUserInfo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    setCurrentUserId(user.id);
     const emailPrefix = user.email?.split("@")[0] || "User";
     setUserName(user.user_metadata?.full_name || emailPrefix);
     setUserEmail(user.email || "");
@@ -77,8 +103,18 @@ const AppSidebar = ({ open, onClose, onNewChat, onSelectConversation, activeConv
     if (!user) return;
     const validModes = ["code", "images", "videos", "files", "learning", "shopping", "research"];
     const modeFilter = validModes.includes(currentMode) ? currentMode : "chat";
-    const { data } = await supabase.from("conversations").select("id, title, updated_at, mode, is_pinned").eq("mode", modeFilter).eq("user_id", user.id).order("is_pinned", { ascending: false }).order("updated_at", { ascending: false }).limit(30);
-    if (data) setConversations(data);
+    const { data } = await supabase
+      .from("conversations")
+      .select("id, title, updated_at, mode, is_pinned")
+      .eq("mode", modeFilter)
+      .eq("user_id", user.id)
+      .order("is_pinned", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(30);
+    if (data) {
+      setConversations(data);
+      try { localStorage.setItem(cacheKey(modeFilter, user.id), JSON.stringify(data)); } catch {}
+    }
   };
 
   const initial = userName.charAt(0).toUpperCase() || "U";
