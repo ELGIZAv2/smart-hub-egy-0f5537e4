@@ -327,8 +327,13 @@ const FilesPage = () => {
   const showHero = messages.length === 0;
 
   return (
-    <AppLayout disablePadding>
-      <AppSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <AppLayout>
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={() => { setMessages([]); setConversationId(null); setSidebarOpen(false); }}
+        currentMode="files"
+      />
 
       <div className="min-h-screen w-full bg-background text-foreground flex flex-col">
         {/* Top bar */}
