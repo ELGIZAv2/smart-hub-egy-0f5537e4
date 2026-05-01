@@ -140,6 +140,21 @@ const CodeWorkspace = () => {
     return null;
   };
 
+  // --- AI two-word project name ---
+  const generateProjectName = async (prompt: string): Promise<string> => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/name-project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await r.json().catch(() => ({} as any));
+      const name = (data?.name || "").trim();
+      if (name) return name;
+    } catch {}
+    return prompt.split(/\s+/).slice(0, 2).join(" ").slice(0, 30) || "New Project";
+  };
+
   // --- Project helper ---
   const ensureProject = async (firstMessage: string, weblyId: string, convId: string | null) => {
     if (projectId) {
@@ -149,7 +164,7 @@ const CodeWorkspace = () => {
       return projectId;
     }
     if (!userId) return null;
-    const name = firstMessage.slice(0, 60) || "Untitled Project";
+    const name = await generateProjectName(firstMessage);
     const { data } = await supabase.from("projects").insert({
       user_id: userId,
       name,
