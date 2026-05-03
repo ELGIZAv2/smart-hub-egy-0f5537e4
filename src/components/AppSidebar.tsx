@@ -51,8 +51,9 @@ const AppSidebar = ({ open, onClose, onNewChat, onSelectConversation, activeConv
     return THEME_PALETTES[Math.floor(Math.random() * THEME_PALETTES.length)];
   }, [open]);
 
-  const showRecent = ["chat", "files", "learning", "shopping", "research"].includes(currentMode);
-  const hideStudioAndHistory = ["images", "videos", "code"].includes(currentMode);
+  // Files & Programming pages: history lives under the input, NOT in the sidebar.
+  const showRecent = ["chat", "learning", "shopping", "research"].includes(currentMode);
+  const hideStudioAndHistory = ["images", "videos", "code", "files"].includes(currentMode);
 
   // Hydrate from cache instantly so the list never disappears between page changes.
   useEffect(() => {
