@@ -181,8 +181,22 @@ const CodeWorkspace = () => {
     return null;
   };
 
-  // Screenshot capture disabled — Webly fallback projects don't support it reliably.
-  const captureScreenshot = async (_pid: string, _weblyId: string) => { /* no-op */ };
+  // Capture a thumbnail from the rendered HTML using ScreenshotOne edge function.
+  const captureScreenshot = async (pid: string, files: Record<string, string>) => {
+    try {
+      const html = files["/index.html"] || files["index.html"] || Object.values(files).find(v => typeof v === "string" && v.includes("<html")) || "";
+      if (!html) return;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/screenshot-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ html, viewportWidth: 1280, viewportHeight: 800, fileName: `project-${pid}` }),
+      });
+      const data = await r.json().catch(() => ({} as any));
+      if (data?.success && data.preview_url) {
+        await supabase.from("projects").update({ thumbnail_url: data.preview_url } as any).eq("id", pid);
+      }
+    } catch {}
+  };
 
   // --- Persist a single message to DB ---
   const persistMessage = async (convId: string | null, msg: ChatMsg) => {
@@ -347,6 +361,8 @@ const CodeWorkspace = () => {
       const pid = await ensureProject(msgText, wpid, convId);
       if (pid && Object.keys(generatedFiles).length > 0) {
         await supabase.from("projects").update({ files_snapshot: generatedFiles as any }).eq("id", pid);
+        // Fire-and-forget thumbnail capture
+        captureScreenshot(pid, generatedFiles);
       }
     } catch (e) {
       completeAllSteps();
