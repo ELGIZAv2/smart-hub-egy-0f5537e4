@@ -609,10 +609,10 @@ const CodeWorkspace = () => {
                   {githubBusy ? "Pushing to GitHub..." : "Push to GitHub"}
                 </button>
                 <button
-                  onClick={() => { setProjectMenuOpen(false); setSupabaseModalOpen(true); }}
+                  onClick={() => { setProjectMenuOpen(false); setIntegrationsOpen(true); }}
                   className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors"
                 >
-                  <Database className="w-5 h-5 text-emerald-500" /> Connect backend
+                  <Database className="w-5 h-5 text-emerald-500" /> Supabase settings
                 </button>
               </motion.div>
             </>
@@ -635,6 +635,9 @@ const CodeWorkspace = () => {
                 onClick={e => e.stopPropagation()}
               >
                 <div className="w-10 h-1 rounded-full bg-foreground/20 mx-auto mb-4" />
+                <button onClick={() => { setPlusMenuOpen(false); setIntegrationsOpen(true); }} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
+                  <Database className="w-5 h-5 text-emerald-500" /> Connect Supabase
+                </button>
                 <button onClick={() => handleFilePick("image")} className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-[15px] text-foreground liquid-glass-hover transition-colors">
                   <ImageIcon className="w-5 h-5" /> Attach image
                 </button>
