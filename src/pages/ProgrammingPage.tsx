@@ -10,6 +10,7 @@ interface Project {
   id: string;
   name: string;
   preview_url: string | null;
+  thumbnail_url: string | null;
   status: string;
   updated_at: string;
   conversation_id: string | null;
@@ -51,7 +52,7 @@ const ProgrammingPage = () => {
     if (!user) { setLoading(false); return; }
     const { data } = await supabase
       .from("projects")
-      .select("id, name, preview_url, status, updated_at, conversation_id, description")
+      .select("id, name, preview_url, thumbnail_url, status, updated_at, conversation_id, description")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(24);
@@ -203,9 +204,9 @@ const ProgrammingPage = () => {
                     className="group relative flex flex-col rounded-2xl border border-border/60 bg-card overflow-hidden text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 transition-all"
                   >
                     <div className="w-full aspect-video bg-gradient-to-br from-primary/15 via-fuchsia-500/10 to-amber-500/10 overflow-hidden relative">
-                      {project.preview_url && (
+                      {(project.thumbnail_url || project.preview_url) && (
                         <img
-                          src={project.preview_url}
+                          src={project.thumbnail_url || project.preview_url || ""}
                           alt={project.name}
                           loading="lazy"
                           className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"

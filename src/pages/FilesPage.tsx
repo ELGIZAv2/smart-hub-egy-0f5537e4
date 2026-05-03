@@ -5,81 +5,57 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
-import { useIsMobile } from "@/hooks/use-mobile";
 import {
-  Menu, ArrowUp, FileText, Presentation, FileSpreadsheet,
-  ScrollText, Map, GitBranch, Calendar, Mail, User, Loader2, Eye, Download, X,
+  Menu, ArrowUp, ArrowLeft, ArrowRight, Loader2, Eye, Download, X, ChevronLeft,
 } from "lucide-react";
 
-// ---------- Backend (Docs Design Studio) ----------
 const DDS_BASE = "https://docs-design-studio.lovable.app";
 
 type Kind =
   | "slides" | "document" | "resume" | "report"
   | "spreadsheet" | "letter" | "roadmap" | "mindmap" | "timeline";
 
-interface Template {
-  type: Kind;
-  id: string;
-  name: string;
-  description?: string;
-  preview?: string;
-  style?: string;
-}
-
-interface DocsDoc {
-  kind: Kind;
-  template?: string;
-  accentColor?: string;
-  background?: "dark" | "light" | "gradient";
-  slides?: Array<{ html: string; title?: string; notes?: string }>;
-  blocks?: Array<any>;
-  title?: string;
-  subtitle?: string;
-  // resume
-  name?: string;
-  contact?: any;
-  summary?: string;
-  experience?: any[];
-  education?: any[];
-  skills?: string[];
-  // spreadsheet
-  sheet?: { name?: string; headers: string[]; rows: string[][]; totals?: string[] };
-}
+interface Template { type: Kind; id: string; name: string; description?: string; preview?: string; style?: string; }
+interface DocsDoc { kind: Kind; template?: string; title?: string; [k: string]: any; }
 
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
-  status?: string;          // streaming status
+  status?: string;
   generationId?: string;
   doc?: DocsDoc;
-  htmlPreview?: string;     // pre-rendered HTML page from /export?format=html
+  htmlPreview?: string;
 }
 
-const KINDS: { id: Kind; label: string; icon: any; gradient: string }[] = [
-  { id: "slides",      label: "Slides",      icon: Presentation,    gradient: "from-purple-500 to-fuchsia-500" },
-  { id: "document",    label: "Document",    icon: FileText,        gradient: "from-blue-500 to-cyan-500" },
-  { id: "resume",      label: "Resume",      icon: User,            gradient: "from-emerald-500 to-teal-500" },
-  { id: "report",      label: "Report",      icon: ScrollText,      gradient: "from-amber-500 to-orange-500" },
-  { id: "spreadsheet", label: "Spreadsheet", icon: FileSpreadsheet, gradient: "from-green-500 to-emerald-500" },
-  { id: "letter",      label: "Letter",      icon: Mail,            gradient: "from-rose-500 to-pink-500" },
-  { id: "roadmap",     label: "Roadmap",     icon: Map,             gradient: "from-indigo-500 to-blue-500" },
-  { id: "mindmap",     label: "Mindmap",     icon: GitBranch,       gradient: "from-violet-500 to-purple-500" },
-  { id: "timeline",    label: "Timeline",    icon: Calendar,        gradient: "from-yellow-500 to-amber-500" },
+interface SavedFile {
+  id: string;
+  title: string;
+  kind: string;
+  thumbnail: string | null;
+  generation_id: string | null;
+  conversation_id: string;
+  updated_at: string;
+}
+
+const KINDS: { id: Kind; label: string }[] = [
+  { id: "slides",      label: "Slides" },
+  { id: "document",    label: "Document" },
+  { id: "resume",      label: "Resume" },
+  { id: "report",      label: "Report" },
+  { id: "spreadsheet", label: "Spreadsheet" },
+  { id: "letter",      label: "Letter" },
+  { id: "roadmap",     label: "Roadmap" },
+  { id: "mindmap",     label: "Mindmap" },
+  { id: "timeline",    label: "Timeline" },
 ];
 
-// ---------- SSE reader ----------
-async function streamGenerate(
-  body: any,
-  onStatus: (msg: string) => void,
-): Promise<{ docJson: string; id: string; url: string | null }> {
+async function streamGenerate(body: any, onStatus: (msg: string) => void) {
   const res = await fetch(`${DDS_BASE}/api/v1/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok || !res.body) throw new Error(`Generation failed (${res.status})`);
-
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -102,15 +78,12 @@ async function streamGenerate(
         if (event === "status" && payload.message) onStatus(payload.message);
         if (event === "done") return payload;
         if (event === "error") throw new Error(payload.message || "Generation failed");
-      } catch (e: any) {
-        if (event === "error") throw e;
-      }
+      } catch (e: any) { if (event === "error") throw e; }
     }
   }
   throw new Error("Stream ended without completion");
 }
 
-// ---------- AI naming (2 words) ----------
 async function generateProjectName(prompt: string): Promise<string> {
   try {
     const { data } = await supabase.functions.invoke("name-project", { body: { prompt } });
@@ -119,9 +92,21 @@ async function generateProjectName(prompt: string): Promise<string> {
   return prompt.split(/\s+/).slice(0, 2).join(" ") || "New File";
 }
 
-// ---------- Main ----------
+async function captureThumb(html: string, fileName: string): Promise<string | null> {
+  try {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/screenshot-preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ html, viewportWidth: 1280, viewportHeight: 800, fileName }),
+    });
+    const data = await r.json().catch(() => ({} as any));
+    return data?.preview_url || null;
+  } catch { return null; }
+}
+
 const FilesPage = () => {
-  const isMobile = useIsMobile();
   const navigate = useNavigate();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -136,11 +121,13 @@ const FilesPage = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [useResearch, setUseResearch] = useState(false);
+  const [savedFiles, setSavedFiles] = useState<SavedFile[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const kindScrollRef = useRef<HTMLDivElement>(null);
 
-  // Load templates from backend
+  // Templates
   useEffect(() => {
     (async () => {
       try {
@@ -148,24 +135,45 @@ const FilesPage = () => {
         const json = await res.json();
         const grouped: Record<string, Template[]> = {};
         for (const t of (json.templates || [])) {
-          if (!grouped[t.type]) grouped[t.type] = [];
-          grouped[t.type].push(t);
+          (grouped[t.type] = grouped[t.type] || []).push(t);
         }
         setTemplatesByKind(grouped);
-      } catch {
-        // silently degrade — templates optional
-      }
+      } catch {}
     })();
   }, []);
 
-  // Auto-pick first template per kind
+  // Saved files (history under the input)
+  const loadSavedFiles = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("conversations")
+      .select("id, title, updated_at, ui_state")
+      .eq("user_id", user.id)
+      .eq("mode", "files")
+      .order("updated_at", { ascending: false })
+      .limit(24);
+    if (!data) return;
+    const list: SavedFile[] = data.map((c: any) => ({
+      id: c.id,
+      title: c.title || "Untitled",
+      kind: c.ui_state?.kind || "document",
+      thumbnail: c.ui_state?.thumbnail || null,
+      generation_id: c.ui_state?.generation_id || null,
+      conversation_id: c.id,
+      updated_at: c.updated_at,
+    }));
+    setSavedFiles(list);
+  }, []);
+
+  useEffect(() => { loadSavedFiles(); }, [loadSavedFiles]);
+
   useEffect(() => {
     const list = templatesByKind[selectedKind];
     if (list && list.length > 0) setSelectedTemplate(list[0]);
     else setSelectedTemplate(null);
   }, [selectedKind, templatesByKind]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -173,23 +181,23 @@ const FilesPage = () => {
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }, [input]);
 
-  // Scroll to bottom on message updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, statusText]);
 
   const currentTemplates = useMemo(() => templatesByKind[selectedKind] || [], [selectedKind, templatesByKind]);
 
+  const scrollKinds = (dir: "left" | "right") => {
+    const el = kindScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === "left" ? -200 : 200, behavior: "smooth" });
+  };
+
   const handleSend = useCallback(async () => {
     const prompt = input.trim();
     if (!prompt || isGenerating) return;
-
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Please sign in to generate files");
-      navigate("/auth");
-      return;
-    }
+    if (!user) { toast.error("Please sign in"); navigate("/auth"); return; }
 
     setInput("");
     const userMsg: ChatMsg = { role: "user", content: prompt };
@@ -198,35 +206,24 @@ const FilesPage = () => {
     setIsGenerating(true);
     setStatusText("Starting...");
 
-    // Persist conversation
     let convId = conversationId;
     if (!convId) {
       const name = await generateProjectName(prompt);
       const { data: conv } = await supabase
         .from("conversations")
-        .insert({ user_id: user.id, title: name, mode: "files" })
-        .select("id")
-        .single();
+        .insert({ user_id: user.id, title: name, mode: "files", ui_state: { kind: selectedKind } as any })
+        .select("id").single();
       convId = conv?.id || null;
       if (convId) setConversationId(convId);
     }
 
     if (convId) {
-      await supabase.from("messages").insert({
-        conversation_id: convId, user_id: user.id, role: "user", content: prompt,
-      });
+      await supabase.from("messages").insert({ conversation_id: convId, role: "user", content: prompt } as any);
     }
 
     try {
       const result = await streamGenerate(
-        {
-          kind: selectedKind,
-          template: selectedTemplate?.id || "modern",
-          templateStyle: selectedTemplate?.style || "",
-          prompt,
-          useResearch,
-          depth: 3,
-        },
+        { kind: selectedKind, template: selectedTemplate?.id || "modern", templateStyle: selectedTemplate?.style || "", prompt, useResearch, depth: 3 },
         (msg) => {
           setStatusText(msg);
           setMessages(prev => {
@@ -240,12 +237,9 @@ const FilesPage = () => {
 
       const doc: DocsDoc = JSON.parse(result.docJson);
 
-      // Fetch standalone HTML for preview
       let htmlPreview = "";
       try {
-        const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${result.id}/export?format=html`, {
-          method: "POST",
-        });
+        const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${result.id}/export?format=html`, { method: "POST" });
         if (expRes.ok) htmlPreview = await expRes.text();
       } catch {}
 
@@ -264,18 +258,24 @@ const FilesPage = () => {
 
       if (convId) {
         await supabase.from("messages").insert({
-          conversation_id: convId, user_id: user.id, role: "assistant",
-          content: `Your ${selectedKind} is ready.`,
-          images: [JSON.stringify({ generationId: result.id, kind: selectedKind })],
-        });
+          conversation_id: convId, role: "assistant", content: `Your ${selectedKind} is ready.`,
+        } as any);
       }
 
       setStatusText("");
 
-      // Open preview if HTML available
       if (htmlPreview) {
         setPreviewHtml(htmlPreview);
         setPreviewOpen(true);
+        // Capture thumb in background
+        if (convId) {
+          captureThumb(htmlPreview, `file-${convId}`).then(async (thumb) => {
+            await supabase.from("conversations").update({
+              ui_state: { kind: selectedKind, thumbnail: thumb, generation_id: result.id } as any,
+            }).eq("id", convId!);
+            loadSavedFiles();
+          });
+        }
       }
     } catch (e: any) {
       setMessages(prev => {
@@ -292,37 +292,45 @@ const FilesPage = () => {
       setIsGenerating(false);
       setStatusText("");
     }
-  }, [input, isGenerating, selectedKind, selectedTemplate, useResearch, conversationId, navigate]);
+  }, [input, isGenerating, selectedKind, selectedTemplate, useResearch, conversationId, navigate, loadSavedFiles]);
 
   const handleDownload = useCallback(async (msg: ChatMsg) => {
     if (!msg.generationId) return;
     try {
-      const res = await fetch(`${DDS_BASE}/api/v1/generations/${msg.generationId}/export?format=html`, {
-        method: "POST",
-      });
+      const res = await fetch(`${DDS_BASE}/api/v1/generations/${msg.generationId}/export?format=html`, { method: "POST" });
       if (!res.ok) throw new Error("Export failed");
       const html = await res.text();
       const blob = new Blob([html], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `${msg.doc?.title || msg.doc?.kind || "document"}.html`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = `${msg.doc?.title || msg.doc?.kind || "document"}.html`;
+      document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       toast.success("Downloaded");
-    } catch (e: any) {
-      toast.error(e?.message || "Download failed");
-    }
+    } catch (e: any) { toast.error(e?.message || "Download failed"); }
   }, []);
 
   const handlePreview = useCallback((msg: ChatMsg) => {
-    if (msg.htmlPreview) {
-      setPreviewHtml(msg.htmlPreview);
-      setPreviewOpen(true);
-    }
+    if (msg.htmlPreview) { setPreviewHtml(msg.htmlPreview); setPreviewOpen(true); }
   }, []);
+
+  const openSavedFile = async (file: SavedFile) => {
+    if (!file.generation_id) return;
+    setIsGenerating(true);
+    try {
+      const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${file.generation_id}/export?format=html`, { method: "POST" });
+      if (expRes.ok) {
+        const html = await expRes.text();
+        setPreviewHtml(html);
+        setPreviewOpen(true);
+      }
+    } catch { toast.error("Couldn't open file"); }
+    finally { setIsGenerating(false); }
+  };
+
+  const handleNewFile = () => {
+    setMessages([]); setConversationId(null); setInput("");
+  };
 
   const showHero = messages.length === 0;
 
@@ -331,7 +339,7 @@ const FilesPage = () => {
       <AppSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onNewChat={() => { setMessages([]); setConversationId(null); setSidebarOpen(false); }}
+        onNewChat={handleNewFile}
         currentMode="files"
       />
 
@@ -339,13 +347,23 @@ const FilesPage = () => {
         {/* Top bar */}
         <header className="sticky top-0 z-20 backdrop-blur-xl bg-background/70 border-b border-border/40">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center transition-colors"
-              aria-label="Open menu"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+            {showHero ? (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center transition-colors"
+                aria-label="Open menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            ) : (
+              <button
+                onClick={handleNewFile}
+                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center transition-colors"
+                aria-label="Back"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
             <h1 className="text-base font-bold tracking-tight">Files</h1>
             <div className="w-10" />
           </div>
@@ -358,7 +376,7 @@ const FilesPage = () => {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="max-w-3xl w-full mx-auto px-5 sm:px-8 pt-10 sm:pt-16 pb-6 text-center"
+              className="max-w-3xl w-full mx-auto px-5 sm:px-8 pt-8 sm:pt-14 pb-4 text-center"
             >
               <h2 className="font-black tracking-tight leading-[1.05] text-4xl sm:text-6xl">
                 Create anything.{" "}
@@ -366,43 +384,53 @@ const FilesPage = () => {
                   Beautifully.
                 </span>
               </h2>
-              <p className="mt-5 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-                Slides, resumes, reports, spreadsheets — generated, designed, and ready to share.
+              <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
+                Slides, resumes, reports, spreadsheets — generated, designed, ready to share.
               </p>
             </motion.section>
           )}
         </AnimatePresence>
 
-        {/* Kind picker */}
+        {/* Kind picker — horizontal slider with arrows */}
         {showHero && (
-          <div className="max-w-5xl w-full mx-auto px-5 sm:px-8 mt-2">
-            <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-1 px-1 scrollbar-hide">
-              {KINDS.map((k) => {
-                const Active = selectedKind === k.id;
-                const Icon = k.icon;
-                return (
-                  <button
-                    key={k.id}
-                    onClick={() => setSelectedKind(k.id)}
-                    className={`snap-start shrink-0 group relative rounded-2xl border transition-all px-4 py-3 flex items-center gap-2.5 ${
-                      Active
-                        ? "border-foreground/80 bg-foreground text-background shadow-md"
-                        : "border-border/60 bg-card hover:border-foreground/40"
-                    }`}
-                  >
-                    <div className={`h-8 w-8 rounded-xl flex items-center justify-center bg-gradient-to-br ${k.gradient} text-white`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <span className="font-semibold text-sm">{k.label}</span>
-                  </button>
-                );
-              })}
+          <div className="max-w-5xl w-full mx-auto px-2 sm:px-8 mt-2">
+            <div className="relative">
+              <button
+                onClick={() => scrollKinds("left")}
+                className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full bg-card/95 backdrop-blur-xl border border-border/60 shadow items-center justify-center hover:bg-card"
+                aria-label="Scroll left"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div ref={kindScrollRef} className="flex gap-2.5 overflow-x-auto pb-3 snap-x snap-mandatory px-3 sm:px-12 scrollbar-hide scroll-smooth">
+                {KINDS.map((k) => {
+                  const Active = selectedKind === k.id;
+                  return (
+                    <button
+                      key={k.id}
+                      onClick={() => setSelectedKind(k.id)}
+                      className={`snap-start shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold border transition-all ${
+                        Active
+                          ? "bg-foreground text-background border-foreground shadow-md"
+                          : "border-border/60 bg-card text-foreground/80 hover:border-foreground/40"
+                      }`}
+                    >
+                      {k.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => scrollKinds("right")}
+                className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full bg-card/95 backdrop-blur-xl border border-border/60 shadow items-center justify-center hover:bg-card"
+                aria-label="Scroll right"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Template strip */}
             {currentTemplates.length > 0 && (
-              <div className="mt-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-3 font-semibold">Style</p>
+              <div className="mt-2 px-3 sm:px-12">
                 <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
                   {currentTemplates.map((t) => {
                     const Active = selectedTemplate?.id === t.id;
@@ -410,13 +438,12 @@ const FilesPage = () => {
                       <button
                         key={t.id}
                         onClick={() => setSelectedTemplate(t)}
-                        className={`shrink-0 px-4 py-2 rounded-full text-xs font-medium transition-all border ${
+                        className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border ${
                           Active
                             ? "bg-foreground text-background border-foreground"
                             : "bg-card text-muted-foreground border-border/60 hover:text-foreground hover:border-foreground/40"
                         }`}
                       >
-                        {t.preview ? <span className="mr-1.5">{t.preview}</span> : null}
                         {t.name}
                       </button>
                     );
@@ -427,56 +454,49 @@ const FilesPage = () => {
           </div>
         )}
 
-        {/* Messages */}
-        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 space-y-4 overflow-y-auto">
-          {messages.map((m, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                  m.role === "user"
-                    ? "bg-foreground text-background"
-                    : "bg-card border border-border/60"
-                }`}
+        {/* Messages (during conversation) */}
+        {!showHero && (
+          <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 space-y-4 overflow-y-auto">
+            {messages.map((m, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {m.status ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{m.status}</span>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm whitespace-pre-wrap">{m.content}</p>
-                    {m.role === "assistant" && m.generationId && (
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={() => handlePreview(m)}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 bg-foreground text-background hover:opacity-90 transition"
-                        >
-                          <Eye className="h-3.5 w-3.5" /> Preview
-                        </button>
-                        <button
-                          onClick={() => handleDownload(m)}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 border border-border hover:bg-muted transition"
-                        >
-                          <Download className="h-3.5 w-3.5" /> Download
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </motion.div>
-          ))}
-          <div ref={messagesEndRef} />
-        </main>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${m.role === "user" ? "bg-foreground text-background" : "bg-card border border-border/60"}`}>
+                  {m.status ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{m.status}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                      {m.role === "assistant" && m.generationId && (
+                        <div className="mt-3 flex gap-2">
+                          <button onClick={() => handlePreview(m)} className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 bg-foreground text-background hover:opacity-90 transition">
+                            <Eye className="h-3.5 w-3.5" /> Preview
+                          </button>
+                          <button onClick={() => handleDownload(m)} className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 border border-border hover:bg-muted transition">
+                            <Download className="h-3.5 w-3.5" /> Download
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+            <div ref={messagesEndRef} />
+          </main>
+        )}
+
+        {/* Spacer to push input down on hero */}
+        {showHero && <div className="flex-1" />}
 
         {/* Input bar */}
-        <div className="sticky bottom-0 z-10 backdrop-blur-xl bg-background/85 border-t border-border/40">
+        <div className={`${showHero ? "" : "sticky bottom-0"} z-10 backdrop-blur-xl bg-background/85 border-t border-border/40`}>
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3">
             <div className="rounded-2xl border border-border/70 bg-card shadow-sm focus-within:border-foreground/60 transition-colors">
               <textarea
@@ -484,10 +504,7 @@ const FilesPage = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
                 }}
                 placeholder={`Describe your ${selectedKind}...`}
                 rows={1}
@@ -498,11 +515,8 @@ const FilesPage = () => {
                 <button
                   onClick={() => setUseResearch(v => !v)}
                   className={`text-[11px] font-semibold rounded-full px-3 py-1 transition-all ${
-                    useResearch
-                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                      : "text-muted-foreground hover:text-foreground"
+                    useResearch ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:text-foreground"
                   }`}
-                  title="Live web research"
                 >
                   {useResearch ? "● Research on" : "○ Research"}
                 </button>
@@ -521,42 +535,64 @@ const FilesPage = () => {
             )}
           </div>
         </div>
+
+        {/* Saved files grid (under input, when on hero) */}
+        {showHero && savedFiles.length > 0 && (
+          <section className="max-w-5xl w-full mx-auto px-5 sm:px-8 pb-20 pt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Your Files</h3>
+              <span className="text-xs text-muted-foreground/60">{savedFiles.length}</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {savedFiles.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => openSavedFile(f)}
+                  className="group flex flex-col rounded-2xl border border-border/60 bg-card overflow-hidden text-left hover:border-foreground/40 hover:shadow-lg transition-all"
+                >
+                  <div className="w-full aspect-video bg-gradient-to-br from-purple-500/10 via-fuchsia-500/10 to-amber-500/10 overflow-hidden">
+                    {f.thumbnail ? (
+                      <img src={f.thumbnail} alt={f.title} loading="lazy"
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground/60 uppercase tracking-wider">
+                        {f.kind}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="text-sm font-semibold truncate">{f.title}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">{f.kind}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Preview modal */}
       <AnimatePresence>
         {previewOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-stretch justify-center p-0 sm:p-6"
             onClick={() => setPreviewOpen(false)}
           >
             <motion.div
-              initial={{ scale: 0.96, y: 12 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.96, y: 12 }}
+              initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 12 }}
               transition={{ type: "spring", damping: 24, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
               className="relative w-full max-w-6xl bg-background rounded-none sm:rounded-2xl overflow-hidden shadow-2xl flex flex-col"
             >
               <div className="flex items-center justify-between px-4 h-12 border-b border-border/60 bg-card/80 backdrop-blur-xl">
                 <span className="text-sm font-semibold">Preview</span>
-                <button
-                  onClick={() => setPreviewOpen(false)}
-                  className="h-9 w-9 rounded-xl hover:bg-muted flex items-center justify-center"
-                  aria-label="Close"
-                >
+                <button onClick={() => setPreviewOpen(false)} className="h-9 w-9 rounded-xl hover:bg-muted flex items-center justify-center">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <iframe
-                srcDoc={previewHtml}
-                title="Document preview"
-                className="flex-1 w-full bg-white"
-                sandbox="allow-same-origin allow-scripts"
-              />
+              <iframe srcDoc={previewHtml} title="Document preview" className="flex-1 w-full bg-white" sandbox="allow-same-origin allow-scripts" />
             </motion.div>
           </motion.div>
         )}

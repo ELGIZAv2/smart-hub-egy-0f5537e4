@@ -1288,6 +1288,7 @@ export type Database = {
           preview_url: string | null
           repo_url: string | null
           status: string
+          thumbnail_url: string | null
           updated_at: string
           user_id: string
           webly_project_id: string | null
@@ -1304,6 +1305,7 @@ export type Database = {
           preview_url?: string | null
           repo_url?: string | null
           status?: string
+          thumbnail_url?: string | null
           updated_at?: string
           user_id: string
           webly_project_id?: string | null
@@ -1320,6 +1322,7 @@ export type Database = {
           preview_url?: string | null
           repo_url?: string | null
           status?: string
+          thumbnail_url?: string | null
           updated_at?: string
           user_id?: string
           webly_project_id?: string | null
