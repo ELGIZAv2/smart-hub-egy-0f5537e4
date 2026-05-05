@@ -577,7 +577,7 @@ const FilesPage = () => {
         {previewOpen && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-stretch justify-center p-0 sm:p-6"
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-stretch justify-center p-0 sm:p-6"
             onClick={() => setPreviewOpen(false)}
           >
             <motion.div
@@ -586,13 +586,16 @@ const FilesPage = () => {
               onClick={(e) => e.stopPropagation()}
               className="relative w-full max-w-6xl bg-background rounded-none sm:rounded-2xl overflow-hidden shadow-2xl flex flex-col"
             >
-              <div className="flex items-center justify-between px-4 h-12 border-b border-border/60 bg-card/80 backdrop-blur-xl">
+              <div className="flex items-center justify-between px-3 sm:px-4 h-12 border-b border-border/60 bg-card/80 backdrop-blur-xl shrink-0">
+                <button onClick={() => setPreviewOpen(false)} className="h-9 w-9 rounded-xl hover:bg-muted flex items-center justify-center">
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
                 <span className="text-sm font-semibold">Preview</span>
                 <button onClick={() => setPreviewOpen(false)} className="h-9 w-9 rounded-xl hover:bg-muted flex items-center justify-center">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <iframe srcDoc={previewHtml} title="Document preview" className="flex-1 w-full bg-white" sandbox="allow-same-origin allow-scripts" />
+              <ScaledHtmlPreview html={previewHtml} />
             </motion.div>
           </motion.div>
         )}
