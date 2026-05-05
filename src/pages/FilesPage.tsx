@@ -6,8 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import ScaledHtmlPreview from "@/components/files/ScaledHtmlPreview";
+import TemplatePickerSheet, { type PickerTemplate } from "@/components/files/TemplatePickerSheet";
 import {
-  Menu, ArrowUp, ArrowLeft, ArrowRight, Loader2, Eye, Download, X, ChevronLeft,
+  Menu, ArrowUp, ChevronLeft, ChevronRight, Loader2, Eye, Download, X,
+  Plus, MoreHorizontal, Paperclip, Sparkles, LayoutTemplate,
 } from "lucide-react";
 
 const DDS_BASE = "https://docs-design-studio.lovable.app";
@@ -26,6 +28,7 @@ interface ChatMsg {
   generationId?: string;
   doc?: DocsDoc;
   htmlPreview?: string;
+  thumbnail?: string | null;
 }
 
 interface SavedFile {
@@ -38,17 +41,19 @@ interface SavedFile {
   updated_at: string;
 }
 
-const KINDS: { id: Kind; label: string }[] = [
-  { id: "slides",      label: "Slides" },
-  { id: "document",    label: "Document" },
-  { id: "resume",      label: "Resume" },
-  { id: "report",      label: "Report" },
+const KINDS: { id: Kind; label: string; hasTemplates?: boolean }[] = [
+  { id: "slides",      label: "Slides",      hasTemplates: true  },
+  { id: "document",    label: "Document",    hasTemplates: true  },
+  { id: "resume",      label: "Resume",      hasTemplates: true  },
+  { id: "report",      label: "Report",      hasTemplates: true  },
   { id: "spreadsheet", label: "Spreadsheet" },
-  { id: "letter",      label: "Letter" },
-  { id: "roadmap",     label: "Roadmap" },
-  { id: "mindmap",     label: "Mindmap" },
-  { id: "timeline",    label: "Timeline" },
+  { id: "letter",      label: "Letter",      hasTemplates: true  },
+  { id: "roadmap",     label: "Roadmap"      },
+  { id: "mindmap",     label: "Mindmap"      },
+  { id: "timeline",    label: "Timeline"     },
 ];
+
+const DEFAULT_SLIDES_TEMPLATE = "premium-megsy";
 
 async function streamGenerate(body: any, onStatus: (msg: string) => void) {
   const res = await fetch(`${DDS_BASE}/api/v1/generate`, {
@@ -90,7 +95,7 @@ async function generateProjectName(prompt: string): Promise<string> {
     const { data } = await supabase.functions.invoke("name-project", { body: { prompt } });
     if (data?.name) return data.name;
   } catch {}
-  return prompt.split(/\s+/).slice(0, 2).join(" ") || "New File";
+  return prompt.split(/\s+/).slice(0, 4).join(" ") || "New File";
 }
 
 async function captureThumb(html: string, fileName: string): Promise<string | null> {
@@ -115,20 +120,28 @@ const FilesPage = () => {
   const [selectedKind, setSelectedKind] = useState<Kind>("slides");
   const [templatesByKind, setTemplatesByKind] = useState<Record<string, Template[]>>({});
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [slideCount, setSlideCount] = useState(10);
+  const [contentDepth, setContentDepth] = useState(3);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
-  const [useResearch, setUseResearch] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState<string>("Preview");
   const [savedFiles, setSavedFiles] = useState<SavedFile[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const kindScrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Templates
+  const currentKindMeta = KINDS.find(k => k.id === selectedKind);
+  const showTemplates = !!currentKindMeta?.hasTemplates;
+  const isSlides = selectedKind === "slides";
+
+  // Load templates
   useEffect(() => {
     (async () => {
       try {
@@ -143,7 +156,7 @@ const FilesPage = () => {
     })();
   }, []);
 
-  // Saved files (history under the input)
+  // Saved files history
   const loadSavedFiles = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -169,17 +182,24 @@ const FilesPage = () => {
 
   useEffect(() => { loadSavedFiles(); }, [loadSavedFiles]);
 
+  // Set default template when kind changes
   useEffect(() => {
     const list = templatesByKind[selectedKind];
-    if (list && list.length > 0) setSelectedTemplate(list[0]);
-    else setSelectedTemplate(null);
+    if (!list || list.length === 0) { setSelectedTemplate(null); return; }
+    if (selectedKind === "slides") {
+      const megsy = list.find(t => t.id === DEFAULT_SLIDES_TEMPLATE);
+      setSelectedTemplate(megsy || list[0]);
+    } else {
+      setSelectedTemplate(list[0]);
+    }
   }, [selectedKind, templatesByKind]);
 
+  // Auto-grow textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
   }, [input]);
 
   useEffect(() => {
@@ -187,12 +207,6 @@ const FilesPage = () => {
   }, [messages, statusText]);
 
   const currentTemplates = useMemo(() => templatesByKind[selectedKind] || [], [selectedKind, templatesByKind]);
-
-  const scrollKinds = (dir: "left" | "right") => {
-    const el = kindScrollRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir === "left" ? -200 : 200, behavior: "smooth" });
-  };
 
   const handleSend = useCallback(async () => {
     const prompt = input.trim();
@@ -224,7 +238,15 @@ const FilesPage = () => {
 
     try {
       const result = await streamGenerate(
-        { kind: selectedKind, template: selectedTemplate?.id || "modern", templateStyle: selectedTemplate?.style || "", prompt, useResearch, depth: 3 },
+        {
+          kind: selectedKind,
+          template: selectedTemplate?.id || (isSlides ? DEFAULT_SLIDES_TEMPLATE : "modern"),
+          templateStyle: selectedTemplate?.style || "",
+          prompt,
+          useResearch: true, // always on, hidden from UI
+          depth: contentDepth,
+          slideCount: isSlides ? slideCount : undefined,
+        },
         (msg) => {
           setStatusText(msg);
           setMessages(prev => {
@@ -244,15 +266,22 @@ const FilesPage = () => {
         if (expRes.ok) htmlPreview = await expRes.text();
       } catch {}
 
+      // Capture screenshot synchronously to show in chat history
+      let thumb: string | null = null;
+      if (htmlPreview) {
+        thumb = await captureThumb(htmlPreview, `file-${convId || result.id}`);
+      }
+
       setMessages(prev => {
         const copy = [...prev];
         const last = copy[copy.length - 1];
         if (last?.role === "assistant") {
           last.status = undefined;
-          last.content = `Your ${selectedKind} is ready.`;
+          last.content = doc?.title || `Your ${selectedKind} is ready.`;
           last.generationId = result.id;
           last.doc = doc;
           last.htmlPreview = htmlPreview;
+          last.thumbnail = thumb;
         }
         return copy;
       });
@@ -261,23 +290,14 @@ const FilesPage = () => {
         await supabase.from("messages").insert({
           conversation_id: convId, role: "assistant", content: `Your ${selectedKind} is ready.`,
         } as any);
+        await supabase.from("conversations").update({
+          title: doc?.title || undefined,
+          ui_state: { kind: selectedKind, thumbnail: thumb, generation_id: result.id } as any,
+        }).eq("id", convId);
+        loadSavedFiles();
       }
 
       setStatusText("");
-
-      if (htmlPreview) {
-        setPreviewHtml(htmlPreview);
-        setPreviewOpen(true);
-        // Capture thumb in background
-        if (convId) {
-          captureThumb(htmlPreview, `file-${convId}`).then(async (thumb) => {
-            await supabase.from("conversations").update({
-              ui_state: { kind: selectedKind, thumbnail: thumb, generation_id: result.id } as any,
-            }).eq("id", convId!);
-            loadSavedFiles();
-          });
-        }
-      }
     } catch (e: any) {
       setMessages(prev => {
         const copy = [...prev];
@@ -293,7 +313,7 @@ const FilesPage = () => {
       setIsGenerating(false);
       setStatusText("");
     }
-  }, [input, isGenerating, selectedKind, selectedTemplate, useResearch, conversationId, navigate, loadSavedFiles]);
+  }, [input, isGenerating, selectedKind, selectedTemplate, isSlides, slideCount, contentDepth, conversationId, navigate, loadSavedFiles]);
 
   const handleDownload = useCallback(async (msg: ChatMsg) => {
     if (!msg.generationId) return;
@@ -311,9 +331,9 @@ const FilesPage = () => {
     } catch (e: any) { toast.error(e?.message || "Download failed"); }
   }, []);
 
-  const handlePreview = useCallback((msg: ChatMsg) => {
-    if (msg.htmlPreview) { setPreviewHtml(msg.htmlPreview); setPreviewOpen(true); }
-  }, []);
+  const openPreview = (html: string, title?: string) => {
+    setPreviewHtml(html); setPreviewTitle(title || "Preview"); setPreviewOpen(true);
+  };
 
   const openSavedFile = async (file: SavedFile) => {
     if (!file.generation_id) return;
@@ -322,8 +342,7 @@ const FilesPage = () => {
       const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${file.generation_id}/export?format=html`, { method: "POST" });
       if (expRes.ok) {
         const html = await expRes.text();
-        setPreviewHtml(html);
-        setPreviewOpen(true);
+        openPreview(html, file.title);
       }
     } catch { toast.error("Couldn't open file"); }
     finally { setIsGenerating(false); }
@@ -334,6 +353,11 @@ const FilesPage = () => {
   };
 
   const showHero = messages.length === 0;
+
+  // Convert templates to picker format
+  const pickerTemplates: PickerTemplate[] = currentTemplates.map(t => ({
+    id: t.id, name: t.name, preview: t.preview, description: t.description,
+  }));
 
   return (
     <AppLayout>
@@ -346,12 +370,12 @@ const FilesPage = () => {
 
       <div className="min-h-screen w-full bg-background text-foreground flex flex-col">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 backdrop-blur-xl bg-background/70 border-b border-border/40">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <header className="sticky top-0 z-20 backdrop-blur-xl bg-background/80 border-b border-border/40">
+          <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between">
             {showHero ? (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center transition-colors"
+                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center"
                 aria-label="Open menu"
               >
                 <Menu className="h-5 w-5" />
@@ -359,61 +383,74 @@ const FilesPage = () => {
             ) : (
               <button
                 onClick={handleNewFile}
-                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center transition-colors"
+                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center"
                 aria-label="Back"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
             )}
-            <h1 className="text-base font-bold tracking-tight">Files</h1>
-            <div className="w-10" />
+            <h1 className="text-base font-semibold tracking-tight">Files</h1>
+            <button
+              onClick={handleNewFile}
+              className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center"
+              aria-label="New"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
           </div>
         </header>
 
-        {/* Hero */}
-        <AnimatePresence>
-          {showHero && (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="max-w-3xl w-full mx-auto px-5 sm:px-8 pt-8 sm:pt-14 pb-4 text-center"
-            >
-              <h2 className="font-black tracking-tight leading-[1.05] text-4xl sm:text-6xl">
-                Create anything.{" "}
-                <span className="bg-gradient-to-r from-purple-600 via-fuchsia-500 to-amber-500 bg-clip-text text-transparent">
-                  Beautifully.
-                </span>
+        {/* HERO LAYOUT */}
+        {showHero ? (
+          <div className="flex-1 flex flex-col">
+            <section className="max-w-3xl w-full mx-auto px-5 sm:px-8 pt-10 sm:pt-16 text-center">
+              <h2 className="font-bold tracking-tight leading-[1.1] text-3xl sm:text-5xl text-foreground">
+                Drop in a topic, get exquisite files.
               </h2>
-              <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-                Slides, resumes, reports, spreadsheets — generated, designed, ready to share.
+              <p className="mt-3 text-muted-foreground text-sm sm:text-base">
+                Slides, documents, reports, resumes — designed and ready.
               </p>
-            </motion.section>
-          )}
-        </AnimatePresence>
+            </section>
 
-        {/* Kind picker — horizontal slider with arrows */}
-        {showHero && (
-          <div className="max-w-5xl w-full mx-auto px-2 sm:px-8 mt-2">
-            <div className="relative">
-              <button
-                onClick={() => scrollKinds("left")}
-                className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full bg-card/95 backdrop-blur-xl border border-border/60 shadow items-center justify-center hover:bg-card"
-                aria-label="Scroll left"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <div ref={kindScrollRef} className="flex gap-2.5 overflow-x-auto pb-3 snap-x snap-mandatory px-3 sm:px-12 scrollbar-hide scroll-smooth">
+            {/* BIG centered input */}
+            <div className="max-w-2xl w-full mx-auto px-4 sm:px-6 mt-8 sm:mt-10">
+              <InputBox
+                value={input}
+                onChange={setInput}
+                onSend={handleSend}
+                isGenerating={isGenerating}
+                textareaRef={textareaRef}
+                kindLabel={currentKindMeta?.label || "file"}
+                isSlides={isSlides}
+                slideCount={slideCount}
+                setSlideCount={setSlideCount}
+                contentDepth={contentDepth}
+                setContentDepth={setContentDepth}
+                showTemplates={showTemplates}
+                selectedTemplate={selectedTemplate}
+                onOpenPicker={() => setPickerOpen(true)}
+                moreOpen={moreOpen}
+                setMoreOpen={setMoreOpen}
+                onAttach={() => fileInputRef.current?.click()}
+              />
+              <input ref={fileInputRef} type="file" hidden onChange={(e) => {
+                if (e.target.files?.[0]) toast.info(`Attached ${e.target.files[0].name}`);
+              }} />
+            </div>
+
+            {/* Kinds slider */}
+            <div className="max-w-3xl w-full mx-auto px-4 sm:px-6 mt-5">
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1 scroll-smooth">
                 {KINDS.map((k) => {
                   const Active = selectedKind === k.id;
                   return (
                     <button
                       key={k.id}
                       onClick={() => setSelectedKind(k.id)}
-                      className={`snap-start shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold border transition-all ${
+                      className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium border transition-all ${
                         Active
-                          ? "bg-foreground text-background border-foreground shadow-md"
-                          : "border-border/60 bg-card text-foreground/80 hover:border-foreground/40"
+                          ? "bg-foreground text-background border-foreground"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {k.label}
@@ -421,187 +458,320 @@ const FilesPage = () => {
                   );
                 })}
               </div>
-              <button
-                onClick={() => scrollKinds("right")}
-                className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full bg-card/95 backdrop-blur-xl border border-border/60 shadow items-center justify-center hover:bg-card"
-                aria-label="Scroll right"
-              >
-                <ArrowRight className="h-4 w-4" />
-              </button>
             </div>
 
-            {currentTemplates.length > 0 && (
-              <div className="mt-2 px-3 sm:px-12">
-                <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
-                  {currentTemplates.map((t) => {
-                    const Active = selectedTemplate?.id === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => setSelectedTemplate(t)}
-                        className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border ${
-                          Active
-                            ? "bg-foreground text-background border-foreground"
-                            : "bg-card text-muted-foreground border-border/60 hover:text-foreground hover:border-foreground/40"
-                        }`}
-                      >
-                        {t.name}
-                      </button>
-                    );
-                  })}
+            {/* Saved history */}
+            {savedFiles.length > 0 && (
+              <section className="max-w-5xl w-full mx-auto px-4 sm:px-8 pt-10 pb-24">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-foreground">Your projects</h3>
+                  <span className="text-xs text-muted-foreground">{savedFiles.length}</span>
                 </div>
-              </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {savedFiles.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => openSavedFile(f)}
+                      className="group flex flex-col rounded-2xl border border-border/60 bg-card overflow-hidden text-left hover:border-foreground/30 hover:shadow-lg transition-all"
+                    >
+                      <div className="w-full aspect-video bg-muted overflow-hidden">
+                        {f.thumbnail ? (
+                          <img src={f.thumbnail} alt={f.title} loading="lazy"
+                            className="w-full h-full object-cover object-top group-hover:scale-[1.03] transition-transform duration-500" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground uppercase tracking-widest">
+                            {f.kind}
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-3 py-2.5">
+                        <p className="text-sm font-semibold truncate">{f.title}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">{f.kind}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
             )}
           </div>
-        )}
-
-        {/* Messages (during conversation) */}
-        {!showHero && (
-          <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 space-y-4 overflow-y-auto">
-            {messages.map((m, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${m.role === "user" ? "bg-foreground text-background" : "bg-card border border-border/60"}`}>
-                  {m.status ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>{m.status}</span>
+        ) : (
+          // CHAT LAYOUT
+          <>
+            <main className="flex-1 max-w-3xl w-full mx-auto px-3 sm:px-6 py-5 space-y-4 overflow-y-auto">
+              {messages.map((m, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {m.role === "user" ? (
+                    <div className="max-w-[85%] rounded-2xl px-4 py-2.5 bg-primary text-primary-foreground text-sm whitespace-pre-wrap">
+                      {m.content}
                     </div>
                   ) : (
-                    <>
-                      <p className="text-sm whitespace-pre-wrap">{m.content}</p>
-                      {m.role === "assistant" && m.generationId && (
-                        <div className="mt-3 flex gap-2">
-                          <button onClick={() => handlePreview(m)} className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 bg-foreground text-background hover:opacity-90 transition">
-                            <Eye className="h-3.5 w-3.5" /> Preview
-                          </button>
-                          <button onClick={() => handleDownload(m)} className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 border border-border hover:bg-muted transition">
-                            <Download className="h-3.5 w-3.5" /> Download
-                          </button>
+                    <div className="max-w-[92%] w-full">
+                      {/* Megsy star avatar */}
+                      <div className="flex items-start gap-2.5">
+                        <div className="shrink-0 mt-0.5">
+                          <Sparkles className="h-5 w-5 text-primary" />
                         </div>
-                      )}
-                    </>
+                        <div className="flex-1 min-w-0">
+                          {m.status ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground py-1.5">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>{m.status}</span>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm whitespace-pre-wrap text-foreground">{m.content}</p>
+                              {m.generationId && (
+                                <div className="mt-3 rounded-2xl border border-border/60 bg-card overflow-hidden">
+                                  <button
+                                    onClick={() => m.htmlPreview && openPreview(m.htmlPreview, m.doc?.title)}
+                                    className="block w-full aspect-video bg-muted overflow-hidden"
+                                  >
+                                    {m.thumbnail ? (
+                                      <img src={m.thumbnail} alt={m.doc?.title || "preview"}
+                                        className="w-full h-full object-cover object-top" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                                        Preview unavailable
+                                      </div>
+                                    )}
+                                  </button>
+                                  <div className="flex items-center justify-between px-3 py-2 border-t border-border/60">
+                                    <span className="text-xs font-medium truncate text-foreground">
+                                      {m.doc?.title || "Untitled"}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        onClick={() => m.htmlPreview && openPreview(m.htmlPreview, m.doc?.title)}
+                                        className="h-8 w-8 rounded-lg hover:bg-muted flex items-center justify-center"
+                                        aria-label="Preview"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDownload(m)}
+                                        className="h-8 w-8 rounded-lg hover:bg-muted flex items-center justify-center"
+                                        aria-label="Download"
+                                      >
+                                        <Download className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </div>
-              </motion.div>
-            ))}
-            <div ref={messagesEndRef} />
-          </main>
-        )}
+                </motion.div>
+              ))}
+              <div ref={messagesEndRef} />
+            </main>
 
-        {/* Spacer to push input down on hero */}
-        {showHero && <div className="flex-1" />}
-
-        {/* Input bar */}
-        <div className={`${showHero ? "" : "sticky bottom-0"} z-10 backdrop-blur-xl bg-background/85 border-t border-border/40`}>
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3">
-            <div className="rounded-2xl border border-border/70 bg-card shadow-sm focus-within:border-foreground/60 transition-colors">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-                }}
-                placeholder={`Describe your ${selectedKind}...`}
-                rows={1}
-                disabled={isGenerating}
-                className="w-full resize-none bg-transparent px-4 py-3 text-sm focus:outline-none disabled:opacity-60 max-h-40"
-              />
-              <div className="flex items-center justify-between px-3 pb-2">
-                <button
-                  onClick={() => setUseResearch(v => !v)}
-                  className={`text-[11px] font-semibold rounded-full px-3 py-1 transition-all ${
-                    useResearch ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {useResearch ? "● Research on" : "○ Research"}
-                </button>
-                <button
-                  onClick={handleSend}
-                  disabled={!input.trim() || isGenerating}
-                  className="h-9 w-9 rounded-xl bg-foreground text-background flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
-                  aria-label="Send"
-                >
-                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-                </button>
+            <div className="sticky bottom-0 z-10 backdrop-blur-xl bg-background/90 border-t border-border/40">
+              <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3">
+                <InputBox
+                  value={input}
+                  onChange={setInput}
+                  onSend={handleSend}
+                  isGenerating={isGenerating}
+                  textareaRef={textareaRef}
+                  kindLabel={currentKindMeta?.label || "file"}
+                  isSlides={isSlides}
+                  slideCount={slideCount}
+                  setSlideCount={setSlideCount}
+                  contentDepth={contentDepth}
+                  setContentDepth={setContentDepth}
+                  showTemplates={showTemplates}
+                  selectedTemplate={selectedTemplate}
+                  onOpenPicker={() => setPickerOpen(true)}
+                  moreOpen={moreOpen}
+                  setMoreOpen={setMoreOpen}
+                  onAttach={() => fileInputRef.current?.click()}
+                  compact
+                />
               </div>
             </div>
-            {statusText && !messages.some(m => m.status) && (
-              <p className="text-xs text-muted-foreground mt-2 text-center">{statusText}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Saved files grid (under input, when on hero) */}
-        {showHero && savedFiles.length > 0 && (
-          <section className="max-w-5xl w-full mx-auto px-5 sm:px-8 pb-20 pt-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Your Files</h3>
-              <span className="text-xs text-muted-foreground/60">{savedFiles.length}</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {savedFiles.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => openSavedFile(f)}
-                  className="group flex flex-col rounded-2xl border border-border/60 bg-card overflow-hidden text-left hover:border-foreground/40 hover:shadow-lg transition-all"
-                >
-                  <div className="w-full aspect-video bg-gradient-to-br from-purple-500/10 via-fuchsia-500/10 to-amber-500/10 overflow-hidden">
-                    {f.thumbnail ? (
-                      <img src={f.thumbnail} alt={f.title} loading="lazy"
-                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground/60 uppercase tracking-wider">
-                        {f.kind}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="text-sm font-semibold truncate">{f.title}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">{f.kind}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
+          </>
         )}
       </div>
+
+      {/* Template picker */}
+      <TemplatePickerSheet
+        open={pickerOpen}
+        templates={pickerTemplates}
+        selectedId={selectedTemplate?.id}
+        onSelect={(t) => {
+          const full = currentTemplates.find(x => x.id === t.id);
+          if (full) setSelectedTemplate(full);
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
 
       {/* Preview modal */}
       <AnimatePresence>
         {previewOpen && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-stretch justify-center p-0 sm:p-6"
-            onClick={() => setPreviewOpen(false)}
+            className="fixed inset-0 z-50 bg-background flex flex-col"
           >
-            <motion.div
-              initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 12 }}
-              transition={{ type: "spring", damping: 24, stiffness: 280 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-6xl bg-background rounded-none sm:rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-            >
-              <div className="flex items-center justify-between px-3 sm:px-4 h-12 border-b border-border/60 bg-card/80 backdrop-blur-xl shrink-0">
-                <button onClick={() => setPreviewOpen(false)} className="h-9 w-9 rounded-xl hover:bg-muted flex items-center justify-center">
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <span className="text-sm font-semibold">Preview</span>
-                <button onClick={() => setPreviewOpen(false)} className="h-9 w-9 rounded-xl hover:bg-muted flex items-center justify-center">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <ScaledHtmlPreview html={previewHtml} />
-            </motion.div>
+            <header className="sticky top-0 z-10 h-14 px-3 sm:px-4 flex items-center justify-between border-b border-border/40 bg-background/90 backdrop-blur-xl">
+              <button onClick={() => setPreviewOpen(false)} className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center">
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <p className="text-sm font-semibold truncate flex-1 text-center px-2">{previewTitle}</p>
+              <button
+                onClick={() => {
+                  const blob = new Blob([previewHtml], { type: "text/html" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.download = `${previewTitle || "file"}.html`;
+                  document.body.appendChild(a); a.click(); a.remove();
+                  URL.revokeObjectURL(url);
+                }}
+                className="h-10 px-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold flex items-center gap-1.5"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+            </header>
+            <ScaledHtmlPreview html={previewHtml} />
           </motion.div>
         )}
       </AnimatePresence>
     </AppLayout>
+  );
+};
+
+/* ───────────────────────── Input Box (clean, centered) ───────────────────────── */
+
+interface InputBoxProps {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+  isGenerating: boolean;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  kindLabel: string;
+  isSlides: boolean;
+  slideCount: number;
+  setSlideCount: (n: number) => void;
+  contentDepth: number;
+  setContentDepth: (n: number) => void;
+  showTemplates: boolean;
+  selectedTemplate: Template | null;
+  onOpenPicker: () => void;
+  moreOpen: boolean;
+  setMoreOpen: (v: boolean) => void;
+  onAttach: () => void;
+  compact?: boolean;
+}
+
+const InputBox = ({
+  value, onChange, onSend, isGenerating, textareaRef, kindLabel,
+  isSlides, slideCount, setSlideCount, contentDepth, setContentDepth,
+  showTemplates, selectedTemplate, onOpenPicker, moreOpen, setMoreOpen, onAttach, compact,
+}: InputBoxProps) => {
+  return (
+    <div className={`rounded-3xl border border-border/70 bg-card shadow-sm focus-within:border-foreground/40 transition-colors ${compact ? "" : "shadow-xl shadow-black/[0.04]"}`}>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+        }}
+        placeholder={isSlides ? "Create slides..." : `Describe your ${kindLabel.toLowerCase()}...`}
+        rows={compact ? 1 : 2}
+        disabled={isGenerating}
+        className={`w-full resize-none bg-transparent px-5 ${compact ? "pt-3" : "pt-5"} text-[15px] focus:outline-none disabled:opacity-60 max-h-48 placeholder:text-muted-foreground/70`}
+      />
+
+      {/* Slides controls */}
+      {isSlides && !compact && (
+        <div className="px-5 pb-3 grid grid-cols-2 gap-4">
+          <div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+              <span className="font-medium">Slides</span>
+              <span className="tabular-nums font-semibold text-foreground">{slideCount}</span>
+            </div>
+            <input
+              type="range" min={4} max={20} value={slideCount}
+              onChange={(e) => setSlideCount(Number(e.target.value))}
+              className="w-full accent-primary h-1"
+            />
+          </div>
+          <div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+              <span className="font-medium">Depth</span>
+              <span className="tabular-nums font-semibold text-foreground">{contentDepth}</span>
+            </div>
+            <input
+              type="range" min={1} max={5} value={contentDepth}
+              onChange={(e) => setContentDepth(Number(e.target.value))}
+              className="w-full accent-primary h-1"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Bottom row */}
+      <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
+        <button
+          onClick={onAttach}
+          className="h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+          aria-label="Attach"
+          title="Attach file"
+        >
+          <Plus className="h-4.5 w-4.5" />
+        </button>
+
+        {showTemplates && (
+          <button
+            onClick={onOpenPicker}
+            className="h-9 px-3 rounded-full hover:bg-muted flex items-center gap-1.5 text-xs font-medium text-foreground border border-border/60"
+          >
+            <LayoutTemplate className="h-3.5 w-3.5" />
+            <span className="truncate max-w-[120px]">{selectedTemplate?.name || "Templates"}</span>
+          </button>
+        )}
+
+        <div className="relative ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setMoreOpen(!moreOpen)}
+            className="h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+            aria-label="More"
+          >
+            <MoreHorizontal className="h-4.5 w-4.5" />
+          </button>
+          {moreOpen && (
+            <div className="absolute bottom-full right-0 mb-2 w-56 rounded-2xl border border-border bg-popover shadow-xl p-1.5 z-30">
+              <button
+                onClick={onAttach}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-muted text-sm text-left"
+              >
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <span>Attach file or image</span>
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={onSend}
+            disabled={!value.trim() || isGenerating}
+            className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
+            aria-label="Send"
+          >
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4.5 w-4.5" />}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
