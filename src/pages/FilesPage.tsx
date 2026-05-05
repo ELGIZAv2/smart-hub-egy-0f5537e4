@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
+import ScaledHtmlPreview from "@/components/files/ScaledHtmlPreview";
 import {
   Menu, ArrowUp, ArrowLeft, ArrowRight, Loader2, Eye, Download, X, ChevronLeft,
 } from "lucide-react";
