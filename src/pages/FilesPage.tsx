@@ -728,7 +728,7 @@ const InputBox = ({
           aria-label="Attach"
           title="Attach file"
         >
-          <Plus className="h-4.5 w-4.5" />
+          <Plus className="h-4 w-4" />
         </button>
 
         {showTemplates && (
@@ -747,7 +747,7 @@ const InputBox = ({
             className="h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
             aria-label="More"
           >
-            <MoreHorizontal className="h-4.5 w-4.5" />
+            <MoreHorizontal className="h-4 w-4" />
           </button>
           {moreOpen && (
             <div className="absolute bottom-full right-0 mb-2 w-56 rounded-2xl border border-border bg-popover shadow-xl p-1.5 z-30">
@@ -767,7 +767,7 @@ const InputBox = ({
             className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
             aria-label="Send"
           >
-            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4.5 w-4.5" />}
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
           </button>
         </div>
       </div>
