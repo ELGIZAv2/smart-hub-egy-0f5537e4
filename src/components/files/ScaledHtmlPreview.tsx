@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Renders generated HTML inside an iframe sized at a fixed desktop
- * resolution (1280×800) and scales it down to fit the container.
- * This makes desktop-designed documents readable on mobile without
- * breaking layout or fonts.
+ * Renders generated HTML inside an iframe at a fixed desktop width
+ * (1280px) and scales it horizontally to fit the container while
+ * allowing vertical scrolling of the full document.
  */
 const BASE_W = 1280;
-const BASE_H = 800;
 
 interface Props {
   html: string;
@@ -15,18 +13,18 @@ interface Props {
 
 const ScaledHtmlPreview = ({ html }: Props) => {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [scale, setScale] = useState(1);
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [contentH, setContentH] = useState(800);
 
+  // Scale to container width
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const update = () => {
       const w = el.clientWidth;
-      const h = el.clientHeight;
-      if (!w || !h) return;
-      setSize({ w, h });
-      setScale(Math.min(w / BASE_W, h / BASE_H, 1));
+      if (!w) return;
+      setScale(Math.min(w / BASE_W, 1));
     };
     update();
     const ro = new ResizeObserver(update);
@@ -34,7 +32,30 @@ const ScaledHtmlPreview = ({ html }: Props) => {
     return () => ro.disconnect();
   }, []);
 
-  // Inject viewport + safety CSS so generated HTML doesn't overflow weirdly
+  // Measure iframe content height after load
+  const handleLoad = () => {
+    try {
+      const doc = iframeRef.current?.contentDocument;
+      if (!doc) return;
+      const h = Math.max(
+        doc.documentElement.scrollHeight,
+        doc.body?.scrollHeight || 0,
+        800,
+      );
+      setContentH(h);
+      // Keep observing for late renders
+      const ro = new ResizeObserver(() => {
+        const nh = Math.max(
+          doc.documentElement.scrollHeight,
+          doc.body?.scrollHeight || 0,
+          800,
+        );
+        setContentH(nh);
+      });
+      if (doc.body) ro.observe(doc.body);
+    } catch {}
+  };
+
   const wrappedHtml = html?.includes("<head>")
     ? html.replace(
         "<head>",
@@ -43,24 +64,37 @@ const ScaledHtmlPreview = ({ html }: Props) => {
     : `<!doctype html><html><head><meta name="viewport" content="width=${BASE_W}"><style>html,body{margin:0;background:#fff;}</style></head><body>${html || ""}</body></html>`;
 
   return (
-    <div ref={wrapRef} className="relative flex-1 w-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
-      {size.w > 0 && (
+    <div
+      ref={wrapRef}
+      className="relative flex-1 w-full bg-neutral-100 dark:bg-neutral-900 overflow-y-auto overflow-x-hidden overscroll-contain"
+    >
+      <div
+        className="mx-auto bg-white shadow-2xl"
+        style={{
+          width: BASE_W * scale,
+          height: contentH * scale,
+        }}
+      >
         <div
-          className="absolute left-1/2 top-1/2 origin-center shadow-2xl bg-white"
           style={{
             width: BASE_W,
-            height: BASE_H,
-            transform: `translate(-50%, -50%) scale(${scale})`,
+            height: contentH,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
           }}
         >
           <iframe
+            ref={iframeRef}
+            onLoad={handleLoad}
             srcDoc={wrappedHtml}
             title="Document preview"
-            className="w-full h-full bg-white border-0"
+            className="bg-white border-0 block"
+            style={{ width: BASE_W, height: contentH }}
             sandbox="allow-same-origin allow-scripts"
+            scrolling="no"
           />
         </div>
-      )}
+      </div>
     </div>
   );
 };

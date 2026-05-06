@@ -8,8 +8,8 @@ import AppLayout from "@/layouts/AppLayout";
 import ScaledHtmlPreview from "@/components/files/ScaledHtmlPreview";
 import TemplatePickerSheet, { type PickerTemplate } from "@/components/files/TemplatePickerSheet";
 import {
-  Menu, ArrowUp, ChevronLeft, ChevronRight, Loader2, Eye, Download, X,
-  Plus, MoreHorizontal, Paperclip, Sparkles, LayoutTemplate,
+  Menu, ArrowUp, ChevronLeft, Loader2, Eye, Download,
+  Plus, Sparkles, LayoutTemplate, SlidersHorizontal, X,
 } from "lucide-react";
 
 const DDS_BASE = "https://docs-design-studio.lovable.app";
@@ -29,6 +29,7 @@ interface ChatMsg {
   doc?: DocsDoc;
   htmlPreview?: string;
   thumbnail?: string | null;
+  report?: string[];
 }
 
 interface SavedFile {
@@ -55,7 +56,23 @@ const KINDS: { id: Kind; label: string; hasTemplates?: boolean }[] = [
 
 const DEFAULT_SLIDES_TEMPLATE = "premium-megsy";
 
-async function streamGenerate(body: any, onStatus: (msg: string) => void) {
+/** Friendly, brand-safe rephrasing of raw status events from the generator. */
+function humanizeStatus(raw: string): string {
+  const s = (raw || "").trim();
+  if (!s) return "Working on it…";
+  // strip any leading emoji or non-letters
+  const stripped = s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+  const lower = stripped.toLowerCase();
+  if (lower.includes("research")) return "Researching the topic";
+  if (lower.includes("plan") || lower.includes("outline")) return "Planning the structure";
+  if (lower.includes("writ") || lower.includes("draft") || lower.includes("content")) return "Writing the content";
+  if (lower.includes("design") || lower.includes("style") || lower.includes("layout")) return "Designing the layout";
+  if (lower.includes("image") || lower.includes("media") || lower.includes("visual")) return "Adding visuals";
+  if (lower.includes("export") || lower.includes("render") || lower.includes("final")) return "Finalizing";
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
+async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep: (msg: string) => void) {
   const res = await fetch(`${DDS_BASE}/api/v1/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -81,7 +98,11 @@ async function streamGenerate(body: any, onStatus: (msg: string) => void) {
       if (!data) continue;
       try {
         const payload = JSON.parse(data);
-        if (event === "status" && payload.message) onStatus(payload.message);
+        if (event === "status" && payload.message) {
+          const friendly = humanizeStatus(payload.message);
+          onStatus(friendly);
+          onStep(friendly);
+        }
         if (event === "done") return payload;
         if (event === "error") throw new Error(payload.message || "Generation failed");
       } catch (e: any) { if (event === "error") throw e; }
@@ -121,12 +142,11 @@ const FilesPage = () => {
   const [templatesByKind, setTemplatesByKind] = useState<Record<string, Template[]>>({});
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [slideCount, setSlideCount] = useState(10);
   const [contentDepth, setContentDepth] = useState(3);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [statusText, setStatusText] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
@@ -135,7 +155,6 @@ const FilesPage = () => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentKindMeta = KINDS.find(k => k.id === selectedKind);
   const showTemplates = !!currentKindMeta?.hasTemplates;
@@ -156,7 +175,6 @@ const FilesPage = () => {
     })();
   }, []);
 
-  // Saved files history
   const loadSavedFiles = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -182,7 +200,6 @@ const FilesPage = () => {
 
   useEffect(() => { loadSavedFiles(); }, [loadSavedFiles]);
 
-  // Set default template when kind changes
   useEffect(() => {
     const list = templatesByKind[selectedKind];
     if (!list || list.length === 0) { setSelectedTemplate(null); return; }
@@ -194,7 +211,6 @@ const FilesPage = () => {
     }
   }, [selectedKind, templatesByKind]);
 
-  // Auto-grow textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -204,7 +220,7 @@ const FilesPage = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, statusText]);
+  }, [messages]);
 
   const currentTemplates = useMemo(() => templatesByKind[selectedKind] || [], [selectedKind, templatesByKind]);
 
@@ -216,10 +232,9 @@ const FilesPage = () => {
 
     setInput("");
     const userMsg: ChatMsg = { role: "user", content: prompt };
-    const assistantMsg: ChatMsg = { role: "assistant", content: "", status: "Starting..." };
+    const assistantMsg: ChatMsg = { role: "assistant", content: "", status: "Getting started", report: [] };
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsGenerating(true);
-    setStatusText("Starting...");
 
     let convId = conversationId;
     if (!convId) {
@@ -243,16 +258,26 @@ const FilesPage = () => {
           template: selectedTemplate?.id || (isSlides ? DEFAULT_SLIDES_TEMPLATE : "modern"),
           templateStyle: selectedTemplate?.style || "",
           prompt,
-          useResearch: true, // always on, hidden from UI
+          useResearch: true,
           depth: contentDepth,
           slideCount: isSlides ? slideCount : undefined,
         },
         (msg) => {
-          setStatusText(msg);
           setMessages(prev => {
             const copy = [...prev];
             const last = copy[copy.length - 1];
             if (last?.role === "assistant") last.status = msg;
+            return copy;
+          });
+        },
+        (step) => {
+          setMessages(prev => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last?.role === "assistant") {
+              const list = last.report || [];
+              if (list[list.length - 1] !== step) last.report = [...list, step];
+            }
             return copy;
           });
         },
@@ -266,18 +291,24 @@ const FilesPage = () => {
         if (expRes.ok) htmlPreview = await expRes.text();
       } catch {}
 
-      // Capture screenshot synchronously to show in chat history
       let thumb: string | null = null;
       if (htmlPreview) {
         thumb = await captureThumb(htmlPreview, `file-${convId || result.id}`);
       }
+
+      // Final summary report
+      const summaryParts: string[] = [];
+      if (doc?.title) summaryParts.push(`Created "${doc.title}"`);
+      if (isSlides && Array.isArray((doc as any).slides)) summaryParts.push(`${(doc as any).slides.length} slides`);
+      if (selectedTemplate?.name) summaryParts.push(`styled with ${selectedTemplate.name}`);
+      const summary = summaryParts.join(" • ") || `Your ${selectedKind} is ready.`;
 
       setMessages(prev => {
         const copy = [...prev];
         const last = copy[copy.length - 1];
         if (last?.role === "assistant") {
           last.status = undefined;
-          last.content = doc?.title || `Your ${selectedKind} is ready.`;
+          last.content = summary;
           last.generationId = result.id;
           last.doc = doc;
           last.htmlPreview = htmlPreview;
@@ -288,7 +319,7 @@ const FilesPage = () => {
 
       if (convId) {
         await supabase.from("messages").insert({
-          conversation_id: convId, role: "assistant", content: `Your ${selectedKind} is ready.`,
+          conversation_id: convId, role: "assistant", content: summary,
         } as any);
         await supabase.from("conversations").update({
           title: doc?.title || undefined,
@@ -296,8 +327,6 @@ const FilesPage = () => {
         }).eq("id", convId);
         loadSavedFiles();
       }
-
-      setStatusText("");
     } catch (e: any) {
       setMessages(prev => {
         const copy = [...prev];
@@ -311,7 +340,6 @@ const FilesPage = () => {
       toast.error(e?.message || "Generation failed");
     } finally {
       setIsGenerating(false);
-      setStatusText("");
     }
   }, [input, isGenerating, selectedKind, selectedTemplate, isSlides, slideCount, contentDepth, conversationId, navigate, loadSavedFiles]);
 
@@ -354,7 +382,6 @@ const FilesPage = () => {
 
   const showHero = messages.length === 0;
 
-  // Convert templates to picker format
   const pickerTemplates: PickerTemplate[] = currentTemplates.map(t => ({
     id: t.id, name: t.name, preview: t.preview, description: t.description,
   }));
@@ -368,42 +395,31 @@ const FilesPage = () => {
         currentMode="files"
       />
 
-      <div className="min-h-screen w-full bg-background text-foreground flex flex-col">
-        {/* Top bar */}
-        <header className="sticky top-0 z-20 backdrop-blur-xl bg-background/80 border-b border-border/40">
-          <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between">
-            {showHero ? (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center"
-                aria-label="Open menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            ) : (
-              <button
-                onClick={handleNewFile}
-                className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center"
-                aria-label="Back"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-            )}
-            <h1 className="text-base font-semibold tracking-tight">Files</h1>
-            <button
-              onClick={handleNewFile}
-              className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center"
-              aria-label="New"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-          </div>
-        </header>
+      {/* Outer scroll container — REPLACES the fixed-height layout that broke scrolling */}
+      <div className="relative h-full w-full overflow-y-auto bg-background text-foreground">
+        {/* Floating sidebar button (replaces the entire top header) */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="fixed top-3 left-3 z-30 h-11 w-11 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/60 shadow-lg flex items-center justify-center hover:bg-muted transition"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
 
-        {/* HERO LAYOUT */}
+        {/* Floating "new" button when in chat mode */}
+        {!showHero && (
+          <button
+            onClick={handleNewFile}
+            aria-label="New file"
+            className="fixed top-3 right-3 z-30 h-11 w-11 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/60 shadow-lg flex items-center justify-center hover:bg-muted transition"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        )}
+
         {showHero ? (
-          <div className="flex-1 flex flex-col">
-            <section className="max-w-3xl w-full mx-auto px-5 sm:px-8 pt-10 sm:pt-16 text-center">
+          <div className="flex flex-col min-h-full pt-20 pb-16">
+            <section className="max-w-3xl w-full mx-auto px-5 sm:px-8 text-center">
               <h2 className="font-bold tracking-tight leading-[1.1] text-3xl sm:text-5xl text-foreground">
                 Drop in a topic, get exquisite files.
               </h2>
@@ -412,7 +428,6 @@ const FilesPage = () => {
               </p>
             </section>
 
-            {/* BIG centered input */}
             <div className="max-w-2xl w-full mx-auto px-4 sm:px-6 mt-8 sm:mt-10">
               <InputBox
                 value={input}
@@ -429,16 +444,11 @@ const FilesPage = () => {
                 showTemplates={showTemplates}
                 selectedTemplate={selectedTemplate}
                 onOpenPicker={() => setPickerOpen(true)}
-                moreOpen={moreOpen}
-                setMoreOpen={setMoreOpen}
-                onAttach={() => fileInputRef.current?.click()}
+                optionsOpen={optionsOpen}
+                setOptionsOpen={setOptionsOpen}
               />
-              <input ref={fileInputRef} type="file" hidden onChange={(e) => {
-                if (e.target.files?.[0]) toast.info(`Attached ${e.target.files[0].name}`);
-              }} />
             </div>
 
-            {/* Kinds slider */}
             <div className="max-w-3xl w-full mx-auto px-4 sm:px-6 mt-5">
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1 scroll-smooth">
                 {KINDS.map((k) => {
@@ -460,9 +470,8 @@ const FilesPage = () => {
               </div>
             </div>
 
-            {/* Saved history */}
             {savedFiles.length > 0 && (
-              <section className="max-w-5xl w-full mx-auto px-4 sm:px-8 pt-10 pb-24">
+              <section className="max-w-5xl w-full mx-auto px-4 sm:px-8 pt-10 pb-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-foreground">Your projects</h3>
                   <span className="text-xs text-muted-foreground">{savedFiles.length}</span>
@@ -495,9 +504,8 @@ const FilesPage = () => {
             )}
           </div>
         ) : (
-          // CHAT LAYOUT
-          <>
-            <main className="flex-1 max-w-3xl w-full mx-auto px-3 sm:px-6 py-5 space-y-4 overflow-y-auto">
+          <div className="flex flex-col min-h-full pt-16">
+            <main className="flex-1 max-w-3xl w-full mx-auto px-3 sm:px-6 pb-40 space-y-4">
               {messages.map((m, i) => (
                 <motion.div
                   key={i}
@@ -511,20 +519,40 @@ const FilesPage = () => {
                     </div>
                   ) : (
                     <div className="max-w-[92%] w-full">
-                      {/* Megsy star avatar */}
                       <div className="flex items-start gap-2.5">
                         <div className="shrink-0 mt-0.5">
                           <Sparkles className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
                           {m.status ? (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground py-1.5">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>{m.status}</span>
+                            <div className="space-y-1.5 py-1">
+                              <div className="flex items-center gap-2 text-sm text-foreground">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                <span className="font-medium">{m.status}…</span>
+                              </div>
+                              {m.report && m.report.length > 1 && (
+                                <ul className="pl-5 space-y-0.5 text-xs text-muted-foreground">
+                                  {m.report.slice(0, -1).slice(-3).map((s, idx) => (
+                                    <li key={idx} className="truncate">• {s}</li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
                           ) : (
                             <>
                               <p className="text-sm whitespace-pre-wrap text-foreground">{m.content}</p>
+                              {m.report && m.report.length > 0 && (
+                                <details className="mt-1.5 text-xs text-muted-foreground">
+                                  <summary className="cursor-pointer hover:text-foreground select-none">
+                                    What I did ({m.report.length} steps)
+                                  </summary>
+                                  <ul className="mt-1.5 pl-4 space-y-0.5">
+                                    {m.report.map((s, idx) => (
+                                      <li key={idx}>• {s}</li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              )}
                               {m.generationId && (
                                 <div className="mt-3 rounded-2xl border border-border/60 bg-card overflow-hidden">
                                   <button
@@ -536,7 +564,7 @@ const FilesPage = () => {
                                         className="w-full h-full object-cover object-top" />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                                        Preview unavailable
+                                        Tap to preview
                                       </div>
                                     )}
                                   </button>
@@ -574,35 +602,23 @@ const FilesPage = () => {
               <div ref={messagesEndRef} />
             </main>
 
-            <div className="sticky bottom-0 z-10 backdrop-blur-xl bg-background/90 border-t border-border/40">
+            {/* Floating chat input */}
+            <div className="fixed bottom-0 left-0 right-0 z-20 backdrop-blur-xl bg-background/90 border-t border-border/40">
               <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3">
-                <InputBox
+                <ChatInputBox
                   value={input}
                   onChange={setInput}
                   onSend={handleSend}
                   isGenerating={isGenerating}
                   textareaRef={textareaRef}
                   kindLabel={currentKindMeta?.label || "file"}
-                  isSlides={isSlides}
-                  slideCount={slideCount}
-                  setSlideCount={setSlideCount}
-                  contentDepth={contentDepth}
-                  setContentDepth={setContentDepth}
-                  showTemplates={showTemplates}
-                  selectedTemplate={selectedTemplate}
-                  onOpenPicker={() => setPickerOpen(true)}
-                  moreOpen={moreOpen}
-                  setMoreOpen={setMoreOpen}
-                  onAttach={() => fileInputRef.current?.click()}
-                  compact
                 />
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
 
-      {/* Template picker */}
       <TemplatePickerSheet
         open={pickerOpen}
         templates={pickerTemplates}
@@ -614,15 +630,14 @@ const FilesPage = () => {
         onClose={() => setPickerOpen(false)}
       />
 
-      {/* Preview modal */}
       <AnimatePresence>
         {previewOpen && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-background flex flex-col"
           >
-            <header className="sticky top-0 z-10 h-14 px-3 sm:px-4 flex items-center justify-between border-b border-border/40 bg-background/90 backdrop-blur-xl">
-              <button onClick={() => setPreviewOpen(false)} className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center">
+            <header className="shrink-0 h-14 px-3 sm:px-4 flex items-center justify-between border-b border-border/40 bg-background/90 backdrop-blur-xl">
+              <button onClick={() => setPreviewOpen(false)} className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center" aria-label="Back">
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <p className="text-sm font-semibold truncate flex-1 text-center px-2">{previewTitle}</p>
@@ -649,7 +664,7 @@ const FilesPage = () => {
   );
 };
 
-/* ───────────────────────── Input Box (clean, centered) ───────────────────────── */
+/* ─────────────── Main hero input (with templates + options popover) ─────────────── */
 
 interface InputBoxProps {
   value: string;
@@ -666,19 +681,17 @@ interface InputBoxProps {
   showTemplates: boolean;
   selectedTemplate: Template | null;
   onOpenPicker: () => void;
-  moreOpen: boolean;
-  setMoreOpen: (v: boolean) => void;
-  onAttach: () => void;
-  compact?: boolean;
+  optionsOpen: boolean;
+  setOptionsOpen: (v: boolean) => void;
 }
 
 const InputBox = ({
   value, onChange, onSend, isGenerating, textareaRef, kindLabel,
   isSlides, slideCount, setSlideCount, contentDepth, setContentDepth,
-  showTemplates, selectedTemplate, onOpenPicker, moreOpen, setMoreOpen, onAttach, compact,
+  showTemplates, selectedTemplate, onOpenPicker, optionsOpen, setOptionsOpen,
 }: InputBoxProps) => {
   return (
-    <div className={`rounded-3xl border border-border/70 bg-card shadow-sm focus-within:border-foreground/40 transition-colors ${compact ? "" : "shadow-xl shadow-black/[0.04]"}`}>
+    <div className="rounded-3xl border border-border/70 bg-card shadow-xl shadow-black/[0.04] focus-within:border-foreground/40 transition-colors">
       <textarea
         ref={textareaRef}
         value={value}
@@ -687,50 +700,12 @@ const InputBox = ({
           if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
         }}
         placeholder={isSlides ? "Create slides..." : `Describe your ${kindLabel.toLowerCase()}...`}
-        rows={compact ? 1 : 2}
+        rows={2}
         disabled={isGenerating}
-        className={`w-full resize-none bg-transparent px-5 ${compact ? "pt-3" : "pt-5"} text-[15px] focus:outline-none disabled:opacity-60 max-h-48 placeholder:text-muted-foreground/70`}
+        className="w-full resize-none bg-transparent px-5 pt-5 text-[15px] focus:outline-none disabled:opacity-60 max-h-48 placeholder:text-muted-foreground/70"
       />
 
-      {/* Slides controls */}
-      {isSlides && !compact && (
-        <div className="px-5 pb-3 grid grid-cols-2 gap-4">
-          <div>
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-              <span className="font-medium">Slides</span>
-              <span className="tabular-nums font-semibold text-foreground">{slideCount}</span>
-            </div>
-            <input
-              type="range" min={4} max={20} value={slideCount}
-              onChange={(e) => setSlideCount(Number(e.target.value))}
-              className="w-full accent-primary h-1"
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-              <span className="font-medium">Depth</span>
-              <span className="tabular-nums font-semibold text-foreground">{contentDepth}</span>
-            </div>
-            <input
-              type="range" min={1} max={5} value={contentDepth}
-              onChange={(e) => setContentDepth(Number(e.target.value))}
-              className="w-full accent-primary h-1"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Bottom row */}
       <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
-        <button
-          onClick={onAttach}
-          className="h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-          aria-label="Attach"
-          title="Attach file"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-
         {showTemplates && (
           <button
             onClick={onOpenPicker}
@@ -741,36 +716,97 @@ const InputBox = ({
           </button>
         )}
 
-        <div className="relative ml-auto flex items-center gap-1.5">
-          <button
-            onClick={() => setMoreOpen(!moreOpen)}
-            className="h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-            aria-label="More"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
-          {moreOpen && (
-            <div className="absolute bottom-full right-0 mb-2 w-56 rounded-2xl border border-border bg-popover shadow-xl p-1.5 z-30">
-              <button
-                onClick={onAttach}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-muted text-sm text-left"
-              >
-                <Paperclip className="h-4 w-4 text-muted-foreground" />
-                <span>Attach file or image</span>
-              </button>
-            </div>
-          )}
+        {isSlides && (
+          <div className="relative">
+            <button
+              onClick={() => setOptionsOpen(!optionsOpen)}
+              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium border transition ${
+                optionsOpen
+                  ? "bg-foreground text-background border-foreground"
+                  : "border-border/60 hover:bg-muted text-foreground"
+              }`}
+              aria-label="Slide options"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span>Options</span>
+            </button>
 
-          <button
-            onClick={onSend}
-            disabled={!value.trim() || isGenerating}
-            className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
-            aria-label="Send"
-          >
-            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-          </button>
-        </div>
+            {optionsOpen && (
+              <div className="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-border bg-popover shadow-xl p-4 z-30 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
+                    <span className="font-medium">Number of slides</span>
+                    <span className="tabular-nums font-semibold text-foreground">{slideCount}</span>
+                  </div>
+                  <input
+                    type="range" min={4} max={20} value={slideCount}
+                    onChange={(e) => setSlideCount(Number(e.target.value))}
+                    className="w-full accent-primary h-1"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
+                    <span className="font-medium">Content depth</span>
+                    <span className="tabular-nums font-semibold text-foreground">{contentDepth}</span>
+                  </div>
+                  <input
+                    type="range" min={1} max={5} value={contentDepth}
+                    onChange={(e) => setContentDepth(Number(e.target.value))}
+                    className="w-full accent-primary h-1"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={onSend}
+          disabled={!value.trim() || isGenerating}
+          className="ml-auto h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
+          aria-label="Send"
+        >
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+        </button>
       </div>
+    </div>
+  );
+};
+
+/* ─────────────── Chat input (clean: no templates, no plus, no more) ─────────────── */
+
+interface ChatInputBoxProps {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+  isGenerating: boolean;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  kindLabel: string;
+}
+
+const ChatInputBox = ({ value, onChange, onSend, isGenerating, textareaRef, kindLabel }: ChatInputBoxProps) => {
+  return (
+    <div className="rounded-3xl border border-border/70 bg-card focus-within:border-foreground/40 transition-colors flex items-end gap-2 px-2.5 py-2">
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+        }}
+        placeholder={`Describe your ${kindLabel.toLowerCase()}...`}
+        rows={1}
+        disabled={isGenerating}
+        className="flex-1 resize-none bg-transparent px-3 py-2 text-[15px] focus:outline-none disabled:opacity-60 max-h-40 placeholder:text-muted-foreground/70"
+      />
+      <button
+        onClick={onSend}
+        disabled={!value.trim() || isGenerating}
+        className="shrink-0 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
+        aria-label="Send"
+      >
+        {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+      </button>
     </div>
   );
 };
