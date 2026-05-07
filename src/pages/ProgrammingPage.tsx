@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Menu } from "lucide-react";
+import { ArrowUp, Menu, X, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import AppLayout from "@/layouts/AppLayout";
 import AppSidebar from "@/components/AppSidebar";
+import TemplateGallery from "@/components/code/TemplateGallery";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Project {
@@ -39,6 +41,8 @@ const ProgrammingPage = () => {
   const [heroIdx, setHeroIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string>("");
   const navigate = useNavigate();
 
   useEffect(() => { loadProjects(); }, []);
@@ -70,6 +74,32 @@ const ProgrammingPage = () => {
     params.set("project_id", project.id);
     if (project.conversation_id) params.set("conversation_id", project.conversation_id);
     navigate(`/code/workspace?${params.toString()}`);
+  };
+
+  const handlePreviewTemplate = (slug: string, name: string) => {
+    setPreviewSlug(slug);
+    setPreviewName(name);
+  };
+
+  const handleUseTemplate = async (slug: string, name: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Please sign in to use a template"); navigate("/auth"); return; }
+    try {
+      const res = await fetch(`/templates/${slug}/index.html`);
+      const html = await res.text();
+      // Persist starter HTML so the workspace can boot from it.
+      sessionStorage.setItem(
+        "code:starter-template",
+        JSON.stringify({ slug, name, html, ts: Date.now() }),
+      );
+      const prompt =
+        `Start a new website using the "${name}" Megsy template I just selected. ` +
+        `Use the provided starter HTML as the foundation, keep its design language, ` +
+        `and adapt the copy, sections and branding to my project. Then publish a live preview.`;
+      navigate(`/code/workspace?prompt=${encodeURIComponent(prompt)}&template=${encodeURIComponent(slug)}`);
+    } catch (e: any) {
+      toast.error("Couldn't load template — please try again.");
+    }
   };
 
   const hero = HERO_LINES[heroIdx];
@@ -179,6 +209,11 @@ const ProgrammingPage = () => {
           </div>
         </section>
 
+        {/* Premium Templates */}
+        <section className="max-w-6xl mx-auto px-5 sm:px-8 mt-12">
+          <TemplateGallery onPreview={handlePreviewTemplate} onUse={handleUseTemplate} />
+        </section>
+
         {/* Projects */}
         <section className="max-w-6xl mx-auto px-5 sm:px-8 mt-14 pb-24">
           {loading ? null : projects.length === 0 ? (
@@ -229,6 +264,42 @@ const ProgrammingPage = () => {
           )}
         </section>
       </div>
+
+      <AnimatePresence>
+        {previewSlug && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background flex flex-col"
+          >
+            <header className="shrink-0 h-14 px-3 flex items-center justify-between border-b border-border/40 bg-background/90 backdrop-blur-xl">
+              <button onClick={() => setPreviewSlug(null)} className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center" aria-label="Close">
+                <X className="h-5 w-5" />
+              </button>
+              <p className="text-sm font-semibold truncate flex-1 text-center px-2">{previewName}</p>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/templates/${previewSlug}/index.html`} target="_blank" rel="noopener"
+                  className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center" aria-label="Open"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+                <button
+                  onClick={() => { const s = previewSlug, n = previewName; setPreviewSlug(null); handleUseTemplate(s!, n); }}
+                  className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Use
+                </button>
+              </div>
+            </header>
+            <iframe
+              src={`/templates/${previewSlug}/index.html`}
+              title={previewName}
+              className="flex-1 w-full border-0 bg-white"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AppLayout>
   );
 };
