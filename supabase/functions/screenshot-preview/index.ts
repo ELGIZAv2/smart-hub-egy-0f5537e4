@@ -8,14 +8,17 @@ const corsHeaders = {
 
 /**
  * screenshot-preview
- * Takes a URL or raw HTML, renders it via ScreenshotOne, uploads PNG to
- * the slide-images bucket and returns a public URL for use as a file preview.
+ * Takes a URL or raw HTML, renders it via ScreenshotOne (POST for large HTML),
+ * uploads PNG to the slide-images bucket and returns a public URL.
  */
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const accessKey = Deno.env.get("ScreenshotOne_Access Key");
+    const accessKey =
+      Deno.env.get("ScreenshotOne_Access Key") ||
+      Deno.env.get("SCREENSHOTONE_ACCESS_KEY") ||
+      Deno.env.get("ScreenshotOne_Access_Key");
     if (!accessKey) throw new Error("ScreenshotOne access key missing");
 
     const { url, html, viewportWidth, viewportHeight, fileName } = await req.json();
@@ -25,25 +28,29 @@ serve(async (req) => {
       });
     }
 
-    const params = new URLSearchParams({
+    const body: Record<string, unknown> = {
       access_key: accessKey,
-      viewport_width: String(viewportWidth || 1280),
-      viewport_height: String(viewportHeight || 720),
-      device_scale_factor: "1",
+      viewport_width: viewportWidth || 1280,
+      viewport_height: viewportHeight || 800,
+      device_scale_factor: 1,
       format: "png",
-      block_ads: "true",
-      block_cookie_banners: "true",
-      cache: "false",
+      block_ads: true,
+      block_cookie_banners: true,
+      cache: false,
+      full_page: false,
+      image_quality: 80,
+    };
+    if (url) body.url = url;
+    else body.html = html;
+
+    const r = await fetch("https://api.screenshotone.com/take", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
-
-    if (url) params.set("url", url);
-    else params.set("html", html);
-
-    const screenshotUrl = `https://api.screenshotone.com/take?${params.toString()}`;
-    const r = await fetch(screenshotUrl);
     if (!r.ok) {
       const txt = await r.text().catch(() => "");
-      console.error("[screenshot] failed", r.status, txt.slice(0, 200));
+      console.error("[screenshot] failed", r.status, txt.slice(0, 300));
       throw new Error(`Screenshot failed: ${r.status}`);
     }
     const png = new Uint8Array(await r.arrayBuffer());

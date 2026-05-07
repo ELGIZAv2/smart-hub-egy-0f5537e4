@@ -7,9 +7,10 @@ import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import ScaledHtmlPreview from "@/components/files/ScaledHtmlPreview";
 import TemplatePickerSheet, { type PickerTemplate } from "@/components/files/TemplatePickerSheet";
+import MegsyStar from "@/components/files/MegsyStar";
 import {
   Menu, ArrowUp, ChevronLeft, Loader2, Eye, Download,
-  Plus, Sparkles, LayoutTemplate, SlidersHorizontal, X,
+  Plus, LayoutTemplate, SlidersHorizontal, X,
 } from "lucide-react";
 
 const DDS_BASE = "https://docs-design-studio.lovable.app";
@@ -59,17 +60,16 @@ const DEFAULT_SLIDES_TEMPLATE = "premium-megsy";
 /** Friendly, brand-safe rephrasing of raw status events from the generator. */
 function humanizeStatus(raw: string): string {
   const s = (raw || "").trim();
-  if (!s) return "Working on it…";
-  // strip any leading emoji or non-letters
+  if (!s) return "Megsy is warming up";
   const stripped = s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
   const lower = stripped.toLowerCase();
-  if (lower.includes("research")) return "Researching the topic";
-  if (lower.includes("plan") || lower.includes("outline")) return "Planning the structure";
-  if (lower.includes("writ") || lower.includes("draft") || lower.includes("content")) return "Writing the content";
-  if (lower.includes("design") || lower.includes("style") || lower.includes("layout")) return "Designing the layout";
-  if (lower.includes("image") || lower.includes("media") || lower.includes("visual")) return "Adding visuals";
-  if (lower.includes("export") || lower.includes("render") || lower.includes("final")) return "Finalizing";
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  if (lower.includes("research")) return "Megsy is researching your topic";
+  if (lower.includes("plan") || lower.includes("outline")) return "Megsy is shaping the outline";
+  if (lower.includes("writ") || lower.includes("draft") || lower.includes("content")) return "Megsy is writing the content";
+  if (lower.includes("design") || lower.includes("style") || lower.includes("layout")) return "Megsy is crafting the design";
+  if (lower.includes("image") || lower.includes("media") || lower.includes("visual")) return "Megsy is curating visuals";
+  if (lower.includes("export") || lower.includes("render") || lower.includes("final")) return "Megsy is polishing the result";
+  return "Megsy is " + (stripped.charAt(0).toLowerCase() + stripped.slice(1));
 }
 
 async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep: (msg: string) => void) {
@@ -232,7 +232,7 @@ const FilesPage = () => {
 
     setInput("");
     const userMsg: ChatMsg = { role: "user", content: prompt };
-    const assistantMsg: ChatMsg = { role: "assistant", content: "", status: "Getting started", report: [] };
+    const assistantMsg: ChatMsg = { role: "assistant", content: "", status: "Megsy is getting started", report: [] };
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsGenerating(true);
 
@@ -420,8 +420,11 @@ const FilesPage = () => {
         {showHero ? (
           <div className="flex flex-col min-h-full pt-20 pb-16">
             <section className="max-w-3xl w-full mx-auto px-5 sm:px-8 text-center">
-              <h2 className="font-bold tracking-tight leading-[1.1] text-3xl sm:text-5xl text-foreground">
-                Drop in a topic, get exquisite files.
+              <h2 className="font-extrabold tracking-tight leading-[1.05] text-3xl sm:text-5xl">
+                <span className="text-foreground">Drop in a topic, get</span>{" "}
+                <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
+                  exquisite files.
+                </span>
               </h2>
               <p className="mt-3 text-muted-foreground text-sm sm:text-base">
                 Slides, documents, reports, resumes — designed and ready.
@@ -521,17 +524,16 @@ const FilesPage = () => {
                     <div className="max-w-[92%] w-full">
                       <div className="flex items-start gap-2.5">
                         <div className="shrink-0 mt-0.5">
-                          <Sparkles className="h-5 w-5 text-primary" />
+                          <MegsyStar size={22} />
                         </div>
                         <div className="flex-1 min-w-0">
                           {m.status ? (
                             <div className="space-y-1.5 py-1">
-                              <div className="flex items-center gap-2 text-sm text-foreground">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                <span className="font-medium">{m.status}…</span>
-                              </div>
+                              <p className="text-base font-extrabold bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
+                                {m.status}…
+                              </p>
                               {m.report && m.report.length > 1 && (
-                                <ul className="pl-5 space-y-0.5 text-xs text-muted-foreground">
+                                <ul className="pl-1 space-y-0.5 text-xs text-muted-foreground">
                                   {m.report.slice(0, -1).slice(-3).map((s, idx) => (
                                     <li key={idx} className="truncate">• {s}</li>
                                   ))}
@@ -690,6 +692,23 @@ const InputBox = ({
   isSlides, slideCount, setSlideCount, contentDepth, setContentDepth,
   showTemplates, selectedTemplate, onOpenPicker, optionsOpen, setOptionsOpen,
 }: InputBoxProps) => {
+  const optionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!optionsOpen) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (optionsRef.current && !optionsRef.current.contains(e.target as Node)) {
+        setOptionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [optionsOpen, setOptionsOpen]);
+
   return (
     <div className="rounded-3xl border border-border/70 bg-card shadow-xl shadow-black/[0.04] focus-within:border-foreground/40 transition-colors">
       <textarea
@@ -717,7 +736,7 @@ const InputBox = ({
         )}
 
         {isSlides && (
-          <div className="relative">
+          <div className="relative" ref={optionsRef}>
             <button
               onClick={() => setOptionsOpen(!optionsOpen)}
               className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium border transition ${
@@ -732,7 +751,10 @@ const InputBox = ({
             </button>
 
             {optionsOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-border bg-popover shadow-xl p-4 z-30 space-y-4">
+              <div
+                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-border bg-popover shadow-2xl p-4 z-40 space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div>
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
                     <span className="font-medium">Number of slides</span>
