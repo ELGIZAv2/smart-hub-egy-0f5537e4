@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Menu } from "lucide-react";
+import { ArrowUp, Menu, X, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import AppLayout from "@/layouts/AppLayout";
 import AppSidebar from "@/components/AppSidebar";
+import TemplateGallery from "@/components/code/TemplateGallery";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Project {
