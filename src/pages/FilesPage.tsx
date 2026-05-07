@@ -60,17 +60,16 @@ const DEFAULT_SLIDES_TEMPLATE = "premium-megsy";
 /** Friendly, brand-safe rephrasing of raw status events from the generator. */
 function humanizeStatus(raw: string): string {
   const s = (raw || "").trim();
-  if (!s) return "Working on it…";
-  // strip any leading emoji or non-letters
+  if (!s) return "Megsy is warming up";
   const stripped = s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
   const lower = stripped.toLowerCase();
-  if (lower.includes("research")) return "Researching the topic";
-  if (lower.includes("plan") || lower.includes("outline")) return "Planning the structure";
-  if (lower.includes("writ") || lower.includes("draft") || lower.includes("content")) return "Writing the content";
-  if (lower.includes("design") || lower.includes("style") || lower.includes("layout")) return "Designing the layout";
-  if (lower.includes("image") || lower.includes("media") || lower.includes("visual")) return "Adding visuals";
-  if (lower.includes("export") || lower.includes("render") || lower.includes("final")) return "Finalizing";
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  if (lower.includes("research")) return "Megsy is researching your topic";
+  if (lower.includes("plan") || lower.includes("outline")) return "Megsy is shaping the outline";
+  if (lower.includes("writ") || lower.includes("draft") || lower.includes("content")) return "Megsy is writing the content";
+  if (lower.includes("design") || lower.includes("style") || lower.includes("layout")) return "Megsy is crafting the design";
+  if (lower.includes("image") || lower.includes("media") || lower.includes("visual")) return "Megsy is curating visuals";
+  if (lower.includes("export") || lower.includes("render") || lower.includes("final")) return "Megsy is polishing the result";
+  return "Megsy is " + (stripped.charAt(0).toLowerCase() + stripped.slice(1));
 }
 
 async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep: (msg: string) => void) {
