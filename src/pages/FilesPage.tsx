@@ -7,9 +7,10 @@ import AppSidebar from "@/components/AppSidebar";
 import AppLayout from "@/layouts/AppLayout";
 import ScaledHtmlPreview from "@/components/files/ScaledHtmlPreview";
 import TemplatePickerSheet, { type PickerTemplate } from "@/components/files/TemplatePickerSheet";
+import MegsyStar from "@/components/files/MegsyStar";
 import {
   Menu, ArrowUp, ChevronLeft, Loader2, Eye, Download,
-  Plus, Sparkles, LayoutTemplate, SlidersHorizontal, X,
+  Plus, LayoutTemplate, SlidersHorizontal, X,
 } from "lucide-react";
 
 const DDS_BASE = "https://docs-design-studio.lovable.app";
