@@ -264,6 +264,42 @@ const ProgrammingPage = () => {
           )}
         </section>
       </div>
+
+      <AnimatePresence>
+        {previewSlug && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background flex flex-col"
+          >
+            <header className="shrink-0 h-14 px-3 flex items-center justify-between border-b border-border/40 bg-background/90 backdrop-blur-xl">
+              <button onClick={() => setPreviewSlug(null)} className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center" aria-label="Close">
+                <X className="h-5 w-5" />
+              </button>
+              <p className="text-sm font-semibold truncate flex-1 text-center px-2">{previewName}</p>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/templates/${previewSlug}/index.html`} target="_blank" rel="noopener"
+                  className="h-10 w-10 rounded-xl hover:bg-muted flex items-center justify-center" aria-label="Open"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+                <button
+                  onClick={() => { const s = previewSlug, n = previewName; setPreviewSlug(null); handleUseTemplate(s!, n); }}
+                  className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Use
+                </button>
+              </div>
+            </header>
+            <iframe
+              src={`/templates/${previewSlug}/index.html`}
+              title={previewName}
+              className="flex-1 w-full border-0 bg-white"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AppLayout>
   );
 };
