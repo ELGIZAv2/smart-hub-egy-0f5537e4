@@ -41,6 +41,8 @@ const ProgrammingPage = () => {
   const [heroIdx, setHeroIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string>("");
   const navigate = useNavigate();
 
   useEffect(() => { loadProjects(); }, []);
