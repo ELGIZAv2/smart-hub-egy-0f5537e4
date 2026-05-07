@@ -527,12 +527,11 @@ const FilesPage = () => {
                         <div className="flex-1 min-w-0">
                           {m.status ? (
                             <div className="space-y-1.5 py-1">
-                              <div className="flex items-center gap-2 text-sm text-foreground">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                <span className="font-medium">{m.status}…</span>
-                              </div>
+                              <p className="text-base font-extrabold bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
+                                {m.status}…
+                              </p>
                               {m.report && m.report.length > 1 && (
-                                <ul className="pl-5 space-y-0.5 text-xs text-muted-foreground">
+                                <ul className="pl-1 space-y-0.5 text-xs text-muted-foreground">
                                   {m.report.slice(0, -1).slice(-3).map((s, idx) => (
                                     <li key={idx} className="truncate">• {s}</li>
                                   ))}
