@@ -689,6 +689,23 @@ const InputBox = ({
   isSlides, slideCount, setSlideCount, contentDepth, setContentDepth,
   showTemplates, selectedTemplate, onOpenPicker, optionsOpen, setOptionsOpen,
 }: InputBoxProps) => {
+  const optionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!optionsOpen) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (optionsRef.current && !optionsRef.current.contains(e.target as Node)) {
+        setOptionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [optionsOpen, setOptionsOpen]);
+
   return (
     <div className="rounded-3xl border border-border/70 bg-card shadow-xl shadow-black/[0.04] focus-within:border-foreground/40 transition-colors">
       <textarea
@@ -716,7 +733,7 @@ const InputBox = ({
         )}
 
         {isSlides && (
-          <div className="relative">
+          <div className="relative" ref={optionsRef}>
             <button
               onClick={() => setOptionsOpen(!optionsOpen)}
               className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium border transition ${
@@ -731,7 +748,10 @@ const InputBox = ({
             </button>
 
             {optionsOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-border bg-popover shadow-xl p-4 z-30 space-y-4">
+              <div
+                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-border bg-popover shadow-2xl p-4 z-40 space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div>
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
                     <span className="font-medium">Number of slides</span>
