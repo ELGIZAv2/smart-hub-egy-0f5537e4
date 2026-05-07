@@ -76,6 +76,32 @@ const ProgrammingPage = () => {
     navigate(`/code/workspace?${params.toString()}`);
   };
 
+  const handlePreviewTemplate = (slug: string, name: string) => {
+    setPreviewSlug(slug);
+    setPreviewName(name);
+  };
+
+  const handleUseTemplate = async (slug: string, name: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Please sign in to use a template"); navigate("/auth"); return; }
+    try {
+      const res = await fetch(`/templates/${slug}/index.html`);
+      const html = await res.text();
+      // Persist starter HTML so the workspace can boot from it.
+      sessionStorage.setItem(
+        "code:starter-template",
+        JSON.stringify({ slug, name, html, ts: Date.now() }),
+      );
+      const prompt =
+        `Start a new website using the "${name}" Megsy template I just selected. ` +
+        `Use the provided starter HTML as the foundation, keep its design language, ` +
+        `and adapt the copy, sections and branding to my project. Then publish a live preview.`;
+      navigate(`/code/workspace?prompt=${encodeURIComponent(prompt)}&template=${encodeURIComponent(slug)}`);
+    } catch (e: any) {
+      toast.error("Couldn't load template — please try again.");
+    }
+  };
+
   const hero = HERO_LINES[heroIdx];
 
   return (
