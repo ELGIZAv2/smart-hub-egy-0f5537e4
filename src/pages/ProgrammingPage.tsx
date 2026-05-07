@@ -209,6 +209,11 @@ const ProgrammingPage = () => {
           </div>
         </section>
 
+        {/* Premium Templates */}
+        <section className="max-w-6xl mx-auto px-5 sm:px-8 mt-12">
+          <TemplateGallery onPreview={handlePreviewTemplate} onUse={handleUseTemplate} />
+        </section>
+
         {/* Projects */}
         <section className="max-w-6xl mx-auto px-5 sm:px-8 mt-14 pb-24">
           {loading ? null : projects.length === 0 ? (
