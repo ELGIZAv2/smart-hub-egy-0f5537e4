@@ -232,7 +232,7 @@ const FilesPage = () => {
 
     setInput("");
     const userMsg: ChatMsg = { role: "user", content: prompt };
-    const assistantMsg: ChatMsg = { role: "assistant", content: "", status: "Getting started", report: [] };
+    const assistantMsg: ChatMsg = { role: "assistant", content: "", status: "Megsy is getting started", report: [] };
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsGenerating(true);
 
