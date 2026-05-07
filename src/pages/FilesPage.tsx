@@ -420,8 +420,11 @@ const FilesPage = () => {
         {showHero ? (
           <div className="flex flex-col min-h-full pt-20 pb-16">
             <section className="max-w-3xl w-full mx-auto px-5 sm:px-8 text-center">
-              <h2 className="font-bold tracking-tight leading-[1.1] text-3xl sm:text-5xl text-foreground">
-                Drop in a topic, get exquisite files.
+              <h2 className="font-extrabold tracking-tight leading-[1.05] text-3xl sm:text-5xl">
+                <span className="text-foreground">Drop in a topic, get</span>{" "}
+                <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
+                  exquisite files.
+                </span>
               </h2>
               <p className="mt-3 text-muted-foreground text-sm sm:text-base">
                 Slides, documents, reports, resumes — designed and ready.
