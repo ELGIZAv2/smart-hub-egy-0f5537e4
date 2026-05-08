@@ -364,14 +364,58 @@ const FilesPage = () => {
   };
 
   const openSavedFile = async (file: SavedFile) => {
-    if (!file.generation_id) return;
     setIsGenerating(true);
     try {
-      const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${file.generation_id}/export?format=html`, { method: "POST" });
-      if (expRes.ok) {
-        const html = await expRes.text();
-        openPreview(html, file.title);
+      // Load the saved conversation messages
+      const { data: msgs } = await supabase
+        .from("messages")
+        .select("role, content, created_at")
+        .eq("conversation_id", file.conversation_id)
+        .order("created_at", { ascending: true });
+
+      let htmlPreview = "";
+      if (file.generation_id) {
+        try {
+          const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${file.generation_id}/export?format=html`, { method: "POST" });
+          if (expRes.ok) htmlPreview = await expRes.text();
+        } catch {}
       }
+
+      const restored: ChatMsg[] = [];
+      const list = msgs || [];
+      for (let i = 0; i < list.length; i++) {
+        const m: any = list[i];
+        if (m.role === "user") {
+          restored.push({ role: "user", content: m.content });
+        } else {
+          // Attach the preview/thumbnail to the LAST assistant message
+          const isLast = !list.slice(i + 1).some((x: any) => x.role === "assistant");
+          restored.push({
+            role: "assistant",
+            content: m.content,
+            ...(isLast ? {
+              generationId: file.generation_id || undefined,
+              doc: { kind: file.kind as Kind, title: file.title },
+              htmlPreview,
+              thumbnail: file.thumbnail,
+            } : {}),
+          });
+        }
+      }
+
+      setConversationId(file.conversation_id);
+      setSelectedKind((file.kind as Kind) || "document");
+      setMessages(restored.length ? restored : [
+        { role: "user", content: file.title },
+        {
+          role: "assistant",
+          content: `Your ${file.kind} is ready.`,
+          generationId: file.generation_id || undefined,
+          doc: { kind: file.kind as Kind, title: file.title },
+          htmlPreview,
+          thumbnail: file.thumbnail,
+        },
+      ]);
     } catch { toast.error("Couldn't open file"); }
     finally { setIsGenerating(false); }
   };
