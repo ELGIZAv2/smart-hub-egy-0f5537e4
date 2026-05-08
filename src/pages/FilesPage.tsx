@@ -460,11 +460,18 @@ const FilesPage = () => {
 
       {/* Outer scroll container — REPLACES the fixed-height layout that broke scrolling */}
       <div className="relative h-full w-full overflow-y-auto bg-background text-foreground">
-        {/* Floating sidebar button (replaces the entire top header) */}
+        {/* Floating sidebar button — iOS 26 liquid glass */}
         <button
           onClick={() => setSidebarOpen(true)}
           aria-label="Open menu"
-          className="fixed top-3 left-3 z-30 h-11 w-11 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/60 shadow-lg flex items-center justify-center hover:bg-muted transition"
+          className="fixed top-3 left-3 z-30 h-11 w-11 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          style={{
+            background: "hsl(var(--glass))",
+            backdropFilter: "blur(28px) saturate(180%)",
+            WebkitBackdropFilter: "blur(28px) saturate(180%)",
+            border: "1px solid hsl(var(--glass-border) / 0.5)",
+            boxShadow: "0 8px 32px -8px rgba(0,0,0,0.2), inset 0 1px 0 hsl(0 0% 100% / 0.15)",
+          }}
         >
           <Menu className="h-5 w-5" />
         </button>
