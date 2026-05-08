@@ -655,12 +655,21 @@ const FilesPage = () => {
             </main>
 
             {/* Floating chat input */}
-            <div className="fixed bottom-0 left-0 right-0 z-20 backdrop-blur-xl bg-background/90 border-t border-border/40">
-              <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3">
+            <div
+              className="fixed bottom-0 left-0 right-0 z-20"
+              style={{
+                background: "hsl(var(--background) / 0.6)",
+                backdropFilter: "blur(28px) saturate(180%)",
+                WebkitBackdropFilter: "blur(28px) saturate(180%)",
+                borderTop: "1px solid hsl(var(--border) / 0.4)",
+              }}
+            >
+              <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <ChatInputBox
                   value={input}
                   onChange={setInput}
                   onSend={handleSend}
+                  onStop={handleStop}
                   isGenerating={isGenerating}
                   textareaRef={textareaRef}
                   kindLabel={currentKindMeta?.label || "file"}
