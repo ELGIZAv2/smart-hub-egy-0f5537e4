@@ -347,17 +347,19 @@ const FilesPage = () => {
         loadSavedFiles();
       }
     } catch (e: any) {
+      const aborted = e?.name === "AbortError";
       setMessages(prev => {
         const copy = [...prev];
         const last = copy[copy.length - 1];
         if (last?.role === "assistant") {
           last.status = undefined;
-          last.content = "Sorry — generation didn't complete. Please try again.";
+          if (!last.content) last.content = aborted ? "Stopped." : "Sorry — generation didn't complete. Please try again.";
         }
         return copy;
       });
-      toast.error(e?.message || "Generation failed");
+      if (!aborted) toast.error(e?.message || "Generation failed");
     } finally {
+      abortRef.current = null;
       setIsGenerating(false);
     }
   }, [input, isGenerating, selectedKind, selectedTemplate, isSlides, slideCount, contentDepth, conversationId, navigate, loadSavedFiles]);
