@@ -496,6 +496,7 @@ const FilesPage = () => {
                 value={input}
                 onChange={setInput}
                 onSend={handleSend}
+                onStop={handleStop}
                 isGenerating={isGenerating}
                 textareaRef={textareaRef}
                 kindLabel={currentKindMeta?.label || "file"}
