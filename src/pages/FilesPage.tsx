@@ -156,6 +156,22 @@ const FilesPage = () => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsGenerating(false);
+    setMessages(prev => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (last?.role === "assistant" && !last.content) {
+        last.status = undefined;
+        last.content = "Stopped.";
+      }
+      return copy;
+    });
+  }, []);
 
   const currentKindMeta = KINDS.find(k => k.id === selectedKind);
   const showTemplates = !!currentKindMeta?.hasTemplates;
