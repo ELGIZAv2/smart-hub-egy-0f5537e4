@@ -725,12 +725,39 @@ const FilesPage = () => {
   );
 };
 
+/* ─────────────── iOS 26 Liquid Glass styles (shared) ─────────────── */
+
+const glassSurface: React.CSSProperties = {
+  background: "hsl(var(--glass))",
+  backdropFilter: "blur(32px) saturate(190%)",
+  WebkitBackdropFilter: "blur(32px) saturate(190%)",
+  border: "1px solid hsl(var(--glass-border) / 0.5)",
+  boxShadow:
+    "0 12px 40px -10px rgba(0,0,0,0.18), inset 0 1px 0 hsl(0 0% 100% / 0.18), inset 0 -1px 0 hsl(0 0% 100% / 0.06)",
+};
+
+const glassChip: React.CSSProperties = {
+  background: "hsl(var(--glass))",
+  backdropFilter: "blur(20px) saturate(180%)",
+  WebkitBackdropFilter: "blur(20px) saturate(180%)",
+  border: "1px solid hsl(var(--glass-border) / 0.55)",
+  boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.15)",
+};
+
+const handleAttach = () => {
+  // Hook up media attachment in a future pass — keeps the + button visually present per iOS 26 spec.
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*,application/pdf,text/*";
+  inp.click();
+};
+
 /* ─────────────── Main hero input (with templates + options popover) ─────────────── */
 
 interface InputBoxProps {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  onStop: () => void;
   isGenerating: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   kindLabel: string;
@@ -747,7 +774,7 @@ interface InputBoxProps {
 }
 
 const InputBox = ({
-  value, onChange, onSend, isGenerating, textareaRef, kindLabel,
+  value, onChange, onSend, onStop, isGenerating, textareaRef, kindLabel,
   isSlides, slideCount, setSlideCount, contentDepth, setContentDepth,
   showTemplates, selectedTemplate, onOpenPicker, optionsOpen, setOptionsOpen,
 }: InputBoxProps) => {
@@ -769,7 +796,10 @@ const InputBox = ({
   }, [optionsOpen, setOptionsOpen]);
 
   return (
-    <div className="rounded-3xl border border-border/70 bg-card shadow-xl shadow-black/[0.04] focus-within:border-foreground/40 transition-colors">
+    <div
+      className="rounded-[28px] focus-within:ring-2 focus-within:ring-primary/30 transition-all"
+      style={glassSurface}
+    >
       <textarea
         ref={textareaRef}
         value={value}
@@ -779,15 +809,26 @@ const InputBox = ({
         }}
         placeholder={isSlides ? "Create slides..." : `Describe your ${kindLabel.toLowerCase()}...`}
         rows={2}
-        disabled={isGenerating}
-        className="w-full resize-none bg-transparent px-5 pt-5 text-[15px] focus:outline-none disabled:opacity-60 max-h-48 placeholder:text-muted-foreground/70"
+        className="w-full resize-none bg-transparent px-5 pt-5 text-[15px] focus:outline-none max-h-48 placeholder:text-muted-foreground/70"
       />
 
       <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
+        {/* Attach button (+) — iOS 26 glass chip */}
+        <button
+          type="button"
+          onClick={handleAttach}
+          aria-label="Attach"
+          className="h-10 w-10 rounded-full flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition"
+          style={glassChip}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+
         {showTemplates && (
           <button
             onClick={onOpenPicker}
-            className="h-9 px-3 rounded-full hover:bg-muted flex items-center gap-1.5 text-xs font-medium text-foreground border border-border/60"
+            className="h-10 px-3.5 rounded-full flex items-center gap-1.5 text-xs font-medium text-foreground hover:scale-[1.02] active:scale-95 transition"
+            style={glassChip}
           >
             <LayoutTemplate className="h-3.5 w-3.5" />
             <span className="truncate max-w-[120px]">{selectedTemplate?.name || "Templates"}</span>
@@ -798,11 +839,8 @@ const InputBox = ({
           <div className="relative" ref={optionsRef}>
             <button
               onClick={() => setOptionsOpen(!optionsOpen)}
-              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium border transition ${
-                optionsOpen
-                  ? "bg-foreground text-background border-foreground"
-                  : "border-border/60 hover:bg-muted text-foreground"
-              }`}
+              className="h-10 px-3.5 rounded-full flex items-center gap-1.5 text-xs font-medium text-foreground hover:scale-[1.02] active:scale-95 transition"
+              style={optionsOpen ? { ...glassChip, background: "hsl(var(--foreground))", color: "hsl(var(--background))" } : glassChip}
               aria-label="Slide options"
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -811,7 +849,8 @@ const InputBox = ({
 
             {optionsOpen && (
               <div
-                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-border bg-popover shadow-2xl p-4 z-40 space-y-4"
+                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(18rem,calc(100vw-2rem))] rounded-3xl p-4 z-40 space-y-4"
+                style={glassSurface}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div>
@@ -841,33 +880,63 @@ const InputBox = ({
           </div>
         )}
 
-        <button
-          onClick={onSend}
-          disabled={!value.trim() || isGenerating}
-          className="ml-auto h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
-          aria-label="Send"
-        >
-          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-        </button>
+        {isGenerating ? (
+          <button
+            onClick={onStop}
+            className="ml-auto h-11 w-11 rounded-full flex items-center justify-center text-white hover:scale-105 active:scale-95 transition"
+            style={{
+              background: "linear-gradient(135deg, hsl(0 80% 60%), hsl(340 80% 55%))",
+              boxShadow: "0 8px 24px -6px hsl(0 80% 60% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+            }}
+            aria-label="Stop"
+          >
+            <Square className="h-4 w-4 fill-current" />
+          </button>
+        ) : (
+          <button
+            onClick={onSend}
+            disabled={!value.trim()}
+            className="ml-auto h-11 w-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:scale-105 active:scale-95 transition"
+            style={{
+              boxShadow: "0 8px 24px -6px hsl(var(--primary) / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+            }}
+            aria-label="Send"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );
 };
 
-/* ─────────────── Chat input (clean: no templates, no plus, no more) ─────────────── */
+/* ─────────────── Chat input (with attach + send/stop) ─────────────── */
 
 interface ChatInputBoxProps {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  onStop: () => void;
   isGenerating: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   kindLabel: string;
 }
 
-const ChatInputBox = ({ value, onChange, onSend, isGenerating, textareaRef, kindLabel }: ChatInputBoxProps) => {
+const ChatInputBox = ({ value, onChange, onSend, onStop, isGenerating, textareaRef, kindLabel }: ChatInputBoxProps) => {
   return (
-    <div className="rounded-3xl border border-border/70 bg-card focus-within:border-foreground/40 transition-colors flex items-end gap-2 px-2.5 py-2">
+    <div
+      className="rounded-[26px] flex items-end gap-2 px-2 py-1.5"
+      style={glassSurface}
+    >
+      <button
+        type="button"
+        onClick={handleAttach}
+        aria-label="Attach"
+        className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition"
+        style={glassChip}
+      >
+        <Plus className="h-4 w-4" />
+      </button>
       <textarea
         ref={textareaRef}
         value={value}
@@ -877,17 +946,30 @@ const ChatInputBox = ({ value, onChange, onSend, isGenerating, textareaRef, kind
         }}
         placeholder={`Describe your ${kindLabel.toLowerCase()}...`}
         rows={1}
-        disabled={isGenerating}
-        className="flex-1 resize-none bg-transparent px-3 py-2 text-[15px] focus:outline-none disabled:opacity-60 max-h-40 placeholder:text-muted-foreground/70"
+        className="flex-1 resize-none bg-transparent px-2 py-2.5 text-[15px] focus:outline-none max-h-40 placeholder:text-muted-foreground/70"
       />
-      <button
-        onClick={onSend}
-        disabled={!value.trim() || isGenerating}
-        className="shrink-0 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
-        aria-label="Send"
-      >
-        {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-      </button>
+      {isGenerating ? (
+        <button
+          onClick={onStop}
+          className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white hover:scale-105 active:scale-95 transition"
+          style={{
+            background: "linear-gradient(135deg, hsl(0 80% 60%), hsl(340 80% 55%))",
+            boxShadow: "0 6px 20px -6px hsl(0 80% 60% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+          }}
+          aria-label="Stop"
+        >
+          <Square className="h-3.5 w-3.5 fill-current" />
+        </button>
+      ) : (
+        <button
+          onClick={onSend}
+          disabled={!value.trim()}
+          className="shrink-0 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:scale-105 active:scale-95 transition"
+          aria-label="Send"
+        >
+          <ArrowUp className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 };
