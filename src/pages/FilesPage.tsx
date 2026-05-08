@@ -268,6 +268,7 @@ const FilesPage = () => {
       await supabase.from("messages").insert({ conversation_id: convId, role: "user", content: prompt } as any);
     }
 
+    abortRef.current = new AbortController();
     try {
       const result = await streamGenerate(
         {
@@ -298,6 +299,7 @@ const FilesPage = () => {
             return copy;
           });
         },
+        abortRef.current.signal,
       );
 
       const doc: DocsDoc = JSON.parse(result.docJson);
