@@ -9,8 +9,8 @@ import ScaledHtmlPreview from "@/components/files/ScaledHtmlPreview";
 import TemplatePickerSheet, { type PickerTemplate } from "@/components/files/TemplatePickerSheet";
 import MegsyStar from "@/components/files/MegsyStar";
 import {
-  Menu, ArrowUp, ChevronLeft, Loader2, Eye, Download,
-  Plus, LayoutTemplate, SlidersHorizontal, X,
+  Menu, ArrowUp, ChevronLeft, Eye, Download,
+  Plus, LayoutTemplate, SlidersHorizontal, Square,
 } from "lucide-react";
 
 const DDS_BASE = "https://docs-design-studio.lovable.app";
