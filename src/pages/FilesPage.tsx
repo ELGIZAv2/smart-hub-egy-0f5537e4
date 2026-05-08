@@ -606,18 +606,7 @@ const FilesPage = () => {
                           ) : (
                             <>
                               <p className="text-sm whitespace-pre-wrap text-foreground">{m.content}</p>
-                              {m.report && m.report.length > 0 && (
-                                <details className="mt-1.5 text-xs text-muted-foreground">
-                                  <summary className="cursor-pointer hover:text-foreground select-none">
-                                    What I did ({m.report.length} steps)
-                                  </summary>
-                                  <ul className="mt-1.5 pl-4 space-y-0.5">
-                                    {m.report.map((s, idx) => (
-                                      <li key={idx}>• {s}</li>
-                                    ))}
-                                  </ul>
-                                </details>
-                              )}
+
                               {m.generationId && (
                                 <div className="mt-3 rounded-2xl border border-border/60 bg-card overflow-hidden">
                                   <button
