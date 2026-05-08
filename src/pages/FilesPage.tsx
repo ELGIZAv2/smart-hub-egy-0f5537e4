@@ -469,16 +469,6 @@ const FilesPage = () => {
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Floating "new" button when in chat mode */}
-        {!showHero && (
-          <button
-            onClick={handleNewFile}
-            aria-label="New file"
-            className="fixed top-3 right-3 z-30 h-11 w-11 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/60 shadow-lg flex items-center justify-center hover:bg-muted transition"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-        )}
 
         {showHero ? (
           <div className="flex flex-col min-h-full pt-20 pb-16">
