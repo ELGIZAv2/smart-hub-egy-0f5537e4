@@ -1,31 +1,22 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
 
 /**
- * Megsy brand star — same visual language as the chat/voice loader.
- * Sized via the `size` prop (px). Renders a glowing rotating orb.
+ * Megsy brand sparkle — same 8-point star used in the main chat ThinkingLoader.
+ * Sized via the `size` prop (px). Use this everywhere we need the brand mark.
  */
-const MegsyStar = ({ size = 28 }: { size?: number }) => {
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-0"
-      >
-        <div className="w-full h-full rounded-full bg-gradient-to-tr from-violet-500 via-blue-500 to-pink-500 blur-md opacity-70" />
-      </motion.div>
-      <motion.div
-        animate={{ scale: [1, 1.15, 1] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-[15%] rounded-full bg-gradient-to-br from-violet-400 via-blue-400 to-pink-400"
-        style={{ filter: "blur(0.5px)" }}
-      />
-      <div
-        className="absolute inset-[35%] rounded-full bg-white/90"
-        style={{ filter: "blur(0.5px)" }}
-      />
-    </div>
-  );
-};
+const MegsyStar = ({ size = 16 }: { size?: number }) => (
+  <motion.svg
+    width={size}
+    height={size}
+    viewBox="0 0 100 100"
+    xmlns="http://www.w3.org/2000/svg"
+    className="shrink-0 text-primary"
+    animate={{ rotate: [0, 180, 360], scale: [1, 1.1, 1] }}
+    transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+  >
+    <path d="M50 5 L60 40 L95 50 L60 60 L50 95 L40 60 L5 50 L40 40 Z" fill="currentColor" />
+  </motion.svg>
+);
 
-export default MegsyStar;
+export default memo(MegsyStar);

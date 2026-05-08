@@ -9,8 +9,8 @@ import ScaledHtmlPreview from "@/components/files/ScaledHtmlPreview";
 import TemplatePickerSheet, { type PickerTemplate } from "@/components/files/TemplatePickerSheet";
 import MegsyStar from "@/components/files/MegsyStar";
 import {
-  Menu, ArrowUp, ChevronLeft, Loader2, Eye, Download,
-  Plus, LayoutTemplate, SlidersHorizontal, X,
+  Menu, ArrowUp, ChevronLeft, Eye, Download,
+  Plus, LayoutTemplate, SlidersHorizontal, Square,
 } from "lucide-react";
 
 const DDS_BASE = "https://docs-design-studio.lovable.app";
@@ -72,11 +72,12 @@ function humanizeStatus(raw: string): string {
   return "Megsy is " + (stripped.charAt(0).toLowerCase() + stripped.slice(1));
 }
 
-async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep: (msg: string) => void) {
+async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep: (msg: string) => void, signal?: AbortSignal) {
   const res = await fetch(`${DDS_BASE}/api/v1/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok || !res.body) throw new Error(`Generation failed (${res.status})`);
   const reader = res.body.getReader();
@@ -155,6 +156,22 @@ const FilesPage = () => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsGenerating(false);
+    setMessages(prev => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (last?.role === "assistant" && !last.content) {
+        last.status = undefined;
+        last.content = "Stopped.";
+      }
+      return copy;
+    });
+  }, []);
 
   const currentKindMeta = KINDS.find(k => k.id === selectedKind);
   const showTemplates = !!currentKindMeta?.hasTemplates;
@@ -251,6 +268,7 @@ const FilesPage = () => {
       await supabase.from("messages").insert({ conversation_id: convId, role: "user", content: prompt } as any);
     }
 
+    abortRef.current = new AbortController();
     try {
       const result = await streamGenerate(
         {
@@ -281,6 +299,7 @@ const FilesPage = () => {
             return copy;
           });
         },
+        abortRef.current.signal,
       );
 
       const doc: DocsDoc = JSON.parse(result.docJson);
@@ -328,17 +347,19 @@ const FilesPage = () => {
         loadSavedFiles();
       }
     } catch (e: any) {
+      const aborted = e?.name === "AbortError";
       setMessages(prev => {
         const copy = [...prev];
         const last = copy[copy.length - 1];
         if (last?.role === "assistant") {
           last.status = undefined;
-          last.content = "Sorry — generation didn't complete. Please try again.";
+          if (!last.content) last.content = aborted ? "Stopped." : "Sorry — generation didn't complete. Please try again.";
         }
         return copy;
       });
-      toast.error(e?.message || "Generation failed");
+      if (!aborted) toast.error(e?.message || "Generation failed");
     } finally {
+      abortRef.current = null;
       setIsGenerating(false);
     }
   }, [input, isGenerating, selectedKind, selectedTemplate, isSlides, slideCount, contentDepth, conversationId, navigate, loadSavedFiles]);
@@ -364,14 +385,58 @@ const FilesPage = () => {
   };
 
   const openSavedFile = async (file: SavedFile) => {
-    if (!file.generation_id) return;
     setIsGenerating(true);
     try {
-      const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${file.generation_id}/export?format=html`, { method: "POST" });
-      if (expRes.ok) {
-        const html = await expRes.text();
-        openPreview(html, file.title);
+      // Load the saved conversation messages
+      const { data: msgs } = await supabase
+        .from("messages")
+        .select("role, content, created_at")
+        .eq("conversation_id", file.conversation_id)
+        .order("created_at", { ascending: true });
+
+      let htmlPreview = "";
+      if (file.generation_id) {
+        try {
+          const expRes = await fetch(`${DDS_BASE}/api/v1/generations/${file.generation_id}/export?format=html`, { method: "POST" });
+          if (expRes.ok) htmlPreview = await expRes.text();
+        } catch {}
       }
+
+      const restored: ChatMsg[] = [];
+      const list = msgs || [];
+      for (let i = 0; i < list.length; i++) {
+        const m: any = list[i];
+        if (m.role === "user") {
+          restored.push({ role: "user", content: m.content });
+        } else {
+          // Attach the preview/thumbnail to the LAST assistant message
+          const isLast = !list.slice(i + 1).some((x: any) => x.role === "assistant");
+          restored.push({
+            role: "assistant",
+            content: m.content,
+            ...(isLast ? {
+              generationId: file.generation_id || undefined,
+              doc: { kind: file.kind as Kind, title: file.title },
+              htmlPreview,
+              thumbnail: file.thumbnail,
+            } : {}),
+          });
+        }
+      }
+
+      setConversationId(file.conversation_id);
+      setSelectedKind((file.kind as Kind) || "document");
+      setMessages(restored.length ? restored : [
+        { role: "user", content: file.title },
+        {
+          role: "assistant",
+          content: `Your ${file.kind} is ready.`,
+          generationId: file.generation_id || undefined,
+          doc: { kind: file.kind as Kind, title: file.title },
+          htmlPreview,
+          thumbnail: file.thumbnail,
+        },
+      ]);
     } catch { toast.error("Couldn't open file"); }
     finally { setIsGenerating(false); }
   };
@@ -397,25 +462,22 @@ const FilesPage = () => {
 
       {/* Outer scroll container — REPLACES the fixed-height layout that broke scrolling */}
       <div className="relative h-full w-full overflow-y-auto bg-background text-foreground">
-        {/* Floating sidebar button (replaces the entire top header) */}
+        {/* Floating sidebar button — iOS 26 liquid glass */}
         <button
           onClick={() => setSidebarOpen(true)}
           aria-label="Open menu"
-          className="fixed top-3 left-3 z-30 h-11 w-11 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/60 shadow-lg flex items-center justify-center hover:bg-muted transition"
+          className="fixed top-3 left-3 z-30 h-11 w-11 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          style={{
+            background: "hsl(var(--glass))",
+            backdropFilter: "blur(28px) saturate(180%)",
+            WebkitBackdropFilter: "blur(28px) saturate(180%)",
+            border: "1px solid hsl(var(--glass-border) / 0.5)",
+            boxShadow: "0 8px 32px -8px rgba(0,0,0,0.2), inset 0 1px 0 hsl(0 0% 100% / 0.15)",
+          }}
         >
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Floating "new" button when in chat mode */}
-        {!showHero && (
-          <button
-            onClick={handleNewFile}
-            aria-label="New file"
-            className="fixed top-3 right-3 z-30 h-11 w-11 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/60 shadow-lg flex items-center justify-center hover:bg-muted transition"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-        )}
 
         {showHero ? (
           <div className="flex flex-col min-h-full pt-20 pb-16">
@@ -436,6 +498,7 @@ const FilesPage = () => {
                 value={input}
                 onChange={setInput}
                 onSend={handleSend}
+                onStop={handleStop}
                 isGenerating={isGenerating}
                 textareaRef={textareaRef}
                 kindLabel={currentKindMeta?.label || "file"}
@@ -543,18 +606,7 @@ const FilesPage = () => {
                           ) : (
                             <>
                               <p className="text-sm whitespace-pre-wrap text-foreground">{m.content}</p>
-                              {m.report && m.report.length > 0 && (
-                                <details className="mt-1.5 text-xs text-muted-foreground">
-                                  <summary className="cursor-pointer hover:text-foreground select-none">
-                                    What I did ({m.report.length} steps)
-                                  </summary>
-                                  <ul className="mt-1.5 pl-4 space-y-0.5">
-                                    {m.report.map((s, idx) => (
-                                      <li key={idx}>• {s}</li>
-                                    ))}
-                                  </ul>
-                                </details>
-                              )}
+
                               {m.generationId && (
                                 <div className="mt-3 rounded-2xl border border-border/60 bg-card overflow-hidden">
                                   <button
@@ -605,12 +657,21 @@ const FilesPage = () => {
             </main>
 
             {/* Floating chat input */}
-            <div className="fixed bottom-0 left-0 right-0 z-20 backdrop-blur-xl bg-background/90 border-t border-border/40">
-              <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3">
+            <div
+              className="fixed bottom-0 left-0 right-0 z-20"
+              style={{
+                background: "hsl(var(--background) / 0.6)",
+                backdropFilter: "blur(28px) saturate(180%)",
+                WebkitBackdropFilter: "blur(28px) saturate(180%)",
+                borderTop: "1px solid hsl(var(--border) / 0.4)",
+              }}
+            >
+              <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <ChatInputBox
                   value={input}
                   onChange={setInput}
                   onSend={handleSend}
+                  onStop={handleStop}
                   isGenerating={isGenerating}
                   textareaRef={textareaRef}
                   kindLabel={currentKindMeta?.label || "file"}
@@ -666,12 +727,39 @@ const FilesPage = () => {
   );
 };
 
+/* ─────────────── iOS 26 Liquid Glass styles (shared) ─────────────── */
+
+const glassSurface: React.CSSProperties = {
+  background: "hsl(var(--glass))",
+  backdropFilter: "blur(32px) saturate(190%)",
+  WebkitBackdropFilter: "blur(32px) saturate(190%)",
+  border: "1px solid hsl(var(--glass-border) / 0.5)",
+  boxShadow:
+    "0 12px 40px -10px rgba(0,0,0,0.18), inset 0 1px 0 hsl(0 0% 100% / 0.18), inset 0 -1px 0 hsl(0 0% 100% / 0.06)",
+};
+
+const glassChip: React.CSSProperties = {
+  background: "hsl(var(--glass))",
+  backdropFilter: "blur(20px) saturate(180%)",
+  WebkitBackdropFilter: "blur(20px) saturate(180%)",
+  border: "1px solid hsl(var(--glass-border) / 0.55)",
+  boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.15)",
+};
+
+const handleAttach = () => {
+  // Hook up media attachment in a future pass — keeps the + button visually present per iOS 26 spec.
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*,application/pdf,text/*";
+  inp.click();
+};
+
 /* ─────────────── Main hero input (with templates + options popover) ─────────────── */
 
 interface InputBoxProps {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  onStop: () => void;
   isGenerating: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   kindLabel: string;
@@ -688,7 +776,7 @@ interface InputBoxProps {
 }
 
 const InputBox = ({
-  value, onChange, onSend, isGenerating, textareaRef, kindLabel,
+  value, onChange, onSend, onStop, isGenerating, textareaRef, kindLabel,
   isSlides, slideCount, setSlideCount, contentDepth, setContentDepth,
   showTemplates, selectedTemplate, onOpenPicker, optionsOpen, setOptionsOpen,
 }: InputBoxProps) => {
@@ -710,7 +798,10 @@ const InputBox = ({
   }, [optionsOpen, setOptionsOpen]);
 
   return (
-    <div className="rounded-3xl border border-border/70 bg-card shadow-xl shadow-black/[0.04] focus-within:border-foreground/40 transition-colors">
+    <div
+      className="rounded-[28px] focus-within:ring-2 focus-within:ring-primary/30 transition-all"
+      style={glassSurface}
+    >
       <textarea
         ref={textareaRef}
         value={value}
@@ -720,15 +811,26 @@ const InputBox = ({
         }}
         placeholder={isSlides ? "Create slides..." : `Describe your ${kindLabel.toLowerCase()}...`}
         rows={2}
-        disabled={isGenerating}
-        className="w-full resize-none bg-transparent px-5 pt-5 text-[15px] focus:outline-none disabled:opacity-60 max-h-48 placeholder:text-muted-foreground/70"
+        className="w-full resize-none bg-transparent px-5 pt-5 text-[15px] focus:outline-none max-h-48 placeholder:text-muted-foreground/70"
       />
 
       <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
+        {/* Attach button (+) — iOS 26 glass chip */}
+        <button
+          type="button"
+          onClick={handleAttach}
+          aria-label="Attach"
+          className="h-10 w-10 rounded-full flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition"
+          style={glassChip}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+
         {showTemplates && (
           <button
             onClick={onOpenPicker}
-            className="h-9 px-3 rounded-full hover:bg-muted flex items-center gap-1.5 text-xs font-medium text-foreground border border-border/60"
+            className="h-10 px-3.5 rounded-full flex items-center gap-1.5 text-xs font-medium text-foreground hover:scale-[1.02] active:scale-95 transition"
+            style={glassChip}
           >
             <LayoutTemplate className="h-3.5 w-3.5" />
             <span className="truncate max-w-[120px]">{selectedTemplate?.name || "Templates"}</span>
@@ -739,11 +841,8 @@ const InputBox = ({
           <div className="relative" ref={optionsRef}>
             <button
               onClick={() => setOptionsOpen(!optionsOpen)}
-              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium border transition ${
-                optionsOpen
-                  ? "bg-foreground text-background border-foreground"
-                  : "border-border/60 hover:bg-muted text-foreground"
-              }`}
+              className="h-10 px-3.5 rounded-full flex items-center gap-1.5 text-xs font-medium text-foreground hover:scale-[1.02] active:scale-95 transition"
+              style={optionsOpen ? { ...glassChip, background: "hsl(var(--foreground))", color: "hsl(var(--background))" } : glassChip}
               aria-label="Slide options"
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -752,7 +851,8 @@ const InputBox = ({
 
             {optionsOpen && (
               <div
-                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-border bg-popover shadow-2xl p-4 z-40 space-y-4"
+                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(18rem,calc(100vw-2rem))] rounded-3xl p-4 z-40 space-y-4"
+                style={glassSurface}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div>
@@ -782,33 +882,63 @@ const InputBox = ({
           </div>
         )}
 
-        <button
-          onClick={onSend}
-          disabled={!value.trim() || isGenerating}
-          className="ml-auto h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
-          aria-label="Send"
-        >
-          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-        </button>
+        {isGenerating ? (
+          <button
+            onClick={onStop}
+            className="ml-auto h-11 w-11 rounded-full flex items-center justify-center text-white hover:scale-105 active:scale-95 transition"
+            style={{
+              background: "linear-gradient(135deg, hsl(0 80% 60%), hsl(340 80% 55%))",
+              boxShadow: "0 8px 24px -6px hsl(0 80% 60% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+            }}
+            aria-label="Stop"
+          >
+            <Square className="h-4 w-4 fill-current" />
+          </button>
+        ) : (
+          <button
+            onClick={onSend}
+            disabled={!value.trim()}
+            className="ml-auto h-11 w-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:scale-105 active:scale-95 transition"
+            style={{
+              boxShadow: "0 8px 24px -6px hsl(var(--primary) / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+            }}
+            aria-label="Send"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );
 };
 
-/* ─────────────── Chat input (clean: no templates, no plus, no more) ─────────────── */
+/* ─────────────── Chat input (with attach + send/stop) ─────────────── */
 
 interface ChatInputBoxProps {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  onStop: () => void;
   isGenerating: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   kindLabel: string;
 }
 
-const ChatInputBox = ({ value, onChange, onSend, isGenerating, textareaRef, kindLabel }: ChatInputBoxProps) => {
+const ChatInputBox = ({ value, onChange, onSend, onStop, isGenerating, textareaRef, kindLabel }: ChatInputBoxProps) => {
   return (
-    <div className="rounded-3xl border border-border/70 bg-card focus-within:border-foreground/40 transition-colors flex items-end gap-2 px-2.5 py-2">
+    <div
+      className="rounded-[26px] flex items-end gap-2 px-2 py-1.5"
+      style={glassSurface}
+    >
+      <button
+        type="button"
+        onClick={handleAttach}
+        aria-label="Attach"
+        className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition"
+        style={glassChip}
+      >
+        <Plus className="h-4 w-4" />
+      </button>
       <textarea
         ref={textareaRef}
         value={value}
@@ -818,17 +948,30 @@ const ChatInputBox = ({ value, onChange, onSend, isGenerating, textareaRef, kind
         }}
         placeholder={`Describe your ${kindLabel.toLowerCase()}...`}
         rows={1}
-        disabled={isGenerating}
-        className="flex-1 resize-none bg-transparent px-3 py-2 text-[15px] focus:outline-none disabled:opacity-60 max-h-40 placeholder:text-muted-foreground/70"
+        className="flex-1 resize-none bg-transparent px-2 py-2.5 text-[15px] focus:outline-none max-h-40 placeholder:text-muted-foreground/70"
       />
-      <button
-        onClick={onSend}
-        disabled={!value.trim() || isGenerating}
-        className="shrink-0 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition"
-        aria-label="Send"
-      >
-        {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-      </button>
+      {isGenerating ? (
+        <button
+          onClick={onStop}
+          className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white hover:scale-105 active:scale-95 transition"
+          style={{
+            background: "linear-gradient(135deg, hsl(0 80% 60%), hsl(340 80% 55%))",
+            boxShadow: "0 6px 20px -6px hsl(0 80% 60% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+          }}
+          aria-label="Stop"
+        >
+          <Square className="h-3.5 w-3.5 fill-current" />
+        </button>
+      ) : (
+        <button
+          onClick={onSend}
+          disabled={!value.trim()}
+          className="shrink-0 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:scale-105 active:scale-95 transition"
+          aria-label="Send"
+        >
+          <ArrowUp className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 };
