@@ -77,6 +77,7 @@ async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok || !res.body) throw new Error(`Generation failed (${res.status})`);
   const reader = res.body.getReader();
