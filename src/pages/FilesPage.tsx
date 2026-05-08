@@ -72,7 +72,7 @@ function humanizeStatus(raw: string): string {
   return "Megsy is " + (stripped.charAt(0).toLowerCase() + stripped.slice(1));
 }
 
-async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep: (msg: string) => void) {
+async function streamGenerate(body: any, onStatus: (msg: string) => void, onStep: (msg: string) => void, signal?: AbortSignal) {
   const res = await fetch(`${DDS_BASE}/api/v1/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
