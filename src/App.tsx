@@ -15,6 +15,7 @@ import AuthPage from "./pages/AuthPage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 import ChatPage from "./pages/ChatPage";
 import LandingPage from "./pages/LandingPage";
+import ComingSoonPage from "./pages/ComingSoonPage";
 
 // Lazy-loaded pages
 const ImagesPage = lazy(() => import("./pages/ImagesPage"));
