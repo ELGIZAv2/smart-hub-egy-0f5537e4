@@ -220,6 +220,7 @@ const App = () => {
               <CookieConsent />
               <Suspense fallback={<LazyFallback />}>
                 <Routes>
+                  <Route path="*" element={<ComingSoonPage />} />
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />
                   <Route path="/pricing" element={<PricingPage />} />
